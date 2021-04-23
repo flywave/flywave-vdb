@@ -35,15 +35,15 @@ FLYWAVE_VDB_API vdb_grid_t *vdb_duplicate(vdb_grid_t *grid) {
   return ret;
 }
 
-FLYWAVE_VDB_API bool vdb_read(vdb_grid_t *grid, const char *filename) {
+FLYWAVE_VDB_API _Bool vdb_read(vdb_grid_t *grid, const char *filename) {
   return grid->ptr->read(filename);
 }
 
-FLYWAVE_VDB_API bool vdb_write(vdb_grid_t *grid, const char *filename) {
+FLYWAVE_VDB_API _Bool vdb_write(vdb_grid_t *grid, const char *filename) {
   return grid->ptr->write(filename);
 }
 
-FLYWAVE_VDB_API bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
+FLYWAVE_VDB_API _Bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
                                      int pCount, double *vRadius, int rCount,
                                      double voxelSize, double bandwidth) {
   std::vector<openvdb::Vec3R> particleList;
@@ -86,7 +86,7 @@ FLYWAVE_VDB_API bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
   return grid->ptr->create_from_points(ps, voxelSize, bandwidth);
 }
 
-FLYWAVE_VDB_API bool vdb_from_mesh(vdb_grid_t *grid, float *vPoints, int vCount,
+FLYWAVE_VDB_API _Bool vdb_from_mesh(vdb_grid_t *grid, float *vPoints, int vCount,
                                    int *vFaces, int fCount, double voxelSize,
                                    double bandwidth) {
   double inverseVoxelSize = 1.0 / voxelSize;
@@ -139,7 +139,7 @@ FLYWAVE_VDB_API int *vdb_face_buffer(vdb_grid_t *grid, int *size) {
   return faceArray;
 }
 
-FLYWAVE_VDB_API bool vdb_transform(vdb_grid_t *grid, double *matrix,
+FLYWAVE_VDB_API _Bool vdb_transform(vdb_grid_t *grid, double *matrix,
                                    int mCount) {
   if (mCount != 16) {
     return false;
@@ -173,7 +173,7 @@ FLYWAVE_VDB_API void vdb_offset(vdb_grid_t *grid, double amount) {
 
 FLYWAVE_VDB_API void vdb_offset_mask(vdb_grid_t *grid, double amount,
                                      vdb_grid_t *mask, double min, double max,
-                                     bool invert) {
+                                     _Bool invert) {
   grid->ptr->offset(amount, *mask->ptr, min, max, invert);
 }
 
@@ -184,7 +184,7 @@ FLYWAVE_VDB_API void vdb_smooth(vdb_grid_t *grid, int type, int iterations,
 
 FLYWAVE_VDB_API void vdb_smooth_mask(vdb_grid_t *grid, int type, int iterations,
                                      int width, vdb_grid_t *mask, double min,
-                                     double max, bool invert) {
+                                     double max, _Bool invert) {
   grid->ptr->smooth(type, iterations, width, *mask->ptr, min, max, invert);
 }
 
@@ -196,7 +196,7 @@ FLYWAVE_VDB_API void vdb_blend(vdb_grid_t *bGrid, vdb_grid_t *eGrid,
 FLYWAVE_VDB_API void vdb_blend_mask(vdb_grid_t *bGrid, vdb_grid_t *eGrid,
                                     double bPosition, double bEnd,
                                     vdb_grid_t *mask, double min, double max,
-                                    bool invert) {
+                                    _Bool invert) {
   bGrid->ptr->blend(*eGrid->ptr, bPosition, bEnd, *mask->ptr, min, max, invert);
 }
 

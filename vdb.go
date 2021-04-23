@@ -2,7 +2,7 @@ package vdb
 
 // #include <stdlib.h>
 // #include "vdb_api.h"
-// #cgo CFLAGS: -I ./
+// #cgo CFLAGS: -I ./lib
 // #cgo CXXFLAGS: -I -std=gnu++14
 import "C"
 
@@ -12,7 +12,7 @@ type Grid struct {
 
 func NewGrid() *Grid {
 	return &Grid{
-		m: C.vdb_create()
+		m: C.vdb_create(),
 	}
 }
 

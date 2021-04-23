@@ -122,7 +122,7 @@ INCLUDE_DIRECTORIES(
 )
 
 # Check c++17
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wno-error=parentheses")
 
 list (APPEND CMAKE_MODULE_PATH
       "${PROJECT_SOURCE_DIR}/src/cmake/modules"

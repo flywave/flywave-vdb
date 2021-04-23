@@ -479,6 +479,41 @@ IF(NOT LERC_INCLUDE)
   SET(LERC_INCLUDE YES)
 ENDIF()
 
+# icu
+IF(NOT ICU_INCLUDE)
+  ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/src/external/icu")
+
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/icu/source/common/")
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/icu/source/i18n/")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/src/external/soicuurce")
+
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "icudata" "icui18n" "icuuc" "icudt")
+  SET(ICU_INCLUDE YES)
+ENDIF()
+
+# xml2
+IF(NOT XML2_INCLUDE)
+  ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml")
+  IF (WIN32)
+    LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/win32
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/win32/include")
+  ENDIF()
+
+  IF(UNIX)
+  IF(APPLE)
+    LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/mac
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/mac/include")
+  ELSE()
+    LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/linux
+                                      ${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/linux/include")
+  ENDIF()
+  ENDIF()
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/external/libxml/src/include/")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/src/external/xml2/")
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "xml2")
+  SET(XML2_INCLUDE YES)
+ENDIF()
+
 include_directories(${FLYWAVE_INCLUDE_DIRS})
 
 set(vdb_SOURCE_FILES grid.cc mesh.cc vdb_api.cc)

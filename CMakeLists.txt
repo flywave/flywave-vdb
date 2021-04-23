@@ -370,7 +370,10 @@ ENDIF()
 IF(NOT VDB_INCLUDE)
   ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/external/openvdb/")
 
-  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/openvdb/")
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/openvdb/openvdb/")
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/openvdb/")
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/openvdb/openvdb/")
+
   LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/")
 
   LIST(APPEND FLYWAVE_LIBRARY_DEPES "openvdb")
@@ -475,6 +478,24 @@ IF(NOT LERC_INCLUDE)
   LIST(APPEND FLYWAVE_LIBRARY_DEPES "lerc")
   SET(LERC_INCLUDE YES)
 ENDIF()
+
+include_directories(${FLYWAVE_INCLUDE_DIRS})
+
+set(vdb_SOURCE_FILES grid.cc mesh.cc vdb_api.cc)
+set(vdb_HEADER_FILES grid_api_impl.hh grid.hh mesh.hh particle.hh vdb_api.h)
+
+ADD_LIBRARY(vdb STATIC
+            ${vdb_HEADER_FILES}
+            ${vdb_SOURCE_FILES}
+          )
+
+TARGET_INCLUDE_DIRECTORIES(vdb PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>)
+
+SOURCE_GROUP("src" FILES ${vdb_SOURCE_FILES})
+SOURCE_GROUP("include" FILES ${vdb_HEADER_FILES})
+
+SET_TARGET_PROPERTIES(vdb
+                    PROPERTIES PUBLIC_HEADER "${headers}")
 
 foreach(LIBDIR ${FLYWAVE_LIBRARY_DIRS})
   INSTALL(

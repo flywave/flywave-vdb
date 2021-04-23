@@ -19,6 +19,7 @@ INCLUDE_DIRECTORIES(
     "${CMAKE_CURRENT_SOURCE_DIR}/../libjpeg/"
     "${CMAKE_CURRENT_BINARY_DIR}/../libjpeg/"
     "${CMAKE_CURRENT_SOURCE_DIR}/../zlib"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../lerc/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../webp/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../zstd/lib"
     "${CMAKE_CURRENT_SOURCE_DIR}/../lzma/api/"
@@ -29,6 +30,10 @@ set(CMAKE_C_STANDARD 99)
 project(tiff
         VERSION "${LIBTIFF_VERSION}"
         LANGUAGES C CXX)
+
+IF(UNIX)
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration ")
+ENDIF()
 
 # Autotools compatibility
 include(AutotoolsCompat)
@@ -64,7 +69,7 @@ set(ZLIB_SUPPORT TRUE)
 set(PIXARLOG_SUPPORT TRUE)
 set(LIBDEFLATE_SUPPORT FALSE)
 set(JPEG_SUPPORT TRUE)
-set(LERC_SUPPORT FALSE)
+set(LERC_SUPPORT TRUE)
 set(LZMA_SUPPORT TRUE)
 set(ZSTD_SUPPORT TRUE)
 set(ZSTD_USABLE TRUE)

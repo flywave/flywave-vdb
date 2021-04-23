@@ -57,95 +57,6 @@ project(OpenVDB LANGUAGES CXX)
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 
-# todo epydoc and pdflatex
-option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
-option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
-option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
-option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
-option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
-option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
-option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
-
-option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
-option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
-option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
-
-option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
-option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
-option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
-  "Install the provided OpenVDB CMake modules when building the core library"
-  ON "OPENVDB_BUILD_CORE" OFF)
-option(USE_HOUDINI [=[
-Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
-provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
-option(USE_MAYA [=[
-Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
-option(USE_BLOSC [=[
-Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
-know it to be required.]=] ON)
-option(USE_ZLIB [=[
-Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
-option(USE_LOG4CPLUS [=[
-Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
-located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
-to be used if you know it to be required.]=] OFF)
-option(USE_IMATH_HALF [=[
-Use the definiton of half floating point types from the Imath library. If OFF, the embedded definition provided
-by OpenVDB is used. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located openvdb build configuration
-to select the correct half support. You may set this to on to force Imath half to be used if you know it to be
-required.]=] OFF)
-cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
-  "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
-option(USE_CCACHE "Build using Ccache if found on the path" ON)
-option(USE_STATIC_DEPENDENCIES [=[
-Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
-back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
-to ON, where XXX is the package name. On Windows this behaviour is less strict, with any located libraries assumed
-to be static. ]=] OFF)
-option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
-Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
-Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
-option(DISABLE_CMAKE_SEARCH_PATHS [=[
-Disable CMakes default system search paths when locating dependencies. When enabled, CMake will fall back to
-its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
-paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
-list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_FUTURE_ABI_9 "Bypass future ABI check" OFF)
-option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
-option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
-option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
-option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
-
-set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
-A global list of library paths to additionally use into when searching for dependencies.]=])
-set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
-The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
-cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
-NOT the number of TU's ]=])
-
-
-set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
-if(NOT CONCURRENT_MALLOC)
-  set(CONCURRENT_MALLOC Auto CACHE STRING
-    "Explicitly link the OpenVDB executables against a particular concurrent malloc library.
-    Options are: None Auto Jemalloc Tbbmalloc. Although not required, it is strongly recommended
-    to use a concurrent memory allocator. Has no effect if OPENVDB_BUILD_BINARIES and
-    OPENVDB_BUILD_UNITTESTS are false. Auto is the default and implies Jemalloc, unless USE_MAYA
-    is ON or Jemalloc is unavailable, in which case Tbbmalloc is used. Note that this is not
-    linked into library builds and defers this choice to downstream applications via explicit
-    CMake targets." FORCE
-  )
-elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
-  message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
-  set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
-endif()
-
 set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
 if(NOT OPENVDB_SIMD)
   set(OPENVDB_SIMD None CACHE STRING
@@ -163,23 +74,17 @@ if(USE_BLOSC AND NOT USE_ZLIB)
   message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
 endif()
 
-# Top-level location for all openvdb headers
-set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
-
-###### Deprecated options
-
-if(USE_EXR)
-  message(FATAL_ERROR "The USE_EXR option has been removed. Use USE_IMATH_HALF to use the Half "
-    "implementation from IMath, or leave OFF to use the new embedded version of half floating point types.")
-endif()
-if(OPENVDB_BUILD_HOUDINI_SOPS)
-  message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
-endif()
-if(DEFINED USE_SYSTEM_LIBRARY_PATHS)
-  message(FATAL_ERROR "The USE_SYSTEM_LIBRARY_PATHS option has been removed. Use DISABLE_CMAKE_SEARCH_PATHS.")
-endif()
-
 # Various root level CMake options which are marked as advanced
+
+set(USE_LOG4CPLUS FALSE)
+set(USE_ZLIB TRUE)
+set(USE_BLOSC TRUE)
+set(USE_IMATH_HALF TRUE)
+set(OPENVDB_USE_DEPRECATED_ABI_6 FALSE)
+set(OPENVDB_USE_FUTURE_ABI_9 FALSE)
+set(OPENVDB_FUTURE_DEPRECATION FALSE)
+set(CONCURRENT_MALLOC Tbbmalloc)
+set(USE_COLORED_OUTPUT FALSE)
 
 mark_as_advanced(
   OPENVDB_CXX_STRICT
@@ -327,8 +232,6 @@ endif()
 # forces the compiler -pthread flag vs -lpthread
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
-enable_testing()
-
 # Add our cmake modules
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
@@ -342,99 +245,6 @@ endif()
 
 # Add cmake modules to installation command
 # @todo fix our glew cmake module
-
-if(OPENVDB_INSTALL_CMAKE_MODULES)
-  set(OPENVDB_CMAKE_MODULES
-    cmake/FindBlosc.cmake
-    cmake/FindJemalloc.cmake
-    cmake/FindIlmBase.cmake
-    cmake/FindLog4cplus.cmake
-    cmake/FindOpenEXR.cmake
-    cmake/FindOpenVDB.cmake
-    cmake/FindTBB.cmake
-    cmake/OpenVDBGLFW3Setup.cmake
-    cmake/OpenVDBHoudiniSetup.cmake
-    cmake/OpenVDBMayaSetup.cmake
-    cmake/OpenVDBUtils.cmake
-  )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
-endif()
-
-# Configure DCC installation if necessary
-
-if(OPENVDB_BUILD_HOUDINI_PLUGIN OR
-   OPENVDB_BUILD_HOUDINI_ABITESTS)
-  set(USE_HOUDINI ON)
-endif()
-
-if(OPENVDB_BUILD_MAYA_PLUGIN)
-  set(USE_MAYA ON)
-endif()
-
-# Configure component dependencies by loading the Houdini/Maya setup
-# scripts. These also find the Houdini/Maya installations
-
-if(USE_HOUDINI)
-  include(OpenVDBHoudiniSetup)
-endif()
-
-if(USE_MAYA)
-  include(OpenVDBMayaSetup)
-endif()
-
-if(OPENVDB_BUILD_DOCS)
-  add_subdirectory(doc)
-endif()
-
-# Early exit if there's nothing to build
-
-if(NOT (
-    OPENVDB_BUILD_CORE OR
-    OPENVDB_BUILD_BINARIES OR
-    OPENVDB_BUILD_AX OR
-    OPENVDB_BUILD_AX_BINARIES OR
-    OPENVDB_BUILD_AX_UNITTESTS OR
-    OPENVDB_BUILD_PYTHON_MODULE OR
-    OPENVDB_BUILD_UNITTESTS OR
-    OPENVDB_BUILD_HOUDINI_PLUGIN OR
-    OPENVDB_BUILD_HOUDINI_ABITESTS OR
-    OPENVDB_BUILD_MAYA_PLUGIN)
-  )
-  return()
-endif()
-
-if(USE_MAYA AND USE_HOUDINI)
-  # @todo technically this is possible so long as library versions match
-  # exactly but it's difficult to validate and dangerous
-  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
-    "the same core dependencies. Plugins must be compiled separately to "
-    "ensure the required DCC dependencies are met."
-  )
-endif()
-
-#########################################################################
-
-# ccache setup
-
-if(USE_CCACHE)
-  find_program(CCACHE_PATH ccache)
-  if(CCACHE_PATH)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-    message(STATUS "Using ccache: ${CCACHE_PATH}")
-  endif()
-endif()
-
-# Build type configuration
-
-if(OPENVDB_CODE_COVERAGE)
-  message(DEPRECATION "The OPENVDB_CODE_COVERAGE option is deprecated. Choose instead the unique"
-    "build type -DCMAKE_BUILD_TYPE=coverage")
-  set(CMAKE_BUILD_TYPE coverage)
-endif()
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
 
 include(cmake/config/OpenVDBBuildTypes.cmake)
 
@@ -457,154 +267,6 @@ endif()
 # for sub projects and verify version requirements
 # @todo  add definitions for Intel.
 
-set(HAS_AVAILABLE_WARNINGS FALSE)
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_CLANG_VERSION)
-    message(FATAL_ERROR "Insufficient clang++ version. Minimum required is "
-      "\"${MINIMUM_CLANG_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
-    )
-  endif()
-  if(OPENVDB_CXX_STRICT)
-    message(STATUS "Configuring Clang CXX warnings")
-    set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_compile_options(
-      -Werror
-      -Wall
-      -Wextra
-      -Wconversion
-      -Wno-sign-conversion
-    )
-  endif()
-  if(USE_COLORED_OUTPUT)
-    message(STATUS "Enabling colored compiler output")
-    add_compile_options(-fcolor-diagnostics)
-  endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_GCC_VERSION)
-    message(FATAL_ERROR "Insufficient g++ version. Minimum required is "
-      "\"${MINIMUM_GCC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
-    )
-  endif()
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_GCC_VERSION)
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_GCC_VERSION)
-      message(DEPRECATION "Support for GCC versions < ${FUTURE_MINIMUM_GCC_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-  if(OPENVDB_CXX_STRICT)
-    message(STATUS "Configuring GCC CXX warnings")
-    set(HAS_AVAILABLE_WARNINGS TRUE)
-    add_compile_options(
-      -Werror
-      -Wall
-      -Wextra
-      -pedantic
-      -Wcast-align
-      -Wcast-qual
-      -Wconversion
-      -Wdisabled-optimization
-      -Woverloaded-virtual
-    )
-  endif()
-  if(USE_COLORED_OUTPUT)
-    message(STATUS "Enabling colored compiler output")
-    add_compile_options(-fdiagnostics-color=always)
-  endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_ICC_VERSION)
-    message(FATAL_ERROR "Insufficient ICC version. Minimum required is "
-      "\"${MINIMUM_ICC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
-    )
-  endif()
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ICC_VERSION)
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_ICC_VERSION)
-      message(DEPRECATION "Support for ICC versions < ${FUTURE_MINIMUM_ICC_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_MSVC_VERSION)
-    message(FATAL_ERROR "Insufficient MSVC version. Minimum required is "
-      "\"${MINIMUM_MSVC_VERSION}\". Found version \"${CMAKE_CXX_COMPILER_VERSION}\""
-  )
-  endif()
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_MSVC_VERSION)
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS FUTURE_MINIMUM_MSVC_VERSION)
-      message(DEPRECATION "Support for MSVC versions < ${FUTURE_MINIMUM_MSVC_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-  # Increase the number of sections that an object file can contain
-  add_compile_options(/bigobj)
-  # Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
-  # defined on MSVC
-  # https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
-  add_definitions(-D_USE_MATH_DEFINES)
-  # Disable the non-portable Windows definitions of min() and max() macros
-  add_definitions(-DNOMINMAX)
-  # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
-  add_definitions(-DWIN32_LEAN_AND_MEAN)
-  # Disable non-secure CRT library function warnings
-  # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
-  #     compiler-warning-level-3-c4996?view=vs-2019#unsafe-crt-library-functions
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-  # Disable POSIX function name warnings
-  # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
-  #     compiler-warning-level-3-c4996?view=vs-2019#posix-function-names
-  add_definitions(-D_CRT_NONSTDC_NO_WARNINGS)
-  if(NOT OPENVDB_CXX_STRICT)
-    message(STATUS "Suppressing some noisy MSVC CXX warnings, "
-      "set OPENVDB_CXX_STRICT=ON to re-enable them.")
-    # Conversion from int64_t to long
-    add_compile_options(/wd4244)
-    # It's not possible to use STL types in DLL interfaces in a portable and
-    # reliable way so disable this warning
-    add_compile_options(/wd4251)
-    # Conversion from size_t to uLong
-    add_compile_options(/wd4267)
-    # Non dll-interface class used as base for dll-interface class
-    add_compile_options(/wd4275)
-    # Truncation from 'int' to 'bool'
-    add_compile_options(/wd4305)
-  endif()
-  # If a user has explicitly requested a parallel build, configure this during CMake
-  if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
-    add_compile_options(/MP${MSVC_MP_THREAD_COUNT})
-  endif()
-endif()
-
-if(OPENVDB_CXX_STRICT AND NOT HAS_AVAILABLE_WARNINGS)
-  message(WARNING "No available CXX warnings for compiler ${CMAKE_CXX_COMPILER_ID}")
-endif()
-unset(HAS_AVAILABLE_WARNINGS)
-
-# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
-# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
-#     malloc: *** malloc_zone_unregister() failed for 0xaddress
-#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
-#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
-#   Jemalloc are thought to work, but haven't been tested.
-# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
-#   of injecting into the Windows runtime to replace the system allocator.
-
-if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
-  if(WIN32 OR APPLE OR USE_MAYA)
-    set(CONCURRENT_MALLOC "Tbbmalloc")
-  else()
-    find_package(Jemalloc QUIET)
-    if(NOT TARGET Jemalloc::jemalloc)
-      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
-        It is recommended to use Jemalloc for optimum performance.")
-      set(CONCURRENT_MALLOC "Tbbmalloc")
-    else()
-      set(CONCURRENT_MALLOC "Jemalloc")
-    endif()
-  endif()
-endif()
-
-# Configure SIMD. AVX implies SSE 4.2.
-
 if(OPENVDB_SIMD STREQUAL "AVX")
   add_compile_options(-mavx -msse4.2)
   add_definitions(-DOPENVDB_USE_AVX)
@@ -617,65 +279,26 @@ endif()
 #########################################################################
 
 # Configure our cmake modules to only search for static libraries
-
-if(USE_STATIC_DEPENDENCIES)
-  set(BLOSC_USE_STATIC_LIBS ON)
-  set(OPENEXR_USE_STATIC_LIBS ON)
-  set(ILMBASE_USE_STATIC_LIBS ON)
-  set(TBB_USE_STATIC_LIBS ON)
-  set(LOG4CPLUS_USE_STATIC_LIBS ON)
-  set(JEMALLOC_USE_STATIC_LIBS ON)
-  set(GTEST_USE_STATIC_LIBS ON)
-  set(Boost_USE_STATIC_LIBS ON)
-  # @todo  glfw needs custom support.
-  # set(GLFW_USE_STATIC_LIBS ON)
-endif()
+set(BLOSC_USE_STATIC_LIBS ON)
+set(OPENEXR_USE_STATIC_LIBS ON)
+set(ILMBASE_USE_STATIC_LIBS ON)
+set(TBB_USE_STATIC_LIBS ON)
+set(Boost_USE_STATIC_LIBS ON)
 
 # Configure OpenVDB Library and ABI versions
-
-if(NOT OPENVDB_BUILD_CORE)
-  # Find VDB installation and determine lib/abi versions
-  find_package(OpenVDB REQUIRED)
-  # Check ABI version was found and explicitly error if attempting to build against
-  # an incompatible Houdini version
-  if(OpenVDB_ABI AND OPENVDB_HOUDINI_ABI)
-    if(NOT ${OpenVDB_ABI} EQUAL ${OPENVDB_HOUDINI_ABI})
-      message(FATAL_ERROR "Located OpenVDB installation is not ABI compatible with "
-        "Houdini Version ${Houdini_VERSION}. Requires ABI ${OPENVDB_HOUDINI_ABI}, found "
-        "ABI ${OpenVDB_ABI}.")
-    endif()
-  endif()
-else()
-  include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
-  set(OPENVDB_VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/version.h")
-  if(NOT EXISTS "${OPENVDB_VERSION_HEADER}")
-    message(FATAL_ERROR "Unable to read ${OPENVDB_VERSION_HEADER}. File does not exist.")
-  endif()
-
-  OPENVDB_VERSION_FROM_HEADER("${OPENVDB_VERSION_HEADER}"
-    VERSION OpenVDB_VERSION
-    MAJOR   OpenVDB_MAJOR_VERSION
-    MINOR   OpenVDB_MINOR_VERSION
-    PATCH   OpenVDB_PATCH_VERSION
-  )
-  message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
+set(OPENVDB_VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/version.h")
+if(NOT EXISTS "${OPENVDB_VERSION_HEADER}")
+  message(FATAL_ERROR "Unable to read ${OPENVDB_VERSION_HEADER}. File does not exist.")
 endif()
 
-# Locate openvdb_ax if necessary
-
-if(WIN32)
-  if(OPENVDB_BUILD_AX OR
-     OPENVDB_BUILD_AX_BINARIES OR
-     OPENVDB_BUILD_AX_UNITTESTS)
-    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
-  endif()
-endif()
-
-if(NOT OPENVDB_BUILD_AX AND
-   (OPENVDB_BUILD_AX_BINARIES OR
-    OPENVDB_BUILD_AX_UNITTESTS))
-  find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
-endif()
+OPENVDB_VERSION_FROM_HEADER("${OPENVDB_VERSION_HEADER}"
+  VERSION OpenVDB_VERSION
+  MAJOR   OpenVDB_MAJOR_VERSION
+  MINOR   OpenVDB_MINOR_VERSION
+  PATCH   OpenVDB_PATCH_VERSION
+)
+message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 
 # Validate the OpenVDB ABI Version. If OpenVDB_ABI is not set, we're either building
 # the core library OR the ABI hasn't been deduced from a VDB installation. Use the
@@ -693,46 +316,6 @@ endif()
 # Forcefully set the ABI to the required value if necessary - do this after to
 # explicitly warn the user if their chosen value is different.
 
-if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}"))
-  message(WARNING "CMake will explicitly set the value of OPENVDB_ABI_VERSION_NUMBER to "
-    "${OPENVDB_HOUDINI_ABI} to match the ABI of the target Houdini Version.")
-  set(OpenVDB_ABI ${OPENVDB_HOUDINI_ABI})
-endif()
-
-if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
-  message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
-    "no longer supported.")
-endif()
-
-if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
-  if((OpenVDB_ABI EQUAL 6 AND OPENVDB_USE_DEPRECATED_ABI_6))
-    message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated and will soon be removed.")
-  else()
-    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI} to ON to "
-      "suppress this error.")
-  endif()
-  # global target definition
-  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_6)
-endif()
-
-if(OpenVDB_ABI EQUAL FUTURE_OPENVDB_ABI_VERSION)
-  if(OPENVDB_USE_FUTURE_ABI_9)
-    message(WARNING "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
-      "in active development and have not been finalized.")
-  else()
-    message(FATAL_ERROR "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
-      "in active development and have not been finalized. Set CMake option "
-      "OPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI} to ON to suppress this error.")
-  endif()
-  # global target definition
-  add_definitions(-DOPENVDB_USE_FUTURE_ABI_9)
-endif()
-
-# The ABI is a global target definition, applicable to all components, so just add it
-# via add_definitions()
-
 add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
 message(STATUS "Configuring for OpenVDB ABI Version ${OpenVDB_ABI}")
 
@@ -744,50 +327,13 @@ determine the ABI number. You may set this to force a given ABI number.]=] FORCE
 
 ##########################################################################
 
-if(OPENVDB_BUILD_CORE)
-  add_subdirectory(openvdb/openvdb)
-endif()
+INCLUDE_DIRECTORIES(
+    "${CMAKE_CURRENT_SOURCE_DIR}/openvdb"
+    "${CMAKE_CURRENT_BINARY_DIR}/openvdb/openvdb"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../tbb/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../c-blosc/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../libboost/boost_1_67_0/"
+)
 
-if(OPENVDB_BUILD_AX)
-  add_subdirectory(openvdb_ax/openvdb_ax)
-endif()
-
-if(OPENVDB_BUILD_AX_BINARIES)
-  add_subdirectory(openvdb_ax/openvdb_ax/cmd)
-endif()
-
-if(OPENVDB_BUILD_AX_UNITTESTS)
-  add_subdirectory(openvdb_ax/openvdb_ax/test)
-endif()
-
-if(OPENVDB_BUILD_PYTHON_MODULE)
-  add_subdirectory(openvdb/openvdb/python)
-endif()
-
-if(OPENVDB_BUILD_BINARIES)
-  add_subdirectory(openvdb/openvdb/cmd)
-endif()
-
-if(OPENVDB_BUILD_UNITTESTS)
-  add_subdirectory(openvdb/openvdb/unittest)
-endif()
-
-if(OPENVDB_BUILD_HOUDINI_PLUGIN)
-  add_subdirectory(openvdb_houdini/openvdb_houdini)
-endif()
-
-if(OPENVDB_BUILD_HOUDINI_ABITESTS)
-  add_subdirectory(openvdb_houdini/openvdb_houdini/abitest)
-endif()
-
-if(OPENVDB_BUILD_MAYA_PLUGIN)
-  add_subdirectory(openvdb_maya/openvdb_maya)
-endif()
-
-##########################################################################
-
-if(OPENVDB_ENABLE_UNINSTALL)
-  add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/Uninstall.cmake
-  )
-endif()
+add_subdirectory(openvdb/openvdb)

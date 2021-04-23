@@ -1,19 +1,16 @@
 include_directories(src)
  
-
-set(CMAKE_DEBUG_POSTFIX d)
-
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # set(CMAKE_SHARED_LINKER_FLAGS "-Wl")
 
-add_library(libxatlas STATIC
+add_library(xatlas STATIC
 	src/xatlas.cpp
 )
 
 
-SET_TARGET_PROPERTIES(libxatlas  
+SET_TARGET_PROPERTIES(xatlas  
                     PROPERTIES PUBLIC_HEADER "${headers}")
 
 IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
-  SET_TARGET_PROPERTIES(libxatlas  PROPERTIES FOLDER external)
+  SET_TARGET_PROPERTIES(xatlas  PROPERTIES FOLDER external)
 ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

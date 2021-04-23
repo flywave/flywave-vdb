@@ -89,12 +89,6 @@ set (${PROJ_NAME}_NAMESPACE ${PROJ_NAMESPACE_V} CACHE STRING
      "Customized outer namespace base name (version will be added)")
 message(STATUS "Setting Namespace to: ${PROJ_NAMESPACE_V}")
 
-
-IF (WIN32)
-  INCLUDE_DIRECTORIES(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/../libgdal/arch/win/)
-ELSE()
-  INCLUDE_DIRECTORIES(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/../libgdal/arch/unix/)
-ENDIF()
 INCLUDE_DIRECTORIES(
     "${CMAKE_CURRENT_SOURCE_DIR}/../libexpat/expat/lib"
     "${CMAKE_CURRENT_SOURCE_DIR}/../freetype2/include/"
@@ -107,8 +101,10 @@ INCLUDE_DIRECTORIES(
     "${CMAKE_CURRENT_SOURCE_DIR}/../zlib"
     "${CMAKE_CURRENT_SOURCE_DIR}/../libiconv/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../webp/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../libgdal/gdal/frmts/gtiff/libtiff"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../libgdal/gdal/port"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../libtiff/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../libtiff/port"
+    "${CMAKE_CURRENT_BINARY_DIR}/../libtiff/src"
+    "${CMAKE_CURRENT_BINARY_DIR}/../libtiff/port"
     "${CMAKE_CURRENT_SOURCE_DIR}/../libjasper"
     "${CMAKE_CURRENT_SOURCE_DIR}/../openexr"
     "${CMAKE_CURRENT_BINARY_DIR}/../openexr"

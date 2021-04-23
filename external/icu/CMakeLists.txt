@@ -28,10 +28,6 @@ add_definitions(
   -DUCONFIG_NO_BREAK_ITERATION=0
 )
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
-SET(CMAKE_CXX_STANDARD 11)
-
 SET(icuuc_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/source/common/appendable.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/source/common/bmpset.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/source/common/brkeng.cpp

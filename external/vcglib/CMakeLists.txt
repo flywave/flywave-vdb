@@ -1,0 +1,12 @@
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+add_library(plylib STATIC
+  wrap/ply/plylib.cc
+)
+
+SET_TARGET_PROPERTIES(plylib  
+                    PROPERTIES PUBLIC_HEADER "${headers}")
+
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(plylib  PROPERTIES FOLDER external)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

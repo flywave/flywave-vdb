@@ -96,6 +96,10 @@ bool vdb_grid::create_from_points(vdb_particle vPoints, double voxelSize,
   return true;
 }
 
+void vdb_grid::rebuild(float iso, float exWidth, float inWidth) {
+  _grid = openvdb::tools::levelSetRebuild(*_grid, 0., exWidth, inWidth);
+}
+
 void vdb_grid::transform(openvdb::math::Mat4d xform) {
   _grid->transform().postMult(xform);
 }
@@ -209,6 +213,9 @@ void vdb_grid::smooth(int type, int iterations, int width) {
     case 3:
       filter.median(width);
       break;
+    case 4:
+      filter.meanCurvature();
+      break;
     default:
       filter.laplacian();
       break;
@@ -239,6 +246,9 @@ void vdb_grid::smooth(int type, int iterations, int width, vdb_grid vMask,
       break;
     case 3:
       filter.median(width, &mMask);
+      break;
+    case 4:
+      filter.meanCurvature();
       break;
     default:
       filter.laplacian(&mMask);
@@ -384,4 +394,23 @@ int *vdb_grid::get_mesh_faces() {
 int vdb_grid::get_vertex_count() { return _vertex_count; }
 
 int vdb_grid::get_face_count() { return _face_count; }
+
+void vdb_grid::set(const int i, const int j, const int k, const float &v) {
+  typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
+  openvdb::Coord ijk(i, j, k);
+  accessor.setValue(ijk, v);
+}
+
+float vdb_grid::operator()(const int i, const int j, const int k) const {
+  typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
+  openvdb::Coord ijk(i, j, k);
+  return accessor.getValue(ijk);
+}
+
+float vdb_grid::operator()(const float i, const float j, const float k) const {
+  typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
+  openvdb::Coord ijk(i, j, k);
+  return accessor.getValue(ijk);
+}
+
 } // namespace flywave

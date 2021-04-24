@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,12 +23,12 @@ extern FLYWAVE_VDB_API _Bool vdb_read(vdb_grid_t *grid, const char *filename);
 extern FLYWAVE_VDB_API _Bool vdb_write(vdb_grid_t *grid, const char *filename);
 
 extern FLYWAVE_VDB_API _Bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
-                                            int pCount, double *vRadius,
-                                            int rCount, double voxelSize,
-                                            double bandwidth);
+                                             int pCount, double *vRadius,
+                                             int rCount, double voxelSize,
+                                             double bandwidth);
 extern FLYWAVE_VDB_API _Bool vdb_from_mesh(vdb_grid_t *grid, float *vPoints,
-                                          int vCount, int *vFaces, int fCount,
-                                          double voxelSize, double bandwidth);
+                                           int vCount, int *vFaces, int fCount,
+                                           double voxelSize, double bandwidth);
 
 extern FLYWAVE_VDB_API void vdb_to_mesh(vdb_grid_t *grid);
 extern FLYWAVE_VDB_API void
@@ -38,7 +38,7 @@ extern FLYWAVE_VDB_API float *vdb_vertex_buffer(vdb_grid_t *grid, int *size);
 extern FLYWAVE_VDB_API int *vdb_face_buffer(vdb_grid_t *grid, int *size);
 
 extern FLYWAVE_VDB_API _Bool vdb_transform(vdb_grid_t *grid, double *matrix,
-                                          int mCount);
+                                           int mCount);
 
 extern FLYWAVE_VDB_API void vdb_union(vdb_grid_t *grid, vdb_grid_t *csgGrid);
 extern FLYWAVE_VDB_API void vdb_difference(vdb_grid_t *grid,
@@ -62,6 +62,10 @@ extern FLYWAVE_VDB_API void vdb_blend_mask(vdb_grid_t *bGrid, vdb_grid_t *eGrid,
                                            double bPosition, double bEnd,
                                            vdb_grid_t *mask, double min,
                                            double max, _Bool invert);
+extern FLYWAVE_VDB_API void vdb_rebuild(vdb_grid_t *bGrid, float iso,
+                                        float exWidth, float inWidth);
+extern FLYWAVE_VDB_API float *vdb_dense(vdb_grid_t *bGrid, int *width,
+                                        int *height, int *depth);
 
 extern FLYWAVE_VDB_API float *
 vdb_closest_point(vdb_grid_t *grid, float *vPoints, int vCount, int *rSize);

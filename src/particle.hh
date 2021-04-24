@@ -32,6 +32,9 @@ public:
   }
 
   bool is_valid() { return (_particle_list.size() > 0) ? true : false; }
+
+  void remove() { _particle_list.pop_back(); }
+
   void clear() { _particle_list.clear(); }
 
   openvdb::CoordBBox getBBox(const openvdb::GridBase &grid) {
@@ -70,7 +73,7 @@ public:
     rad = _radius_scale * _particle_list[n].r;
   }
   void getPosRadVel(size_t n, openvdb::Vec3R &pos, openvdb::Real &rad,
-                       openvdb::Vec3R &vel) const {
+                    openvdb::Vec3R &vel) const {
     pos = _particle_list[n].p;
     rad = _radius_scale * _particle_list[n].r;
     vel = _velocity_scale * _particle_list[n].v;

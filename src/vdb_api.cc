@@ -5,6 +5,7 @@
 #include "mesh.hh"
 #include "particle.hh"
 
+#include <openvdb/tools/Dense.h>
 #include <openvdb/util/Util.h>
 
 #include <vector>
@@ -44,8 +45,8 @@ FLYWAVE_VDB_API _Bool vdb_write(vdb_grid_t *grid, const char *filename) {
 }
 
 FLYWAVE_VDB_API _Bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
-                                     int pCount, double *vRadius, int rCount,
-                                     double voxelSize, double bandwidth) {
+                                      int pCount, double *vRadius, int rCount,
+                                      double voxelSize, double bandwidth) {
   std::vector<openvdb::Vec3R> particleList;
 
   int i = 0;
@@ -63,14 +64,12 @@ FLYWAVE_VDB_API _Bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
   ps.clear();
 
   if (particleList.size() == rCount) {
-
     int i = 0;
     for (auto it = particleList.begin(); it != particleList.end(); ++it) {
       ps.add((*it), openvdb::Real(vRadius[i]));
       i++;
     }
   } else {
-
     double average = 0.0;
     for (int i = 0; i < rCount; i++) {
       average += vRadius[i];
@@ -86,9 +85,9 @@ FLYWAVE_VDB_API _Bool vdb_from_points(vdb_grid_t *grid, double *vPoints,
   return grid->ptr->create_from_points(ps, voxelSize, bandwidth);
 }
 
-FLYWAVE_VDB_API _Bool vdb_from_mesh(vdb_grid_t *grid, float *vPoints, int vCount,
-                                   int *vFaces, int fCount, double voxelSize,
-                                   double bandwidth) {
+FLYWAVE_VDB_API _Bool vdb_from_mesh(vdb_grid_t *grid, float *vPoints,
+                                    int vCount, int *vFaces, int fCount,
+                                    double voxelSize, double bandwidth) {
   double inverseVoxelSize = 1.0 / voxelSize;
 
   vdb_mesh vMesh;
@@ -140,7 +139,7 @@ FLYWAVE_VDB_API int *vdb_face_buffer(vdb_grid_t *grid, int *size) {
 }
 
 FLYWAVE_VDB_API _Bool vdb_transform(vdb_grid_t *grid, double *matrix,
-                                   int mCount) {
+                                    int mCount) {
   if (mCount != 16) {
     return false;
   }
@@ -198,6 +197,37 @@ FLYWAVE_VDB_API void vdb_blend_mask(vdb_grid_t *bGrid, vdb_grid_t *eGrid,
                                     vdb_grid_t *mask, double min, double max,
                                     _Bool invert) {
   bGrid->ptr->blend(*eGrid->ptr, bPosition, bEnd, *mask->ptr, min, max, invert);
+}
+
+FLYWAVE_VDB_API void vdb_rebuild(vdb_grid_t *bGrid, float iso, float exWidth,
+                                 float inWidth) {
+  bGrid->ptr->rebuild(iso, exWidth, inWidth);
+}
+
+FLYWAVE_VDB_API float *vdb_dense(vdb_grid_t *bGrid, int *width, int *height, int *depth) {
+  openvdb::FloatGrid::Ptr grid =
+      openvdb::gridPtrCast<openvdb::FloatGrid>(bGrid->ptr->grid());
+
+  openvdb::CoordBBox bb = grid->evalActiveVoxelBoundingBox();
+  *width = abs(bb.min().x()) + abs(bb.max().x());
+  *height = abs(bb.min().y()) + abs(bb.max().y());
+  *depth = abs(bb.min().z()) + abs(bb.max().z());
+
+  openvdb::Coord dim(*width, *height, *depth);
+  openvdb::Coord originvdb(-abs(bb.min().x()), -abs(bb.min().y()),
+                           -abs(bb.min().z()));
+  openvdb::tools::Dense<float> dense(dim, originvdb);
+
+  openvdb::tools::copyToDense<openvdb::tools::Dense<float>, openvdb::FloatGrid>(
+      *grid, dense);
+
+  int size = *width * *height * *depth;
+
+  float *floatData = reinterpret_cast<float *>(malloc(size));
+
+  std::copy(dense.data(), (dense.data() + size), floatData);
+
+  return floatData;
 }
 
 FLYWAVE_VDB_API float *vdb_closest_point(vdb_grid_t *grid, float *vPoints,

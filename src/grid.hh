@@ -51,6 +51,14 @@ public:
   void update_display();
   void update_display(double isovalue, double adaptivity);
 
+  void rebuild(float iso, float exWidth, float inWidth);
+
+  void set(const int i, const int j, const int k, const float &v);
+
+  float operator()(const int i, const int j, const int k) const;
+
+  float operator()(const float i, const float j, const float k) const;
+
   float *get_mesh_vertices();
   int *get_mesh_faces();
   int get_vertex_count();

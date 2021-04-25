@@ -1,7 +1,5 @@
 #pragma once
 
-#include "base_texture.hh"
-
 #include <openvdb/Types.h>
 
 namespace flywave {
@@ -185,13 +183,13 @@ public:
     return it;
   }
 
-  bool operator==(const const_texture_row_iterator<ColorType> &it) const
-      noexcept {
+  bool
+  operator==(const const_texture_row_iterator<ColorType> &it) const noexcept {
     return row_ == it.row_;
   }
 
-  bool operator!=(const const_texture_row_iterator<ColorType> &it) const
-      noexcept {
+  bool
+  operator!=(const const_texture_row_iterator<ColorType> &it) const noexcept {
     return row_ != it.row_;
   }
 
@@ -744,22 +742,24 @@ interpolate(const openvdb::math::Vec4<fp_type> &a,
   return e;
 }
 
-template <typename Color> class texture2d : public base_texture {
+template <typename Color>
+class texture2d : public std::enable_shared_from_this<base_texture> {
 public:
-  typedef std::shared_ptr<texture2d<Color>> ptr;
-  typedef const std::shared_ptr<texture2d<Color>> const_ptr;
-  typedef typename color_value_type<Color>::pixel_type pixel_type;
+  typedef std::shared_ptr<texture2d<Color>> Ptr;
+  typedef const std::shared_ptr<texture2d<Color>> ConstPtr;
+  typedef typename color_value_type<Color>::pixel_type PixelType;
   typedef Color color_type;
 
-  typedef impl::texture_row_iterator<Color> iterator;
-  typedef impl::const_texture_row_iterator<Color> const_iterator;
+  typedef impl::texture_row_iterator<Color> Iterator;
+  typedef impl::const_texture_row_iterator<Color> ConstIterator;
 
-  typedef std::vector<uint8_t *> row_pointers_type;
-  typedef std::vector<const uint8_t *> const_row_pointers_type;
+  typedef std::vector<uint8_t *> RowPointersType;
+  typedef std::vector<const uint8_t *> ConstRowPointersType;
 
   std::pair<uint32_t, uint32_t> size;
   static constexpr size_t channels_ = color_channel<Color>();
   static constexpr size_t color_size = sizeof(Color);
+  std::unique_ptr<uint8_t[]> data;
 
 public:
   texture2d() = default;
@@ -815,6 +815,23 @@ public:
 
   friend bool operator!=(const texture2d &lhs, const texture2d &rhs) {
     return !(lhs == rhs);
+  }
+
+  inline uint8_t *raw_data() { return data.get(); }
+
+  inline const uint8_t *raw_data() const { return data.get(); }
+
+  static texture_type get_type_for_string(std::string const &type_string) {
+    if (type_string == "uint8")
+      return TEXTURE_TYPE_UINT8;
+    else if (type_string == "uint16")
+      return TEXTURE_TYPE_UINT16;
+    else if (type_string == "float")
+      return TEXTURE_TYPE_FLOAT;
+    else if (type_string == "double")
+      return TEXTURE_TYPE_DOUBLE;
+
+    return TEXTURE_TYPE_UNKNOWN;
   }
 
   explicit operator bool() const { return valid(); }
@@ -947,9 +964,9 @@ public:
     return (color_begin(r) + stride());
   }
 
-  row_pointers_type row_pointers() {
-    using size_type = typename row_pointers_type::size_type;
-    row_pointers_type row_pointers(this->height());
+  RowPointersType row_pointers() {
+    using size_type = typename RowPointersType::size_type;
+    RowPointersType row_pointers(this->height());
 
     for (size_t y = 0; y < this->height(); ++y) {
       row_pointers[y] = reinterpret_cast<uint8_t *>(this->color_begin(y));
@@ -958,9 +975,9 @@ public:
     return row_pointers;
   }
 
-  const_row_pointers_type const_row_pointers() {
-    using size_type = typename const_row_pointers_type::size_type;
-    const_row_pointers_type row_pointers(this->height());
+  ConstRowPointersType const_row_pointers() {
+    using size_type = typename ConstRowPointersType::size_type;
+    ConstRowPointersType row_pointers(this->height());
 
     for (size_t y = 0; y < this->height(); ++y) {
       row_pointers[y] = reinterpret_cast<const uint8_t *>(this->color_begin(y));
@@ -1107,9 +1124,6 @@ public:
   inline size_t stride() const { return color_size * size.first; }
   inline size_t bytes() const { return stride() * size.second; }
 
-  texture_type get_type() const;
-  char const *get_type_string() const;
-
   inline uint64_t width() const { return size.first; }
   inline uint64_t height() const { return size.second; }
 
@@ -1183,170 +1197,6 @@ public:
     }
   }
 };
-
-template <> inline texture_type texture2d<uint8_t>::get_type() const {
-  return TEXTURE_TYPE_UINT8;
-}
-
-template <> inline char const *texture2d<uint8_t>::get_type_string() const {
-  return "uint8";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec2<uint8_t>>::get_type() const {
-  return TEXTURE_TYPE_UINT8;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec2<uint8_t>>::get_type_string() const {
-  return "uint8";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec3<uint8_t>>::get_type() const {
-  return TEXTURE_TYPE_UINT8;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec3<uint8_t>>::get_type_string() const {
-  return "uint8";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec4<uint8_t>>::get_type() const {
-  return TEXTURE_TYPE_UINT8;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec4<uint8_t>>::get_type_string() const {
-  return "uint8";
-}
-
-template <> inline texture_type texture2d<uint16_t>::get_type() const {
-  return TEXTURE_TYPE_UINT16;
-}
-
-template <> inline char const *texture2d<uint16_t>::get_type_string() const {
-  return "uint16";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec3<uint16_t>>::get_type() const {
-  return TEXTURE_TYPE_UINT16;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec3<uint16_t>>::get_type_string() const {
-  return "uint16";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec2<uint16_t>>::get_type() const {
-  return TEXTURE_TYPE_UINT16;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec2<uint16_t>>::get_type_string() const {
-  return "uint16";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec4<uint16_t>>::get_type() const {
-  return TEXTURE_TYPE_UINT16;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec4<uint16_t>>::get_type_string() const {
-  return "uint16";
-}
-
-template <> inline texture_type texture2d<float>::get_type() const {
-  return TEXTURE_TYPE_FLOAT;
-}
-
-template <> inline char const *texture2d<float>::get_type_string() const {
-  return "float";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec2<float>>::get_type() const {
-  return TEXTURE_TYPE_FLOAT;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec2<float>>::get_type_string() const {
-  return "float";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec3<float>>::get_type() const {
-  return TEXTURE_TYPE_FLOAT;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec3<float>>::get_type_string() const {
-  return "float";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec4<float>>::get_type() const {
-  return TEXTURE_TYPE_FLOAT;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec4<float>>::get_type_string() const {
-  return "float";
-}
-
-template <> inline texture_type texture2d<double>::get_type() const {
-  return TEXTURE_TYPE_DOUBLE;
-}
-
-template <> inline char const *texture2d<double>::get_type_string() const {
-  return "double";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec2<double>>::get_type() const {
-  return TEXTURE_TYPE_DOUBLE;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec2<double>>::get_type_string() const {
-  return "double";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec3<double>>::get_type() const {
-  return TEXTURE_TYPE_DOUBLE;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec3<double>>::get_type_string() const {
-  return "double";
-}
-
-template <>
-inline texture_type texture2d<openvdb::math::Vec4<double>>::get_type() const {
-  return TEXTURE_TYPE_DOUBLE;
-}
-
-template <>
-inline char const *
-texture2d<openvdb::math::Vec4<double>>::get_type_string() const {
-  return "double";
-}
 
 } // namespace flywave
 

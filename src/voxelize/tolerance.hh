@@ -10,8 +10,8 @@ template <typename T> struct tolerance {
   operator T() const { return zero<T>(); }
 };
 
-template <> struct tolerance<openvdb::math::half> {
-  operator openvdb::math::half() const { return {1e-6f}; }
+template <> struct tolerance<openvdb::OPENVDB_VERSION_NAME::math::half> {
+  operator openvdb::OPENVDB_VERSION_NAME::math::half() const { return {1e-6f}; }
 };
 
 template <> struct tolerance<float> {

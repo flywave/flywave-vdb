@@ -23,12 +23,12 @@ struct material_data {
   uint32_t type = 0;
   uint16_t mode{0};
 
-  Eigen::Matrix<uint8_t, 3, 1> color{255, 255, 255};
+  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> color{255, 255, 255};
 
-  Eigen::Matrix<uint8_t, 3, 1> ambient{255, 255, 255};
-  Eigen::Matrix<uint8_t, 3, 1> emissive{0, 0, 0};
+  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> ambient{255, 255, 255};
+  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> emissive{0, 0, 0};
 
-  Eigen::Matrix<uint8_t, 3, 1> specular{0, 0, 0};
+  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> specular{0, 0, 0};
 
   float opacity{1.0};
 
@@ -53,30 +53,30 @@ struct material_data {
       switch (type) {
       case BASE:
         return mode == p.mode && color == p.color &&
-              openvdb::math::isApproxEqual(opacity, p.opacity);
+               openvdb::math::isApproxEqual(opacity, p.opacity);
       case LAMBERT:
         return mode == p.mode && color == p.color &&
-              openvdb::math::isApproxEqual(opacity, p.opacity) &&
+               openvdb::math::isApproxEqual(opacity, p.opacity) &&
                ambient == p.ambient && emissive == p.emissive;
       case PHONG:
         return mode == p.mode && color == p.color &&
-              openvdb::math::isApproxEqual(opacity, p.opacity) &&
+               openvdb::math::isApproxEqual(opacity, p.opacity) &&
                ambient == p.ambient && emissive == p.emissive &&
                specular == p.specular &&
-              openvdb::math::isApproxEqual(shininess, p.shininess);
+               openvdb::math::isApproxEqual(shininess, p.shininess);
       case PBR:
         return mode == p.mode && color == p.color &&
-              openvdb::math::isApproxEqual(opacity, p.opacity) &&
-              openvdb::math::isApproxEqual(metallic, p.metallic) &&
-              openvdb::math::isApproxEqual(roughness, p.roughness) &&
-              openvdb::math::isApproxEqual(reflectance, p.reflectance) &&
-              openvdb::math::isApproxEqual(clearcoat_thickness,
-                                              p.clearcoat_thickness) &&
-              openvdb::math::isApproxEqual(clearcoat_roughness,
-                                              p.clearcoat_roughness) &&
-              openvdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
-              openvdb::math::isApproxEqual(anisotropy_rotation,
-                                              p.anisotropy_rotation);
+               openvdb::math::isApproxEqual(opacity, p.opacity) &&
+               openvdb::math::isApproxEqual(metallic, p.metallic) &&
+               openvdb::math::isApproxEqual(roughness, p.roughness) &&
+               openvdb::math::isApproxEqual(reflectance, p.reflectance) &&
+               openvdb::math::isApproxEqual(clearcoat_thickness,
+                                            p.clearcoat_thickness) &&
+               openvdb::math::isApproxEqual(clearcoat_roughness,
+                                            p.clearcoat_roughness) &&
+               openvdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
+               openvdb::math::isApproxEqual(anisotropy_rotation,
+                                            p.anisotropy_rotation);
       default:
         break;
       }
@@ -115,10 +115,8 @@ private:
 struct data_triangle {
   triangle3<float> _triangle;
   uint16_t _material_id;
-    
-  const openvdb::Vec3f &operator[](size_t index) {
-    return _triangle[index];
-  }
+
+  const openvdb::Vec3f &operator[](size_t index) { return _triangle[index]; }
 };
 
 class mesh_adapter;
@@ -140,13 +138,12 @@ public:
 
   virtual size_t polygon_count() const = 0;
 
-  virtual void set_transfrom(openvdb::math::Transform::Ptr xfrom) {
+  virtual void
+  set_transfrom(openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr xfrom) {
     _xform = xfrom;
   }
 
-  virtual void set_matrix(openvdb::Mat4d matrix) {
-    _matrix44 = matrix;
-  }
+  virtual void set_matrix(openvdb::Mat4d matrix) { _matrix44 = matrix; }
 
   openvdb::BBoxd compute_boundbox() {
     openvdb::BBoxd box;
@@ -166,7 +163,7 @@ public:
   virtual data_triangle find_triangle(uint32_t face_index) = 0;
 
 private:
-  openvdb::math::Transform::Ptr _xform;
+  openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr _xform;
 
 protected:
   openvdb::Mat4d _matrix44;

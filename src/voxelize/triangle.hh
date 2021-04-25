@@ -28,6 +28,11 @@ public:
             const vector_type &p2_) noexcept
       : data_array(p0_, p1_, p2_) {}
 
+  triangle2(const vector3_type &p0_, const vector3_type &p1_,
+            const vector3_type &p2_) noexcept
+      : data_array(vector_type(p0_.x(), p0_.y()), vector_type(p1_.x(), p1_.y()),
+                   vector_type(p2_.x(), p2_.y())) {}
+
   triangle2(const triangle2<scalar_type> *q2) noexcept
       : data_array(q2->data_array) {}
 

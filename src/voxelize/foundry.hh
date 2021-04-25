@@ -1,8 +1,11 @@
 #pragma once
 
 #include "mesh_adapter.hh"
+#include "texture2d.hh"
 #include "voxel_pot.hh"
 #include "xparam.hh"
+
+#include <openvdb/Types.h>
 
 namespace flywave {
 namespace voxelize {
@@ -14,8 +17,10 @@ public:
   textute_foundry(vertex_grid::Ptr cgrid, pixel_grid::Ptr, float tquality,
                   float tpad);
 
-  texture2d<color4<uint8_t>>::ptr extract(const fmesh_tri_patch &tri,
-                                          texture2d<color4i>::ptr img) const;
+  texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr
+  extract(const fmesh_tri_patch &tri,
+          texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr
+              img) const;
 
   size_t pixel_size() const;
 
@@ -34,14 +39,14 @@ public:
 struct seam_repair {
   using seam_tree = openvdb::tree::Tree4<uint32_t, 5, 4, 3>::Type;
   seam_tree::Ptr _seam_index_tree;
-  shared_ptr<std::vector<vertext_type>> _seam_vertexs;
+  std::shared_ptr<std::vector<vertext_type>> _seam_vertexs;
 };
 
 struct seam_box_setting {
-  bbox3<double> _box;
-  openvdb::math::Transform::ConstPtr _transform;
-  Eigen::Matrix<double, 3, 1> _up;
-  Eigen::Matrix<double, 3, 1> _left;
+  openvdb::OPENVDB_VERSION_NAME::math::BBox<double> _box;
+  openvdb::OPENVDB_VERSION_NAME::math::Transform::ConstPtr _transform;
+  openvdb::Vec3d _up;
+  openvdb::Vec3d _left;
 };
 
 class triangle_foundry {
@@ -73,13 +78,14 @@ public:
         _tfoundry(std::move(tfoundry)) {}
 
 public:
-  texture2d<color4i>::ptr pack_texture() {
+  texture2d<openvdb::math::Vec4<uint8_t>>::ptr pack_texture() {
     auto img_size = Param::image_size();
     if (img_size.x == 0 || img_size.y == 0)
       return nullptr;
 
-    texture2d<color4i>::ptr _texture =
-        texture2d<color4i>::create({img_size.x, img_size.y});
+    texture2d<openvdb::math::Vec4<uint8_t>>::ptr _texture =
+        texture2d<openvdb::math::Vec4<uint8_t>>::create(
+            {img_size.x, img_size.y});
 
     _texture->fill('\0');
     int count = 0;
@@ -110,7 +116,7 @@ public:
   }
 
 private:
-  shared_ptr<textute_foundry> _tfoundry;
+  std::shared_ptr<textute_foundry> _tfoundry;
 };
 
 } // namespace voxelize

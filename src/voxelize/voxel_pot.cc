@@ -16,7 +16,9 @@ voxel_pot::voxel_pot(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
   _vertex->setTransform(_resolution);
 }
 
-bool voxel_pot::ray_test(const openvdb::OPENVDB_VERSION_NAME::math::Ray<double> &ray, openvdb::Vec3d &p) {
+bool voxel_pot::ray_test(
+    const openvdb::OPENVDB_VERSION_NAME::math::Ray<double> &ray,
+    openvdb::Vec3d &p) {
   if (_vertex->empty())
     return false;
 
@@ -44,13 +46,13 @@ void voxel_pot::clear_unuse_materials() {
 }
 
 void voxel_pot_intersection(voxel_pot &tpot, voxel_pot &spot) {
-    openvdb::tools::csgIntersection(tpot.voxel_grid()->tree(),
-                               spot.voxel_grid()->tree(), true);
+  openvdb::tools::csgIntersection(tpot.voxel_grid()->tree(),
+                                  spot.voxel_grid()->tree(), true);
 }
 
 void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
- openvdb::tools::csgUnion(tpot.voxel_grid()->tree(), spot.voxel_grid()->tree(),
-                        true);
+  openvdb::tools::csgUnion(tpot.voxel_grid()->tree(), spot.voxel_grid()->tree(),
+                           true);
   tpot.pixel_grid()->tree().merge(spot.pixel_grid()->tree());
 
   auto iter = spot.voxel_grid()->tree().beginValueOn();
@@ -70,7 +72,7 @@ void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
 
 void voxel_pot_difference(voxel_pot &tpot, voxel_pot &spot) {
   openvdb::tools::csgDifference(tpot.voxel_grid()->tree(),
-                             spot.voxel_grid()->tree(), true);
+                                spot.voxel_grid()->tree(), true);
 }
 
 void voxel_pot::composite(voxel_pot &pot, const composite_type &type) {

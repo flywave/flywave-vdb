@@ -71,7 +71,8 @@ public:
 
   void composite(voxel_pot &pot, const composite_type &type);
 
-  bool ray_test(const openvdb::OPENVDB_VERSION_NAME::math::Ray<double> &ray, openvdb::Vec3d &p);
+  bool ray_test(const openvdb::OPENVDB_VERSION_NAME::math::Ray<double> &ray,
+                openvdb::Vec3d &p);
 
   void clean() { return clear_unuse_materials(); }
 

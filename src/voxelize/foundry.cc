@@ -30,9 +30,10 @@ public:
     return _query->extract(std::move(coords));
   }
 
-  static texture2d<color4<uint8_t>>::ptr
-  project_to_image(std::vector<sampler_type> points,
-                   const triangle_projection &prj, texture2d<color4i>::ptr);
+  static texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr
+  project_to_image(
+      std::vector<sampler_type> points, const triangle_projection &prj,
+      texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr);
 
   size_t pixel_size() const { return _query->pixel_count(); }
 
@@ -45,13 +46,15 @@ textute_foundry::textute_foundry(vertex_grid::Ptr cgrid, pixel_grid::Ptr pgrid,
     : _query(std::make_unique<impl>(cgrid, pgrid)), _grid(cgrid),
       _texture_quality(tquality), _pixel_pad(pixel_pad) {}
 
-texture2d<color4<uint8_t>>::ptr
-textute_foundry::extract(const fmesh_tri_patch &tri,
-                         texture2d<color4i>::ptr texture) const {
+texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr
+textute_foundry::extract(
+    const fmesh_tri_patch &tri,
+    texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr texture)
+    const {
   fmesh_tri_patch ptri = tri;
-  ptri.p1 = _grid->transform().world_to_index(tri.p1);
-  ptri.p2 = _grid->transform().world_to_index(tri.p2);
-  ptri.p3 = _grid->transform().world_to_index(tri.p3);
+  ptri.p1 = _grid->transform().worldToIndex(tri.p1);
+  ptri.p2 = _grid->transform().worldToIndex(tri.p2);
+  ptri.p3 = _grid->transform().worldToIndex(tri.p3);
 
   triangle_projection proj(ptri, _pixel_pad);
   return impl::project_to_image(_query->extract(proj.to_voxels()), proj,
@@ -62,39 +65,26 @@ size_t textute_foundry::pixel_size() const { return _query->pixel_size(); }
 
 textute_foundry::~textute_foundry() = default;
 
-texture2d<color4<uint8_t>>::ptr
-textute_foundry::impl::project_to_image(std::vector<sampler_type> points,
-                                        const triangle_projection &prj,
-                                        texture2d<color4i>::ptr img) {
+texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr
+textute_foundry::impl::project_to_image(
+    std::vector<sampler_type> points, const triangle_projection &prj,
+    texture2d<openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t>>::Ptr img) {
 
   auto h = img->height();
 
   for (auto &it : points) {
     auto uv = prj.point_to_uv(it._tri_coord);
-    if (uv.x >= 0 && uv.y >= 0) {
+    if (uv.x() >= 0 && uv.y() >= 0) {
 
-      uint64_t min_x = std::min(uint64_t(std::floor(uv.x)), img->width() - 1);
-      uint64_t min_y = std::min(uint64_t(std::floor(h - uv.y - 1)), h - 1);
-      uint64_t max_x = std::min(uint64_t(std::ceil(uv.x)), img->width() - 1);
-      uint64_t max_y = std::min(uint64_t(std::ceil(h - uv.y - 1)), h - 1);
+      uint64_t min_x = std::min(uint64_t(std::floor(uv.x())), img->width() - 1);
+      uint64_t min_y = std::min(uint64_t(std::floor(h - uv.y() - 1)), h - 1);
+      uint64_t max_x = std::min(uint64_t(std::ceil(uv.x())), img->width() - 1);
+      uint64_t max_y = std::min(uint64_t(std::ceil(h - uv.y() - 1)), h - 1);
 
-      // auto zero = color4i();
-      // if (img->color(min_x, min_y) == zero) {
       img->color(min_x, min_y) = it._value._data._color;
-      // }
-      // if (img->color(max_x, max_y) == zero) {
       img->color(max_x, max_y) = it._value._data._color;
-      // }
-      // if (img->color(min_x, max_y) == zero) {
       img->color(min_x, max_y) = it._value._data._color;
-      // }
-      // if (img->color(max_x, min_y) == zero) {
       img->color(max_x, min_y) = it._value._data._color;
-      // }
-      // if (x == 325 && y == 1077) {
-      //   FLYWAVE_ASSERT(true);
-      // }
-      // img->color(x, y) = it._value._data._color;
     }
   }
   return img;
@@ -102,7 +92,7 @@ textute_foundry::impl::project_to_image(std::vector<sampler_type> points,
 
 namespace {
 class in_setting_volume_mesh_func
-    : public vdb::tools::setting_volume_mesh_func {
+    : public openvdb::tools::setting_volume_mesh_func {
 public:
   in_setting_volume_mesh_func(shared_ptr<seam_repair> srepair)
       : _seam_repair(srepair) {}
@@ -190,7 +180,6 @@ future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,
     auto assess = pot.pixel_grid()->get_accessor();
     auto add_triangles = [&count, &points, &pot, &group_triangles, &assess,
                           &repair](triangle_type &tri) {
-
       auto &v0 = points[tri[0]];
       auto &v1 = points[tri[1]];
       auto &v2 = points[tri[2]];
@@ -249,9 +238,9 @@ future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,
         }
       }
 
-      auto pt = pot.voxel_resolution()->world_to_index(v0);
-      auto pt1 = pot.voxel_resolution()->world_to_index(v1);
-      auto pt2 = pot.voxel_resolution()->world_to_index(v2);
+      auto pt = pot.voxelResolution()->worldToIndex(v0);
+      auto pt1 = pot.voxelResolution()->worldToIndex(v1);
+      auto pt2 = pot.voxelResolution()->worldToIndex(v2);
 
       lm::io_vertex _v0{};
       lm::io_vertex _v1{};

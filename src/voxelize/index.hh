@@ -15,8 +15,10 @@ struct closest_points_type {
 class closest_points_index {
 public:
   virtual ~closest_points_index() = default;
+
   virtual void search(const std::vector<openvdb::Vec3d> &,
                       std::vector<closest_points_type> &) = 0;
+
   virtual size_t pixel_count() const = 0;
 };
 
@@ -106,8 +108,8 @@ private:
           openvdb::math::Coord(value._coord.x, value._coord.y, value._coord.z);
       auto val = _accessor.get_value(index);
       if (val._data._type == pixel_data::type_t::invalid)
-        val = _accessor.get_value(
-            openvdb::math::Coord(value._point.x, value._point.y, value._point.z));
+        val = _accessor.get_value(openvdb::math::Coord(
+            value._point.x, value._point.y, value._point.z));
 #if false
       if (val._color.r <= 15 && val._color.g < 4 &&
           val._color.b < 4) {
@@ -123,7 +125,7 @@ private:
 
 private:
   std::unique_ptr<closest_points_index> _closest_points_index;
-  vdb::tree::value_accessor<const typename GridType::TreeType> _accessor;
+  openvdb::tree::ValueAccessor<const typename GridType::TreeType> _accessor;
   typename GridType::ConstPtr _grid;
 };
 

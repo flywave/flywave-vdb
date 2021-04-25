@@ -1,7 +1,8 @@
 #pragma once
 
-#include <flywave/voxelize/barycentric.hh>
-#include <flywave/voxelize/rasterize.hh>
+#include "barycentric.hh"
+#include "rasterize.hh"
+#include "triangle.hh"
 
 namespace flywave {
 namespace voxelize {
@@ -9,7 +10,6 @@ namespace voxelize {
 class triangle_projection {
 public:
   triangle_projection(const fmesh_tri_patch &tri, double pad = 2) : _tri(tri) {
-
     box2.extend(_tri.tp1);
     box2.extend(_tri.tp2);
     box2.extend(_tri.tp3);
@@ -61,7 +61,7 @@ public:
 
   openvdb::Vec2d point_to_uv(const openvdb::Vec3d &point) const {
     auto uv = _convert->bary2uv(_convert->pos2bary(point));
-    return openvdb::Vec2d(uv.x, uv.y);
+    return openvdb::Vec2d(uv.x(), uv.y());
   }
 
   openvdb::Vec3d uv_to_point(const openvdb::Vec2d &uv) const {

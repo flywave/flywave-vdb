@@ -54,7 +54,8 @@ public:
     using VoxelizationDataType =
         openvdb::tools::mesh_to_volume_internal::VoxelizationData<
             vertex_grid::TreeType>;
-   using DataTable = tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
+    using DataTable =
+        tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
     openvdb::util::NullInterrupter interrupter;
 
     DataTable data;
@@ -64,8 +65,7 @@ public:
 
     const tbb::blocked_range<size_t> polygonRange(0, stream.polygon_count());
 
-    tbb::parallel_for(polygonRange,
-                      Voxelizer(data, _xform->copy(), &interrupter));
+    tbb::parallel_for(polygonRange, Voxelizer(data, stream, &interrupter));
 
     for (typename DataTable::iterator i = data.begin(); i != data.end(); ++i) {
       VoxelizationDataType &dataItem = **i;

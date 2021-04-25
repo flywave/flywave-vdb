@@ -51,6 +51,11 @@ public:
     }
   }
 
+  void extend(const vector3_type &v) {
+    min = openvdb::math::minComponent(min, vector_type(v.x(), v.y()));
+    max = openvdb::math::maxComponent(max, vector_type(v.x(), v.y()));
+  }
+
   void extend(const vector_type &v) {
     min = openvdb::math::minComponent(min, v);
     max = openvdb::math::maxComponent(max, v);
@@ -178,10 +183,8 @@ public:
     vector_type t1 = (v1 - r.origin) / div;
     vector_type t2 = (v2 - r.origin) / div;
 
-    vector_type tmin =
-        openvdb::math::minComponent(t1, t2);
-    vector_type tmax =
-        openvdb::math::maxComponent(t1, t2);
+    vector_type tmin = openvdb::math::minComponent(t1, t2);
+    vector_type tmax = openvdb::math::maxComponent(t1, t2);
 
     return {std::max(tmin.x(), tmin.y()), std::min(tmax.x(), tmax.y())};
   }
@@ -235,7 +238,7 @@ template <typename T> bbox2<T> operator*(const float &a, const bbox2<T> &b) {
 }
 
 template <typename T>
-bbox2<T> operator*(const openvdb::math::Vec2<T> &a,
+bbox2<T> operator*(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
                    const bbox2<T> &b) {
   return bbox2<T>(a * b.min, a * b.max);
 }
@@ -250,31 +253,31 @@ template <typename T> bbox2<T> operator-(const bbox2<T> &a, const bbox2<T> &b) {
 
 template <typename T>
 bbox2<T> operator+(const bbox2<T> &a,
-                   const openvdb::math::Vec2<T> &b) {
+                   const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
   return bbox2<T>(a.min + b, a.max + b);
 }
 
 template <typename T>
 bbox2<T> operator-(const bbox2<T> &a,
-                   const openvdb::math::Vec2<T> &b) {
+                   const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
   return bbox2<T>(a.min - b, a.max - b);
 }
 
 template <typename T>
 bbox2<T> enlarge(const bbox2<T> &a,
-                 const openvdb::math::Vec2<T> &b) {
+                 const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
   return bbox2<T>(a.min - b, a.max + b);
 }
 
 template <typename T>
 const bbox2<T> merge(const bbox2<T> &a,
-                     const openvdb::math::Vec2<T> &b) {
+                     const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
   return bbox2<T>(openvdb::math::minComponent(a.min, b),
                   openvdb::math::maxComponent(a.max, b));
 }
 
 template <typename T>
-const bbox2<T> merge(const openvdb::math::Vec2<T> &a,
+const bbox2<T> merge(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
                      const bbox2<T> &b) {
   return bbox2<T>(openvdb::math::minComponent(a, b.min),
                   openvdb::math::maxComponent(a, b.max));
@@ -282,9 +285,8 @@ const bbox2<T> merge(const openvdb::math::Vec2<T> &a,
 
 template <typename T>
 const bbox2<T> merge(const bbox2<T> &a, const bbox2<T> &b) {
-  return bbox2<T>(
-      openvdb::math::minComponent(a.min, b.min),
-      openvdb::math::maxComponent(a.max, b.max));
+  return bbox2<T>(openvdb::math::minComponent(a.min, b.min),
+                  openvdb::math::maxComponent(a.max, b.max));
 }
 
 template <typename T>
@@ -300,9 +302,8 @@ bbox2<T> merge(const bbox2<T> &a, const bbox2<T> &b, const bbox2<T> &c,
 
 template <typename T>
 const bbox2<T> intersect(const bbox2<T> &a, const bbox2<T> &b) {
-  return bbox2<T>(
-      openvdb::math::maxComponent(a.min, b.min),
-      openvdb::math::minComponent(a.max, b.max));
+  return bbox2<T>(openvdb::math::maxComponent(a.min, b.min),
+                  openvdb::math::minComponent(a.max, b.max));
 }
 
 template <typename T>
@@ -323,12 +324,12 @@ template <typename T> bool disjoint(const bbox2<T> &a, const bbox2<T> &b) {
 
 template <typename T>
 bool disjoint(const bbox2<T> &a,
-              const openvdb::math::Vec2<T> &b) {
+              const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
   return disjoint(a, bbox2<T>(b));
 }
 
 template <typename T>
-bool disjoint(const openvdb::math::Vec2<T> &a,
+bool disjoint(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
               const bbox2<T> &b) {
   return disjoint(bbox2<T>(a), b);
 }
@@ -339,12 +340,12 @@ template <typename T> bool conjoint(const bbox2<T> &a, const bbox2<T> &b) {
 
 template <typename T>
 bool conjoint(const bbox2<T> &a,
-              const openvdb::math::Vec2<T> &b) {
+              const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
   return conjoint(a, bbox2<T>(b));
 }
 
 template <typename T>
-bool conjoint(const openvdb::math::Vec2<T> &a,
+bool conjoint(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
               const bbox2<T> &b) {
   return conjoint(bbox2<T>(a), b);
 }

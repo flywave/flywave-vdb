@@ -1,11 +1,11 @@
 #pragma once
-#include <flywave/voxelize/types.hh>
 
-#include <flywave/voxelize/mesh_adapter.hh>
-#include <flywave/voxelize/resolution.hh>
-#include <flywave/voxelize/st_policy.hh>
+#include "types.hh"
 
-#include <flywave/voxelize/voxel_pot.hh>
+#include "mesh_adapter.hh"
+#include "resolution.hh"
+#include "st_policy.hh"
+#include "voxel_pot.hh"
 
 namespace flywave {
 namespace voxelize {

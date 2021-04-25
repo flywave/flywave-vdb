@@ -9,7 +9,7 @@ namespace flywave {
 namespace voxelize {
 
 class vertext_sampler {
-  using int32_tree = openvdb::tree::Tree4<int32_t, 5, 4, 3>::type;
+  using int32_tree = openvdb::tree::Tree4<int32_t, 5, 4, 3>::Type;
 
 public:
   using int32_grid = openvdb::Grid<int32_tree>;

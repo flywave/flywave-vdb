@@ -1,19 +1,15 @@
 #pragma once
 
-#include <flywave/core/io_file_pickle.hh>
-#include <flywave/core/range.hh>
-#include <flywave/math/triangle.hh>
-#include <flywave/math/vector_lib.hh>
-#include <flywave/voxelize/color_extract.hh>
-#include <flywave/voxelize/st_policy.hh>
-#include <flywave/voxelize/types.hh>
+#include "color_extract.hh"
+#include "st_policy.hh"
+#include "types.hh"
 
 namespace flywave {
 namespace voxelize {
 
 struct texture_sampler {
-  shared_ptr<st_policy> _policy;
-  shared_ptr<color_extract> _extract;
+  std::shared_ptr<st_policy> _policy;
+  std::shared_ptr<color_extract> _extract;
 };
 
 struct material_data {
@@ -21,15 +17,16 @@ struct material_data {
 
   enum { BASE = 0, LAMBERT = 1, PHONG = 2, PBR = 3 };
   enum { COLOR = 0x1, TEXTURE = 0x2, BUMP = 0x4 };
+
   uint32_t type = 0;
   uint16_t mode{0};
 
-  color3i color{255, 255, 255};
+  Eigen::Matrix<uint8_t, 3, 1> color{255, 255, 255};
 
-  color3i ambient{255, 255, 255};
-  color3i emissive{0, 0, 0};
+  Eigen::Matrix<uint8_t, 3, 1> ambient{255, 255, 255};
+  Eigen::Matrix<uint8_t, 3, 1> emissive{0, 0, 0};
 
-  color3i specular{0, 0, 0};
+  Eigen::Matrix<uint8_t, 3, 1> specular{0, 0, 0};
 
   float opacity{1.0};
 
@@ -44,6 +41,7 @@ struct material_data {
 
   float anisotropy{0.f};
   float anisotropy_rotation{0.0f};
+
   material_data(const material_data &) = default;
   material_data() = default;
   material_data(material_data &&) = default;
@@ -83,23 +81,17 @@ struct material_data {
     }
     return false;
   }
-
-  template <typename Describer> auto describe_type(Describer f) {
-    return f(_material_id, type, mode, color, ambient, emissive, specular,
-             opacity, shininess, metallic, roughness, reflectance,
-             clearcoat_thickness, clearcoat_roughness, anisotropy,
-             anisotropy_rotation);
-  }
 };
 
 class material_group {
 public:
-  material_group(shared_ptr<material_data> mdata,
+  material_group(std::shared_ptr<material_data> mdata,
                  const texture_sampler &sampler)
-      : _texture_sampler(make_shared<texture_sampler>(sampler)),
+      : _texture_sampler(std::make_shared<texture_sampler>(sampler)),
         _material_data(mdata) {}
 
-  material_group(shared_ptr<material_data> mdata) : _material_data(mdata) {}
+  material_group(std::shared_ptr<material_data> mdata)
+      : _material_data(mdata) {}
 
   material_group() = default;
 
@@ -107,22 +99,24 @@ public:
 
   const material_data &material() const { return *_material_data; }
 
-  shared_ptr<material_data> material_ptr() const { return _material_data; }
+  std::shared_ptr<material_data> material_ptr() const { return _material_data; }
 
   texture_sampler &sampler() const { return *_texture_sampler; }
 
   bool has_texture_sampler() const { return _texture_sampler != nullptr; }
 
 private:
-  shared_ptr<texture_sampler> _texture_sampler;
-  shared_ptr<material_data> _material_data;
+  std::shared_ptr<texture_sampler> _texture_sampler;
+  std::shared_ptr<material_data> _material_data;
 };
 
 struct data_triangle {
   triangle3<float> _triangle;
   uint16_t _material_id;
 
-  const vector3<float> &operator[](size_t index) { return _triangle[index]; }
+  const Eigen::Matrix<float, 3, 1> &operator[](size_t index) {
+    return _triangle[index];
+  }
 };
 
 class mesh_adapter;
@@ -137,18 +131,20 @@ class triangles_stream {
 public:
   triangle3<float> find_triangle_transfromed(uint32_t face_index) {
     data_triangle tri = find_triangle(face_index);
-    return triangle3<float>(_xform->world_to_index(tri._triangle[0]),
-                            _xform->world_to_index(tri._triangle[1]),
-                            _xform->world_to_index(tri._triangle[2]));
+    return triangle3<float>(_xform->worldToIndex(tri._triangle[0]),
+                            _xform->worldToIndex(tri._triangle[1]),
+                            _xform->worldToIndex(tri._triangle[2]));
   }
 
   virtual size_t polygon_count() const = 0;
 
-  virtual void set_transfrom(vdb::math::transform::ptr xfrom) {
+  virtual void set_transfrom(openvdb::math::Transform::Ptr xfrom) {
     _xform = xfrom;
   }
 
-  virtual void set_matrix(matrix44<double> matrix) { _matrix44 = matrix; }
+  virtual void set_matrix(Eigen::Matrix<double, 4, 4> matrix) {
+    _matrix44 = matrix;
+  }
 
   bbox3d compute_boundbox() {
     bbox3d box;
@@ -168,10 +164,10 @@ public:
   virtual data_triangle find_triangle(uint32_t face_index) = 0;
 
 private:
-  vdb::math::transform::ptr _xform;
+  openvdb::math::Transform::Ptr _xform;
 
 protected:
-  matrix44<double> _matrix44;
+  Eigen::Matrix<double, 4, 4> _matrix44;
 };
 
 class mesh_adapter {
@@ -195,10 +191,10 @@ public:
 
 class material_merge_transfrom {
 public:
-  material_merge_transfrom(std::vector<shared_ptr<material_data>> mtls)
+  material_merge_transfrom(std::vector<std::shared_ptr<material_data>> mtls)
       : _materials(std::move(mtls)) {}
 
-  void merge(std::vector<shared_ptr<material_data>> materials) {
+  void merge(std::vector<std::shared_ptr<material_data>> materials) {
     for (auto pt : materials) {
       auto qpt = find_same_material(_materials, pt);
       if (!qpt) {
@@ -218,14 +214,14 @@ public:
     return _mapping.find(id)->second;
   }
 
-  std::vector<shared_ptr<material_data>> materials() {
+  std::vector<std::shared_ptr<material_data>> materials() {
     return std::move(_materials);
   }
 
 private:
-  shared_ptr<material_data>
-  find_same_material(std::vector<shared_ptr<material_data>> &mates,
-                     shared_ptr<material_data> mat) {
+  std::shared_ptr<material_data>
+  find_same_material(std::vector<std::shared_ptr<material_data>> &mates,
+                     std::shared_ptr<material_data> mat) {
     for (auto pt : mates) {
       if (*mat == *pt)
         return pt;
@@ -235,7 +231,7 @@ private:
   }
 
 protected:
-  std::vector<shared_ptr<material_data>> _materials;
+  std::vector<std::shared_ptr<material_data>> _materials;
   std::map<material_id_t, material_id_t> _mapping;
 };
 } // namespace voxelize

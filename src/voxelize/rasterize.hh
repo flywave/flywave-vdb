@@ -1,4 +1,5 @@
 #pragma once
+
 #include <flywave/voxelize/barycentric.hh>
 
 namespace flywave {

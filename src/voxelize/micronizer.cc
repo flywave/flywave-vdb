@@ -1,6 +1,7 @@
 #include <flywave/voxelize/micronizer.hh>
 #include <flywave/voxelize/projection.hh>
 #include <flywave/voxelize/sampler.hh>
+
 namespace flywave {
 namespace voxelize {
 
@@ -10,18 +11,16 @@ void coloring(vertex_grid::ptr vertex, pixel_grid::ptr pixel,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id);
 
-future<voxel_pot> micronizer::micronize(float precision,
-                                        clip_box_createor &creator,
-                                        sampler_type type,
-                                        material_merge_transfrom &tmtl,
-                                        matrix44<double> matrix) {
+voxel_pot micronizer::micronize(float precision, clip_box_createor &creator,
+                                sampler_type type,
+                                material_merge_transfrom &tmtl,
+                                matrix44<double> matrix) {
   auto transform = _resolution.eval_resolution(precision);
   _adapter._stream->set_matrix(matrix);
   return do_with(vertext_sampler::make_mesh_sampler(transform, type),
                  [this, &tmtl, &creator, transform](auto &vsamper) {
                    return vsamper->sampler(*(_adapter._stream), creator)
                        .then([this, &tmtl, transform](auto vgrid, auto fgrid) {
-
                          std::vector<shared_ptr<material_data>> materials;
                          for (auto &i : _adapter._materials) {
                            materials.emplace_back(i.second.material_ptr());
@@ -42,9 +41,9 @@ struct paint_color_on_surface {
 
   paint_color_on_surface(
       std::vector<
-          typename vertext_sampler::int32_grid::tree_type::leaf_node_type *>
+          typename vertext_sampler::int32_grid::TreeType::leaf_node_type *>
           &nodes,
-      vertex_grid::tree_type &vertex, pixel_grid::tree_type &pixel,
+      vertex_grid::TreeType &vertex, pixel_grid::TreeType &pixel,
       vdb::math::transform &transform, const material_merge_transfrom &tmtl,
       mesh_adapter &adapter, local_feature_id_t local_feature)
       : _nodes(nodes), _vertex(vertex), _pixel(&pixel), _transform(transform),
@@ -61,8 +60,8 @@ struct paint_color_on_surface {
     material_group const *_material_group;
     std::unique_ptr<st_policy> uv_policy;
 
-    vdb::tree::value_accessor<const vertex_grid::tree_type> vaccess(_vertex);
-    vdb::tree::value_accessor<pixel_grid::tree_type> paccess(*_pixel);
+    vdb::tree::value_accessor<const vertex_grid::TreeType> vaccess(_vertex);
+    vdb::tree::value_accessor<pixel_grid::TreeType> paccess(*_pixel);
 
     for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
       auto &distNode = *_nodes[n];
@@ -121,11 +120,11 @@ struct paint_color_on_surface {
 
   void join(paint_color_on_surface &surface) { _pixel->merge(*surface._pixel); }
 
-  std::vector<typename vertext_sampler::int32_grid::tree_type::leaf_node_type *>
+  std::vector<typename vertext_sampler::int32_grid::TreeType::leaf_node_type *>
       &_nodes;
-  vertex_grid::tree_type &_vertex;
-  pixel_grid::tree_type _local_tree;
-  pixel_grid::tree_type *_pixel;
+  vertex_grid::TreeType &_vertex;
+  pixel_grid::TreeType _local_tree;
+  pixel_grid::TreeType *_pixel;
   vdb::math::transform &_transform;
   const material_merge_transfrom &_tmtl;
   mesh_adapter &_adapter;
@@ -138,7 +137,7 @@ void coloring(vertex_grid::ptr vertex, pixel_grid::ptr pixel,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id) {
 
-  std::vector<typename vertext_sampler::int32_grid::tree_type::leaf_node_type *>
+  std::vector<typename vertext_sampler::int32_grid::TreeType::leaf_node_type *>
       nodes;
   nodes.reserve(index->tree().leaf_count());
   index->tree().get_nodes(nodes);

@@ -1,6 +1,9 @@
 #pragma once
-#include <flywave/voxelize/barycentric.hh>
-#include <flywave/voxelize/types.hh>
+
+#include "barycentric.hh"
+#include "types.hh"
+
+#include <memory>
 
 namespace flywave {
 namespace voxelize {
@@ -10,7 +13,8 @@ public:
   virtual void start_triangle(const face_index_t &index,
                               const triangle3<double> &tri) = 0;
 
-  virtual vector2<double> eval_uv(const vector3<double> &point) = 0;
+  virtual Eigen::Matrix<double, 2, 1>
+  eval_uv(const Eigen::Matrix<double, 3, 1> &point) = 0;
 
   virtual std::unique_ptr<st_policy> make_shared() = 0;
 };
@@ -33,7 +37,8 @@ public:
     }
   }
 
-  vector2<double> eval_uv(const vector3<double> &point) override {
+  Eigen::Matrix<double, 2, 1>
+  eval_uv(const Eigen::Matrix<double, 3, 1> &point) override {
     return _convert.bary2uv(_convert.pos2bary(point));
   }
 
@@ -52,19 +57,21 @@ private:
 
 class only_vertex_policy : public st_policy {
 public:
-  only_vertex_policy(const vector3<float> up, const bbox2<float> &box)
+  only_vertex_policy(const Eigen::Matrix<float, 3, 1> up,
+                     const bbox2<float> &box)
       : _bbox(box), _up(up) {}
 
   inline void start_triangle(const face_index_t &index,
                              const triangle3<double> &tri) override {}
 
-  vector2<double> eval_uv(const vector3<double> &point) override {
-    return vector2<double>(0, 0);
+  Eigen::Matrix<double, 2, 1>
+  eval_uv(const Eigen::Matrix<double, 3, 1> &point) override {
+    return Eigen::Matrix<double, 2, 1>(0, 0);
   }
 
 public:
   bbox2<float> _bbox;
-  vector3<float> _up;
+  Eigen::Matrix<float, 3, 1> _up;
 };
 
 } // namespace voxelize

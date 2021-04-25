@@ -1,4 +1,5 @@
 #pragma once
+
 #include <flywave/voxelize/barycentric.hh>
 #include <flywave/voxelize/rasterize.hh>
 
@@ -9,10 +10,6 @@ class triangle_projection {
 public:
   triangle_projection(const fmesh_tri_patch &tri, double pad = 2) : _tri(tri) {
 
-    // auto etp1 = extent_triangle(_tri.tp1);
-    // auto etp2 = extent_triangle(_tri.tp2);
-    // auto etp3 = extent_triangle(_tri.tp3);
-
     box2.extend(_tri.tp1);
     box2.extend(_tri.tp2);
     box2.extend(_tri.tp3);
@@ -22,10 +19,10 @@ public:
         triangle2<double>(_tri.tp1, _tri.tp2, _tri.tp3));
   }
 
-  std::vector<vdb::vec3d> to_voxels() const {
-    std::vector<vdb::vec3d> coords;
+  std::vector<openvdb::Vec3d> to_voxels() const {
+    std::vector<openvdb::Vec3d> coords;
     if (box2.width() == 0 && box2.height() == 0)
-      return std::vector<vdb::vec3d>();
+      return std::vector<openvdb::Vec3d>();
 
     for (double y = std::floor(box2.min.y); y <= std::ceil(box2.max.y); y++) {
       for (double x = std::floor(box2.min.x); x <= std::ceil(box2.max.x); x++) {
@@ -38,7 +35,7 @@ public:
             BarycentricCoordsAreValid(_convert->uv2bary({x + 1, y + 1})) ||
             BarycentricCoordsAreValid(_convert->uv2bary({x - 1, y - 1})) ||
             BarycentricCoordsAreValid(_convert->uv2bary({x + 1, y - 1}))) {
-          coords.emplace_back(uv_to_point(vector2<double>(x, y)));
+          coords.emplace_back(uv_to_point(Eigen::Matrix<double, 2, 1>(x, y)));
         }
       }
     }
@@ -46,17 +43,17 @@ public:
   }
 
   bool
-  BarycentricCoordsAreValid(const vector3<double> &p_barycentricCoords) const {
+  BarycentricCoordsAreValid(const Eigen::Matrix<double, 3, 1> &p_barycentricCoords) const {
     return p_barycentricCoords.x >= 0.0f && p_barycentricCoords.y >= 0.0f &&
            p_barycentricCoords.x + p_barycentricCoords.y <= 1.05f;
   }
 
-  vector2<double> point_to_uv(const vector3<double> &point) const {
+  Eigen::Matrix<double, 2, 1> point_to_uv(const Eigen::Matrix<double, 3, 1> &point) const {
     auto uv = _convert->bary2uv(_convert->pos2bary(point));
-    return vector2<double>(uv.x, uv.y);
+    return Eigen::Matrix<double, 2, 1>(uv.x, uv.y);
   }
 
-  vector3<double> uv_to_point(const vector2<double> &uv) const {
+  Eigen::Matrix<double, 3, 1> uv_to_point(const Eigen::Matrix<double, 2, 1> &uv) const {
     return _convert->bary2pos(_convert->uv2bary(uv));
   }
 

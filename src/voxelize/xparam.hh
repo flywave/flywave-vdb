@@ -1,14 +1,9 @@
 #pragma once
-#include <flywave/mesh/mesh_graph.hh>
-#include <flywave/mesh/mesh_uv.hh>
-#include <flywave/mesh/parameterization.hh>
-#include <flywave/mesh/texture_optimization.hh>
 
-#include <xatlas/src/xatlas.h>
-
-#include <wrap/io_trimesh/export_obj.h>
+#include <xatlas.h>
 
 #include <algorithm>
+
 namespace flywave {
 namespace voxelize {
 
@@ -143,7 +138,7 @@ public:
         j++;
       }
 
-      input_mesh.indexCount = (uint32_t)atlas_mesh.FN()*3;
+      input_mesh.indexCount = (uint32_t)atlas_mesh.FN() * 3;
       input_mesh.indexData = faces.data();
       input_mesh.indexFormat = xatlas::IndexFormat::UInt32;
     }
@@ -232,13 +227,13 @@ public:
     }
   }
 
-  vector2<uint32_t> image_size() { return _size; }
+  Eigen::Matrix<uint32_t, 2, 1> image_size() { return _size; }
 
   Mesh &mesh() { return _curmesh; }
 
 private:
   Mesh &_curmesh;
-  vector2<uint32_t> _size;
+  Eigen::Matrix<uint32_t, 2, 1> _size;
   double _tquality;
 };
 

@@ -9,12 +9,12 @@
 #include <flywave/voxelize/voxel_pot.hh>
 
 #include <flywave/math/tolerance.hh>
-#include <flywave/vdb/math/transform.hh>
+#include <openvdb/math/Transform.h>
+#include <openvdb/tools/VolumeToMesh.h>
 
 #include <flywave/lm/mesh.hh>
 #include <flywave/lm/texture_mesh.hh>
 
-#include <flywave/vdb/tools/volume_to_mesh.hh>
 #include <wrap/io_trimesh/export_obj.h>
 
 namespace flywave {
@@ -22,14 +22,14 @@ namespace voxelize {
 
 class textute_foundry::impl {
 public:
-  using sampler_type = sampling_result<pixel_grid::value_type>;
+  using sampler_type = sampling_result<pixel_grid::ValueType>;
 
 public:
   impl(vertex_grid::ptr cgrid, pixel_grid::ptr pgrid) {
     _query = make_near_voxels_index<vertex_grid, pixel_grid>(cgrid, pgrid);
   }
 
-  std::vector<sampler_type> extract(std::vector<vdb::vec3d> coords) const {
+  std::vector<sampler_type> extract(std::vector<openvdb::Vec3d> coords) const {
     return _query->extract(std::move(coords));
   }
 
@@ -206,7 +206,7 @@ future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,
 
       auto get_mt_config = [&](const vertext_type &p) {
         auto pt = pot.voxel_resolution()->world_to_index(p);
-        auto &pix = assess.get_value(vdb::coord(pt[0], pt[1], pt[2]));
+        auto &pix = assess.get_value(openvdb::Coord(pt[0], pt[1], pt[2]));
 
         mtsetting mtconfig;
 
@@ -262,11 +262,11 @@ future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,
 
       if (repair) {
         _v0.b = repair->_seam_index_tree->is_value_on(
-            vdb::coord(pt[0], pt[1], pt[2]));
+            openvdb::Coord(pt[0], pt[1], pt[2]));
         _v1.b = repair->_seam_index_tree->is_value_on(
-            vdb::coord(pt1[0], pt1[1], pt1[2]));
+            openvdb::Coord(pt1[0], pt1[1], pt1[2]));
         _v2.b = repair->_seam_index_tree->is_value_on(
-            vdb::coord(pt2[0], pt2[1], pt2[2]));
+            openvdb::Coord(pt2[0], pt2[1], pt2[2]));
       }
       _v0.v[0] = v0[0];
       _v0.v[1] = v0[1];

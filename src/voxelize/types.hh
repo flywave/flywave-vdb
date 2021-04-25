@@ -1,38 +1,34 @@
 #pragma once
 
-#include <flywave/math/color.hh>
-#include <flywave/math/plan.hh>
-#include <flywave/math/ray.hh>
-#include <flywave/math/vector_lib.hh>
-#include <flywave/math/zero.hh>
+#include <Eigen/Geometry>
 
 namespace flywave {
 namespace voxelize {
 
-using index_type = vector3<uint32_t>;
+using index_type = Eigen::Matrix<uint32_t, 3, 1>;
 
-using quad_type = vector4<int32_t>;
+using quad_type = Eigen::Matrix<int32_t, 3, 1>;
 
-using triangle_type = vector3<int32_t>;
+using triangle_type = Eigen::Matrix<int32_t, 3, 1>;
 
-using vertext_type = vector3<float>;
+using vertext_type = Eigen::Matrix<float, 3, 1>;
 
 using local_feature_id_t = uint16_t;
 using globe_feature_id_t = uint64_t;
 
 struct fmesh_tri_patch {
-  vector3<float> p1;
-  vector3<float> p2;
-  vector3<float> p3;
+  Eigen::Matrix<float, 3, 1> p1;
+  Eigen::Matrix<float, 3, 1> p2;
+  Eigen::Matrix<float, 3, 1> p3;
 
-  vector2<float> tp1;
-  vector2<float> tp2;
-  vector2<float> tp3;
+  Eigen::Matrix<float, 3, 1> tp1;
+  Eigen::Matrix<float, 3, 1> tp2;
+  Eigen::Matrix<float, 3, 1> tp3;
 };
 
-using color_type = color4<uint8_t>;
+using color_type = Eigen::Matrix<uint8_t, 4, 1>;
 
-using uv_type = vector2<float>;
+using uv_type = Eigen::Matrix<float, 2, 1>;
 
 enum class sampler_type { level_set, surface };
 
@@ -48,41 +44,6 @@ template <typename T> struct approx_value {
   }
 
   T tol = tolerance<T>();
-};
-
-template <typename scalar_type> class intersec_ray3 : public ray3<scalar_type> {
-  using base = ray3<scalar_type>;
-
-public:
-  intersec_ray3(const vector3<scalar_type> &rorigin,
-                const vector3<scalar_type> &rdirection)
-      : base(rorigin, rdirection) {}
-
-  bool distance_to_plane(const plan<scalar_type> &plane, scalar_type &value) {
-
-    scalar_type denominator = plane.normal.dot(base::direction);
-
-    if (denominator == 0) {
-
-      if (plane.distance_to_point(base::origin) == 0) {
-
-        value = 0.0;
-        return true;
-      }
-
-      return false;
-    }
-
-    scalar_type t =
-        -(base::origin.dot(plane.normal) + plane.distance) / denominator;
-
-    if (t >= 0) {
-      value = t;
-      return true;
-    } else {
-      return false;
-    }
-  }
 };
 
 } // namespace voxelize

@@ -1,11 +1,8 @@
 #pragma once
-#include <flywave/lm/trianglesoup.hh>
-#include <flywave/math/bbox.hh>
-#include <flywave/math/color.hh>
-#include <flywave/mesh/texture2d.hh>
-#include <flywave/voxelize/mesh_adapter.hh>
-#include <flywave/voxelize/voxel_pot.hh>
-#include <flywave/voxelize/xparam.hh>
+
+#include "mesh_adapter.hh"
+#include "voxel_pot.hh"
+#include "xparam.hh"
 
 namespace flywave {
 namespace voxelize {
@@ -14,7 +11,7 @@ class textute_foundry {
   class impl;
 
 public:
-  textute_foundry(vertex_grid::ptr cgrid, pixel_grid::ptr, float tquality,
+  textute_foundry(vertex_grid::Ptr cgrid, pixel_grid::Ptr, float tquality,
                   float tpad);
 
   texture2d<color4<uint8_t>>::ptr extract(const fmesh_tri_patch &tri,
@@ -26,7 +23,7 @@ public:
 
 private:
   std::unique_ptr<impl> _query;
-  vertex_grid::ptr _grid;
+  vertex_grid::Ptr _grid;
   float _texture_quality;
   float _pixel_pad;
 
@@ -35,45 +32,44 @@ public:
 };
 
 struct seam_repair {
-  using seam_tree = vdb::tree::tree4<uint32_t, 5, 4, 3>::type;
-  seam_tree::ptr _seam_index_tree;
+  using seam_tree = openvdb::tree::Tree4<uint32_t, 5, 4, 3>::Type;
+  seam_tree::Ptr _seam_index_tree;
   shared_ptr<std::vector<vertext_type>> _seam_vertexs;
 };
 
 struct seam_box_setting {
   bbox3<double> _box;
-  vdb::math::transform::const_ptr _transform;
-  vector3<double> _up;
-  vector3<double> _left;
+  openvdb::math::Transform::ConstPtr _transform;
+  Eigen::Matrix<double, 3, 1> _up;
+  Eigen::Matrix<double, 3, 1> _left;
 };
 
 class triangle_foundry {
-
 public:
-  triangle_foundry(vertex_grid::ptr vgrid) : _grid(vgrid) {}
+  triangle_foundry(vertex_grid::Ptr vgrid) : _grid(vgrid) {}
 
-  triangle_foundry(vertex_grid::ptr vgrid, shared_ptr<seam_repair> repair)
+  triangle_foundry(vertex_grid::Ptr vgrid, std::shared_ptr<seam_repair> repair)
       : _grid(vgrid), _seam_repair(repair) {}
 
-  future<> make_mesh(std::vector<vertext_type> &points,
+  void make_mesh(std::vector<vertext_type> &points,
                      std::vector<triangle_type> &tri,
                      std::vector<quad_type> &quads, double isovalue = 0.0,
                      double adapter = 0.01);
 
-  future<shared_ptr<seam_repair>> make_mesh_mark_seam(
+  std::shared_ptr<seam_repair> make_mesh_mark_seam(
       const seam_box_setting &mbox, std::vector<vertext_type> &points,
       std::vector<triangle_type> &tri, std::vector<quad_type> &a,
       double isovalue = 0.0, double adapter = 0.01);
 
 private:
-  vertex_grid::ptr _grid;
-  shared_ptr<seam_repair> _seam_repair;
+  vertex_grid::Ptr _grid;
+  std::shared_ptr<seam_repair> _seam_repair;
 };
 
 template <typename Param> class packed_mesh : public Param {
 public:
   packed_mesh(typename Param::mesh_type &mesh,
-              shared_ptr<textute_foundry> tfoundry)
+              std::shared_ptr<textute_foundry> tfoundry)
       : Param(mesh, tfoundry->texture_quality()),
         _tfoundry(std::move(tfoundry)) {}
 
@@ -89,16 +85,6 @@ public:
     _texture->fill('\0');
     int count = 0;
     for (auto fptr : Param::mesh().face) {
-      //      if (vcg::tri::Index(Param::mesh(), fptr.V(0)) == 11433 &&
-      //          vcg::tri::Index(Param::mesh(), fptr.V(1)) == 11415 &&
-      //          vcg::tri::Index(Param::mesh(), fptr.V(2)) == 11432)
-      //        count = 0;
-      //      if (fptr.tex == -1)
-      //        continue;
-      // vcg::Box2f box;
-      // for (int i = 0; i < 3; ++i)
-      //   box.Add({fptr.V(i)->T().U(), fptr.V(i)->T().V()});
-
       auto image = _tfoundry->extract(
           fmesh_tri_patch{
               vertext_type(fptr.P(0)[0], fptr.P(0)[1], fptr.P(0)[2]),
@@ -128,14 +114,6 @@ private:
   shared_ptr<textute_foundry> _tfoundry;
 };
 
-future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &vtriangles,
-                           voxel_pot &pot, shared_ptr<seam_repair> repair,
-                           double fquality, double isovalue = 0.0,
-                           double adapter = 0.01);
-
-future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &vtriangles,
-                           voxel_pot &pot, double fquality,
-                           double isovalue = 0.0, double adapter = 0.01);
 
 } // namespace voxelize
 } // namespace flywave

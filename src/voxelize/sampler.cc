@@ -3,6 +3,7 @@
 
 #include <flywave/vdb/tools/clip.hh>
 #include <flywave/vdb/tools/mesh_to_volume.hh>
+
 namespace flywave {
 namespace voxelize {
 
@@ -55,14 +56,14 @@ public:
         vdb::util::null_interrupter interrupter;
         using voxelization_data_type =
             vdb::tools::mesh_to_volume_internal::voxelization_data<
-                vertex_grid::tree_type>;
+                vertex_grid::TreeType>;
         using data_type = vdb::parallel::enumerable_thread_specific<
             typename voxelization_data_type::ptr>;
 
         data_type data;
         using Voxelizer =
             vdb::tools::mesh_to_volume_internal::voxelize_polygons<
-                vertex_grid::tree_type, triangles_stream,
+                vertex_grid::TreeType, triangles_stream,
                 vdb::util::null_interrupter>;
 
         const vdb::parallel::blocked_range<size_t> polygonRange(

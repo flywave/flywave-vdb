@@ -1,46 +1,45 @@
 #pragma once
 
-#include <flywave/vdb/tools/grid_operators.hh>
+#include <openvdb/tools/GridOperators.h>
 
 namespace flywave {
 namespace voxelize {
+
 struct closest_points_type {
   float _distance;
-  vdb::vec3d _coord;
-  vdb::vec3d _point;
+  openvdb::Vec3d _coord;
+  openvdb::Vec3d _point;
   bool b = false;
 };
 
 class closest_points_index {
 public:
-  virtual void search(const std::vector<vdb::vec3d> &,
-                      std::vector<closest_points_type> &) = 0;
-
-  virtual size_t pixel_count() const = 0;
   virtual ~closest_points_index() = default;
+  virtual void search(const std::vector<openvdb::Vec3d> &,
+                      std::vector<closest_points_type> &) = 0;
+  virtual size_t pixel_count() const = 0;
 };
 
-////////////////////////////////////////
-
 namespace {
-inline double tac(vdb::vec3d t, size_t k) { return t[k]; }
+inline double tac(openvdb::Vec3d t, size_t k) { return t[k]; }
 } // namespace
+
 template <typename GridT>
 class near_voxels_index : public closest_points_index {
 public:
-  near_voxels_index(typename GridT::const_ptr grid)
+  near_voxels_index(typename GridT::ConstPtr grid)
       : _grid(grid), inAccessor(grid->get_const_accessor()), _pixel_counts(0) {}
 
-  void search(const std::vector<vdb::vec3d> &points,
+  void search(const std::vector<openvdb::Vec3d> &points,
               std::vector<closest_points_type> &distances) override {
     size_t i = 0;
     auto scale =
-        _grid->transform_ptr()->template map<vdb::math::uniform_scale_map>();
+        _grid->transform_ptr()->template map<openvdb::math::UniformScaleMap>();
     for (auto &point : points) {
-      vdb::vec3f P =
-          vdb::math::CPT<vdb::math::scale_map, vdb::math::CD_2ND>::result<
-              float>(*scale, inAccessor, vdb::coord(point.x, point.y, point.z));
-
+      openvdb::Vec3f P =
+          openvdb::math::CPT<openvdb::math::ScaleMap, openvdb::math::CD_2ND>::
+              result<float>(*scale, inAccessor,
+                            openvdb::math::Coord(point.x, point.y, point.z));
       distances[i++] = closest_points_type{0, P, point, true};
     }
   }
@@ -49,34 +48,33 @@ public:
 
 private:
   size_t _pixel_counts;
-  // std::unique_ptr<voxel_kdtree> _tree;
-  typename GridT::const_ptr _grid;
-  typename GridT::const_accessor inAccessor;
+  typename GridT::ConstPtr _grid;
+  typename GridT::ConstAccessor inAccessor;
 };
 
 #define PI 3.141592653589793
 
 template <typename ValueType> struct sampling_result {
-  vdb::vec3d _coord;
-  vdb::vec3d _tri_coord;
+  openvdb::Vec3d _coord;
+  openvdb::Vec3d _tri_coord;
   ValueType _value;
   sampling_result() = default;
-  sampling_result(const vdb::vec3d &c, const vdb::vec3d &tri_cood,
+  sampling_result(const openvdb::Vec3d &c, const openvdb::Vec3d &tri_cood,
                   const ValueType &value)
       : _coord(c), _tri_coord(tri_cood), _value(value) {}
 };
 
 template <typename GridType> class triangle_range_query {
   using sampling_voxels =
-      std::vector<sampling_result<typename GridType::value_type>>;
+      std::vector<sampling_result<typename GridType::ValueType>>;
 
 public:
   triangle_range_query(std::unique_ptr<closest_points_index> index,
-                       typename GridType::const_ptr grid)
+                       typename GridType::ConstPtr grid)
       : _closest_points_index(std::move(index)), _grid(grid),
         _accessor(grid->tree()) {}
 
-  sampling_voxels extract(std::vector<vdb::vec3d> coords) {
+  sampling_voxels extract(std::vector<openvdb::Vec3d> coords) {
     return sampling(std::move(coords));
   }
 
@@ -95,7 +93,7 @@ private:
   };
   approx_value<double> _approx_value;
 
-  sampling_voxels sampling(std::vector<vdb::vec3d> coords) {
+  sampling_voxels sampling(std::vector<openvdb::Vec3d> coords) {
     std::vector<closest_points_type> instanceRadius(coords.size());
     sampling_voxels result;
 
@@ -104,18 +102,19 @@ private:
     for (auto &value : instanceRadius) {
       if (!value.b)
         continue;
-      auto index = vdb::coord(value._coord.x, value._coord.y, value._coord.z);
+      auto index =
+          openvdb::Coord(value._coord.x, value._coord.y, value._coord.z);
       auto val = _accessor.get_value(index);
       if (val._data._type == pixel_data::type_t::invalid)
         val = _accessor.get_value(
-            vdb::coord(value._point.x, value._point.y, value._point.z));
+            openvdb::Coord(value._point.x, value._point.y, value._point.z));
 #if false
       if (val._color.r <= 15 && val._color.g < 4 &&
           val._color.b < 4) {
         val._color = color4<uint8_t>(255, 0, 0, 255);
       }
 #endif
-      result.emplace_back(sampling_result<typename GridType::value_type>{
+      result.emplace_back(sampling_result<typename GridType::ValueType>{
           value._coord, value._point, val});
     }
 
@@ -124,14 +123,14 @@ private:
 
 private:
   std::unique_ptr<closest_points_index> _closest_points_index;
-  vdb::tree::value_accessor<const typename GridType::tree_type> _accessor;
-  typename GridType::const_ptr _grid;
+  vdb::tree::value_accessor<const typename GridType::TreeType> _accessor;
+  typename GridType::ConstPtr _grid;
 };
 
 template <typename Grid, typename PixelGrid>
 inline std::unique_ptr<triangle_range_query<PixelGrid>>
-make_near_voxels_index(typename Grid::const_ptr grid,
-                       typename PixelGrid::const_ptr pgrid) {
+make_near_voxels_index(typename Grid::ConstPtr grid,
+                       typename PixelGrid::ConstPtr pgrid) {
   return std::make_unique<triangle_range_query<PixelGrid>>(
       std::make_unique<near_voxels_index<Grid>>(grid), pgrid);
 }

@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cmath>
 #include <stdio.h>
 #include <string.h>
@@ -20,9 +21,6 @@ inline constexpr bool is_approx_equal(const voxelize::pixel &a,
 } // namespace math
 } // namespace flywave
 
-#include <flywave/math/color.hh>
-#include <flywave/math/vector_lib.hh>
-#include <flywave/math/zero.hh>
 namespace flywave {
 namespace voxelize {
 

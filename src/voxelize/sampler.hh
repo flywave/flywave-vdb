@@ -1,5 +1,7 @@
 #pragma once
+
 #include <flywave/voxelize/mesh_adapter.hh>
+
 #include <flywave/voxelize/trees.hh>
 
 namespace flywave {

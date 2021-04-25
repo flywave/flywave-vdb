@@ -9,19 +9,20 @@
 namespace flywave {
 namespace voxelize {
 
-voxel_pot::voxel_pot(vertex_grid::ptr vertex, pixel_grid::ptr pixel,
-                     openvdb::math::Transform::Ptr res)
+voxel_pot::voxel_pot(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
+                     openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr res)
     : _resolution(res), _vertex(vertex), _pixel(pixel) {
-  _vertex->set_grid_class(vdb::GRID_LEVEL_SET);
-  _vertex->set_transform(_resolution);
+  _vertex->setGridClass(openvdb::GRID_LEVEL_SET);
+  _vertex->setTransform(_resolution);
 }
 
-bool voxel_pot::ray_test(const flywave::extray3<double> &ray, openvdb::Vec3d &p) {
+bool voxel_pot::ray_test(const openvdb::OPENVDB_VERSION_NAME::math::Ray<double> &ray, openvdb::Vec3d &p) {
   if (_vertex->empty())
     return false;
-  vdb::tools::level_set_ray_intersector<vertex_grid> vray(*_vertex);
 
-  return vray.intersects_WS(ray, p);
+  openvdb::tools::LevelSetRayIntersector<vertex_grid> vray(*_vertex);
+
+  return vray.intersectsWS(ray, p);
 }
 
 void voxel_pot::clear_unuse_materials() {
@@ -30,9 +31,9 @@ void voxel_pot::clear_unuse_materials() {
     mapping.emplace(pt->_material_id, true);
   }
 
-  auto iter = pixel_grid()->tree().begin_value_on();
+  auto iter = pixel_grid()->tree().beginValueOn();
   while (iter) {
-    mapping[iter.get_value()._data._material_id] = false;
+    mapping[iter.getValue()._data._material_id] = false;
     ++iter;
   }
 
@@ -43,34 +44,32 @@ void voxel_pot::clear_unuse_materials() {
 }
 
 void voxel_pot_intersection(voxel_pot &tpot, voxel_pot &spot) {
-  vdb::tools::csg_intersection(tpot.voxel_grid()->tree(),
+    openvdb::tools::csgIntersection(tpot.voxel_grid()->tree(),
                                spot.voxel_grid()->tree(), true);
 }
 
 void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
-  auto pix_size = tpot.voxel_grid()->active_voxel_count();
-
-  vdb::tools::csg_union(tpot.voxel_grid()->tree(), spot.voxel_grid()->tree(),
+ openvdb::tools::csgUnion(tpot.voxel_grid()->tree(), spot.voxel_grid()->tree(),
                         true);
   tpot.pixel_grid()->tree().merge(spot.pixel_grid()->tree());
 
-  auto iter = spot.voxel_grid()->tree().begin_value_on();
-  auto paccess = tpot.pixel_grid()->get_accessor();
-  auto vaccess = tpot.voxel_grid()->get_accessor();
+  auto iter = spot.voxel_grid()->tree().beginValueOn();
+  auto paccess = tpot.pixel_grid()->getAccessor();
+  auto vaccess = tpot.voxel_grid()->getAccessor();
 
   while (iter) {
-    if (!vaccess.is_value_on(iter.get_coord())) {
-      paccess.set_value_off(iter.get_coord());
+    if (!vaccess.isValueOn(iter.getCoord())) {
+      paccess.setValueOff(iter.getCoord());
     }
 
     ++iter;
   }
 
-  vdb::tools::prune_level_set(tpot.voxel_grid()->tree());
+  openvdb::tools::pruneLevelSet(tpot.voxel_grid()->tree());
 }
 
 void voxel_pot_difference(voxel_pot &tpot, voxel_pot &spot) {
-  vdb::tools::csg_difference(tpot.voxel_grid()->tree(),
+  openvdb::tools::csgDifference(tpot.voxel_grid()->tree(),
                              spot.voxel_grid()->tree(), true);
 }
 
@@ -93,7 +92,7 @@ void voxel_pot::composite(voxel_pot &pot, const composite_type &type) {
       break;
     }
   }
-  _vertex->set_transform(_resolution);
+  _vertex->setTransform(_resolution);
 }
 
 } // namespace voxelize

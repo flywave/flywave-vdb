@@ -13,8 +13,7 @@ public:
   virtual void start_triangle(const face_index_t &index,
                               const triangle3<double> &tri) = 0;
 
-  virtual Eigen::Matrix<double, 2, 1>
-  eval_uv(const Eigen::Matrix<double, 3, 1> &point) = 0;
+  virtual openvdb::Vec2d eval_uv(const openvdb::Vec3d &point) = 0;
 
   virtual std::unique_ptr<st_policy> make_shared() = 0;
 };
@@ -37,8 +36,7 @@ public:
     }
   }
 
-  Eigen::Matrix<double, 2, 1>
-  eval_uv(const Eigen::Matrix<double, 3, 1> &point) override {
+  openvdb::Vec2d eval_uv(const openvdb::Vec3d &point) override {
     return _convert.bary2uv(_convert.pos2bary(point));
   }
 
@@ -57,21 +55,19 @@ private:
 
 class only_vertex_policy : public st_policy {
 public:
-  only_vertex_policy(const Eigen::Matrix<float, 3, 1> up,
-                     const bbox2<float> &box)
+  only_vertex_policy(const openvdb::Vec3d up, const bbox2<float> &box)
       : _bbox(box), _up(up) {}
 
   inline void start_triangle(const face_index_t &index,
                              const triangle3<double> &tri) override {}
 
-  Eigen::Matrix<double, 2, 1>
-  eval_uv(const Eigen::Matrix<double, 3, 1> &point) override {
-    return Eigen::Matrix<double, 2, 1>(0, 0);
+  openvdb::Vec2d eval_uv(const openvdb::Vec3d &point) override {
+    return openvdb::Vec2d(0, 0);
   }
 
 public:
   bbox2<float> _bbox;
-  Eigen::Matrix<float, 3, 1> _up;
+  openvdb::Vec3d _up;
 };
 
 } // namespace voxelize

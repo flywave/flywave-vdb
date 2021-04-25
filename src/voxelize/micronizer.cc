@@ -1,20 +1,20 @@
-#include <flywave/voxelize/micronizer.hh>
-#include <flywave/voxelize/projection.hh>
-#include <flywave/voxelize/sampler.hh>
+#include "micronizer.hh"
+#include "projection.hh"
+#include "sampler.hh"
 
 namespace flywave {
 namespace voxelize {
 
 void coloring(vertex_grid::ptr vertex, pixel_grid::ptr pixel,
               vertext_sampler::int32_grid::ptr index,
-              vdb::math::transform::ptr transform,
+              openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr transform,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id);
 
 voxel_pot micronizer::micronize(float precision, clip_box_createor &creator,
                                 sampler_type type,
                                 material_merge_transfrom &tmtl,
-                                matrix44<double> matrix) {
+                                openvdb::Mat4d matrix) {
   auto transform = _resolution.eval_resolution(precision);
   _adapter._stream->set_matrix(matrix);
   return do_with(vertext_sampler::make_mesh_sampler(transform, type),
@@ -133,7 +133,7 @@ struct paint_color_on_surface {
 
 void coloring(vertex_grid::ptr vertex, pixel_grid::ptr pixel,
               vertext_sampler::int32_grid::ptr index,
-              vdb::math::transform::ptr transform,
+              openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr transform,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id) {
 

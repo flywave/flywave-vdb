@@ -1,8 +1,16 @@
-#include <flywave/voxelize/mesh_adapter.hh>
-#include <flywave/voxelize/sampler.hh>
+#include "sampler.hh"
+#include "mesh_adapter.hh"
 
-#include <flywave/vdb/tools/clip.hh>
-#include <flywave/vdb/tools/mesh_to_volume.hh>
+#include <openvdb/tools/Clip.h>
+#include <openvdb/tools/MeshToVolume.h>
+
+#include <tbb/blocked_range.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
+#include <tbb/partitioner.h>
+#include <tbb/task_group.h>
+#include <tbb/task_scheduler_init.h>
 
 namespace flywave {
 namespace voxelize {
@@ -11,30 +19,20 @@ class level_set_sampler : public vertext_sampler {
 public:
   using vertext_sampler::vertext_sampler;
 
-  future<vertex_grid::ptr, int32_grid::ptr>
+  std::tuple<vertex_grid::Ptr, int32_grid::Ptr>
   sampler(triangles_stream &stream, clip_box_createor &bc) override {
-    return do_with(
-        int32_grid::create(int32_t(vdb::util::INVALID_IDX)),
-        [this, &stream, &bc](auto &grid) mutable {
-          stream.set_transfrom(_xform);
-          return vdb::tools::mesh_to_volume<vertex_grid>(stream, *_xform, 3.0f,
-                                                         3.0f, 0, grid.get())
-              .then([&grid, &bc, &stream, this](auto ptr) {
-                assert(ptr);
-#if false
-              std::cout << "active voxel count:" << ptr->active_voxel_count()
-                                                   << '\n';
-#endif
 
-                bbox3d clip_box;
-                if (!bc(ptr, _xform, stream.compute_boundbox(), clip_box))
-                  return make_ready_future<vertex_grid::ptr, int32_grid::ptr>(
-                      ptr, grid);
-                else
-                  return make_ready_future<vertex_grid::ptr, int32_grid::ptr>(
-                      vdb::tools::clip(*ptr, clip_box, true), grid);
-              });
-        });
+    auto grid = int32_grid::create(int32_t(openvdb::util::INVALID_IDX));
+    stream.set_transfrom(_xform);
+    auto ptr = openvdb::tools::meshToVolume<vertex_grid>(stream, *_xform, 3.0f,
+                                                         3.0f, 0, grid.get());
+    assert(ptr);
+    openvdb::BBoxd clip_box;
+    if (!bc(ptr, _xform, stream.compute_boundbox(), clip_box))
+      return std::tuple<vertex_grid::Ptr, int32_grid::Ptr>(ptr, grid);
+    else
+      return std::tuple<vertex_grid::Ptr, int32_grid::Ptr>(
+          openvdb::tools::clip(*ptr, clip_box, true), grid);
   }
 };
 
@@ -42,53 +40,46 @@ class surface_vertext_sampler : public vertext_sampler {
 public:
   using vertext_sampler::vertext_sampler;
 
-  future<vertex_grid::ptr, int32_grid::ptr>
+  std::tuple<vertex_grid::Ptr, int32_grid::Ptr>
   sampler(triangles_stream &stream, clip_box_createor &bc) override {
-    return async([&stream, &bc, this] {
-      stream.set_transfrom(_xform);
-      vertex_grid::ptr _vertex_grid =
-          vertex_grid::create(std::numeric_limits<float>::max());
-      int32_grid::ptr _index =
-          int32_grid::create(int32_t(vdb::util::INVALID_IDX));
-      auto &indexTree = _index->tree();
-      auto &distTree = _vertex_grid->tree();
-      {
-        vdb::util::null_interrupter interrupter;
-        using voxelization_data_type =
-            vdb::tools::mesh_to_volume_internal::voxelization_data<
-                vertex_grid::TreeType>;
-        using data_type = vdb::parallel::enumerable_thread_specific<
-            typename voxelization_data_type::ptr>;
+    stream.set_transfrom(_xform);
+    vertex_grid::Ptr _vertex_grid =
+        vertex_grid::create(std::numeric_limits<float>::max());
+    int32_grid::Ptr _index =
+        int32_grid::create(int32_t(openvdb::util::INVALID_IDX));
 
-        data_type data;
-        using Voxelizer =
-            vdb::tools::mesh_to_volume_internal::voxelize_polygons<
-                vertex_grid::TreeType, triangles_stream,
-                vdb::util::null_interrupter>;
+    auto &indexTree = _index->tree();
+    auto &distTree = _vertex_grid->tree();
 
-        const vdb::parallel::blocked_range<size_t> polygonRange(
-            0, stream.polygon_count());
+    using VoxelizationDataType =
+        openvdb::tools::mesh_to_volume_internal::VoxelizationData<
+            vertex_grid::TreeType>;
+   using DataTable = tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
+    openvdb::util::NullInterrupter interrupter;
 
-        vdb::parallel::parallel_for(
-            polygonRange,
-            Voxelizer(data, stream, _xform->copy(), &interrupter));
+    DataTable data;
+    using Voxelizer = openvdb::tools::mesh_to_volume_internal::VoxelizePolygons<
+        vertex_grid::TreeType, triangles_stream,
+        openvdb::util::NullInterrupter>;
 
-        for (typename data_type::iterator i = data.begin(); i != data.end();
-             ++i) {
-          voxelization_data_type &dataItem = ***i;
-          vdb::tools::mesh_to_volume_internal::combine_data(
-              distTree, indexTree, dataItem.distTree, dataItem.indexTree);
-        }
-      }
-      return make_ready_future<vertex_grid::ptr, int32_grid::ptr>(_vertex_grid,
-                                                                  _index);
-    });
+    const tbb::blocked_range<size_t> polygonRange(0, stream.polygon_count());
+
+    tbb::parallel_for(polygonRange,
+                      Voxelizer(data, _xform->copy(), &interrupter));
+
+    for (typename DataTable::iterator i = data.begin(); i != data.end(); ++i) {
+      VoxelizationDataType &dataItem = **i;
+      openvdb::tools::mesh_to_volume_internal::combineData(
+          distTree, indexTree, dataItem.distTree, dataItem.indexTree);
+    }
+
+    return std::tuple<vertex_grid::Ptr, int32_grid::Ptr>(_vertex_grid, _index);
   }
 };
 
-std::unique_ptr<vertext_sampler>
-vertext_sampler::make_mesh_sampler(vdb::math::transform::ptr xform,
-                                   sampler_type type) {
+std::unique_ptr<vertext_sampler> vertext_sampler::make_mesh_sampler(
+    openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr xform,
+    sampler_type type) {
   switch (type) {
   case sampler_type::level_set:
     return std::make_unique<level_set_sampler>(xform);

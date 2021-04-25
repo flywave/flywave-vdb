@@ -1,7 +1,6 @@
 #pragma once
 #include <flywave/voxelize/types.hh>
 
-#include <flywave/core/phased_barrier.hh>
 #include <flywave/voxelize/mesh_adapter.hh>
 #include <flywave/voxelize/resolution.hh>
 #include <flywave/voxelize/st_policy.hh>
@@ -18,7 +17,7 @@ public:
 
   voxel_pot micronize(float precision, clip_box_createor &creator,
                       sampler_type type, material_merge_transfrom &tmtl,
-                      matrix44<double> matrix);
+                      openvdb::Mat4d matrix);
 
 private:
   resolution _resolution;

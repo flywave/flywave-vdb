@@ -3,9 +3,9 @@
 namespace flywave {
 namespace voxelize {
 
-Eigen::Matrix<double, 3, 1> bary_convert::bary_convert_impl::uv2bary(
-    const Eigen::Matrix<double, 2, 1> &uv) {
-  Eigen::Matrix<double, 3, 1> bary;
+openvdb::Vec3d
+bary_convert::bary_convert_impl::uv2bary(const openvdb::Vec2d &uv) {
+  openvdb::Vec3d bary;
   double b0;
 
   b0 = (kb.x() - ka.x()) * (kc.y() - ka.y()) -
@@ -24,41 +24,40 @@ Eigen::Matrix<double, 3, 1> bary_convert::bary_convert_impl::uv2bary(
   return bary;
 }
 
-Eigen::Matrix<double, 3, 1> bary_convert::bary_convert_impl::pos2bary(
-    const Eigen::Matrix<double, 3, 1> &pos) {
+openvdb::Vec3d
+bary_convert::bary_convert_impl::pos2bary(const openvdb::Vec3d &pos) {
   bary_convert_impl t;
-  Eigen::Matrix<double, 3, 1> bary;
+  openvdb::Vec3d bary;
   if ((fabs(nrm.x()) > fabs(nrm.y())) && (fabs(nrm.x()) > fabs(nrm.z()))) {
-    t.ka = Eigen::Matrix<double, 2, 1>(a.y(), a.z());
-    t.kb = Eigen::Matrix<double, 2, 1>(b.y(), b.z());
-    t.kc = Eigen::Matrix<double, 2, 1>(c.y(), c.z());
-    bary = t.uv2bary(Eigen::Matrix<double, 2, 1>(pos.y(), pos.z()));
+    t.ka = openvdb::Vec2d(a.y(), a.z());
+    t.kb = openvdb::Vec2d(b.y(), b.z());
+    t.kc = openvdb::Vec2d(c.y(), c.z());
+    bary = t.uv2bary(openvdb::Vec2d(pos.y(), pos.z()));
   } else if ((fabs(nrm.y()) > fabs(nrm.x())) &&
              (fabs(nrm.y()) > fabs(nrm.z()))) {
-    t.ka = Eigen::Matrix<double, 2, 1>(a.x(), a.z());
-    t.kb = Eigen::Matrix<double, 2, 1>(b.x(), b.z());
-    t.kc = Eigen::Matrix<double, 2, 1>(c.x(), c.z());
-    bary = t.uv2bary(Eigen::Matrix<double, 2, 1>(pos.x(), pos.z()));
+    t.ka = openvdb::Vec2d(a.x(), a.z());
+    t.kb = openvdb::Vec2d(b.x(), b.z());
+    t.kc = openvdb::Vec2d(c.x(), c.z());
+    bary = t.uv2bary(openvdb::Vec2d(pos.x(), pos.z()));
   } else {
-    t.ka = Eigen::Matrix<double, 2, 1>(a.x(), a.y());
-    t.kb = Eigen::Matrix<double, 2, 1>(b.x(), b.y());
-    t.kc = Eigen::Matrix<double, 2, 1>(c.x(), c.y());
-    bary = t.uv2bary(Eigen::Matrix<double, 2, 1>(pos.x(), pos.y()));
+    t.ka = openvdb::Vec2d(a.x(), a.y());
+    t.kb = openvdb::Vec2d(b.x(), b.y());
+    t.kc = openvdb::Vec2d(c.x(), c.y());
+    bary = t.uv2bary(openvdb::Vec2d(pos.x(), pos.y()));
   }
   return bary;
 }
 
-Eigen::Matrix<double, 3, 1> bary_convert::bary_convert_impl::bary2pos(
-    const Eigen::Matrix<double, 3, 1> &bary) {
-  return Eigen::Matrix<double, 3, 1>(
-      a.x() * bary.x() + b.x() * bary.y() + c.x() * bary.z(),
-      a.y() * bary.x() + b.y() * bary.y() + c.y() * bary.z(),
-      a.z() * bary.x() + b.z() * bary.y() + c.z() * bary.z());
+openvdb::Vec3d
+bary_convert::bary_convert_impl::bary2pos(const openvdb::Vec3d &bary) {
+  return openvdb::Vec3d(a.x() * bary.x() + b.x() * bary.y() + c.x() * bary.z(),
+                        a.y() * bary.x() + b.y() * bary.y() + c.y() * bary.z(),
+                        a.z() * bary.x() + b.z() * bary.y() + c.z() * bary.z());
 }
 
-Eigen::Matrix<double, 2, 1> bary_convert::bary_convert_impl::bary2uv(
-    const Eigen::Matrix<double, 3, 1> &bary) {
-  return Eigen::Matrix<double, 2, 1>(
+openvdb::Vec2d
+bary_convert::bary_convert_impl::bary2uv(const openvdb::Vec3d &bary) {
+  return openvdb::Vec2d(
       ka.x() * bary.x() + kb.x() * bary.y() + kc.x() * bary.z(),
       ka.y() * bary.x() + kb.y() * bary.y() + kc.y() * bary.z());
 }

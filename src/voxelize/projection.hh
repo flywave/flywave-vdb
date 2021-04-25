@@ -24,18 +24,29 @@ public:
     if (box2.width() == 0 && box2.height() == 0)
       return std::vector<openvdb::Vec3d>();
 
-    for (double y = std::floor(box2.min.y); y <= std::ceil(box2.max.y); y++) {
-      for (double x = std::floor(box2.min.x); x <= std::ceil(box2.max.x); x++) {
-        if (BarycentricCoordsAreValid(_convert->uv2bary({x, y})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x + 1, y})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x - 1, y})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x, y + 1})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x, y - 1})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x - 1, y + 1})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x + 1, y + 1})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x - 1, y - 1})) ||
-            BarycentricCoordsAreValid(_convert->uv2bary({x + 1, y - 1}))) {
-          coords.emplace_back(uv_to_point(Eigen::Matrix<double, 2, 1>(x, y)));
+    for (double y = std::floor(box2.min.y()); y <= std::ceil(box2.max.y());
+         y++) {
+      for (double x = std::floor(box2.min.x()); x <= std::ceil(box2.max.x());
+           x++) {
+        if (BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x, y))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x + 1, y))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x - 1, y))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x, y + 1))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x, y - 1))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x - 1, y + 1))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x + 1, y + 1))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x - 1, y - 1))) ||
+            BarycentricCoordsAreValid(
+                _convert->uv2bary(openvdb::Vec2d(x + 1, y - 1)))) {
+          coords.emplace_back(uv_to_point(openvdb::Vec2d(x, y)));
         }
       }
     }
@@ -43,25 +54,26 @@ public:
   }
 
   bool
-  BarycentricCoordsAreValid(const Eigen::Matrix<double, 3, 1> &p_barycentricCoords) const {
-    return p_barycentricCoords.x >= 0.0f && p_barycentricCoords.y >= 0.0f &&
-           p_barycentricCoords.x + p_barycentricCoords.y <= 1.05f;
+  BarycentricCoordsAreValid(const openvdb::Vec3d &p_barycentricCoords) const {
+    return p_barycentricCoords.x() >= 0.0f && p_barycentricCoords.y() >= 0.0f &&
+           p_barycentricCoords.x() + p_barycentricCoords.y() <= 1.05f;
   }
 
-  Eigen::Matrix<double, 2, 1> point_to_uv(const Eigen::Matrix<double, 3, 1> &point) const {
+  openvdb::Vec2d point_to_uv(const openvdb::Vec3d &point) const {
     auto uv = _convert->bary2uv(_convert->pos2bary(point));
-    return Eigen::Matrix<double, 2, 1>(uv.x, uv.y);
+    return openvdb::Vec2d(uv.x, uv.y);
   }
 
-  Eigen::Matrix<double, 3, 1> uv_to_point(const Eigen::Matrix<double, 2, 1> &uv) const {
+  openvdb::Vec3d uv_to_point(const openvdb::Vec2d &uv) const {
     return _convert->bary2pos(_convert->uv2bary(uv));
   }
 
   const bbox2<double> &to_box2() const { return box2; }
 
-  vector2<int> size() const {
-    return vector2<int>(std::ceil(box2.max.x) - std::floor(box2.min.x),
-                        std::ceil(box2.max.y) - std::floor(box2.min.y));
+  std::pair<int, int> size() const {
+    return std::pair<int, int>(
+        std::ceil(box2.max.x()) - std::floor(box2.min.x()),
+        std::ceil(box2.max.y()) - std::floor(box2.min.y()));
   }
 
 private:

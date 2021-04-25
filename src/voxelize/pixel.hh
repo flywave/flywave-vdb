@@ -4,22 +4,26 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <openvdb/Types.h>
+
 namespace flywave {
 namespace voxelize {
 class pixel;
 }
+} // namespace flywave
 
+namespace openvdb {
 namespace math {
 
-inline constexpr bool is_approx_equal(const flywave::voxelize::pixel &a,
-                                      const flywave::voxelize::pixel &b);
+inline bool isApproxEqual(const flywave::voxelize::pixel &a,
+                          const flywave::voxelize::pixel &b);
 
-inline constexpr bool is_approx_equal(const voxelize::pixel &a,
-                                      const voxelize::pixel &b,
-                                      const voxelize::pixel &);
+inline bool isApproxEqual(const flywave::voxelize::pixel &a,
+                          const flywave::voxelize::pixel &b,
+                          const flywave::voxelize::pixel &);
 
 } // namespace math
-} // namespace flywave
+} // namespace openvdb
 
 namespace flywave {
 namespace voxelize {
@@ -30,21 +34,19 @@ public:
 
   pixel_data() : _type(type_t::invalid) {}
 
-  pixel_data(uint8_t material, const color4<uint8_t> &color,
+  pixel_data(uint8_t material,
+             const openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t> &color,
              uint16_t feature_id = -1)
       : _type(type_t::material_and_color), _material_id(material),
-        _color(color), _feature_id(feature_id) {}
+        _feature_id(feature_id), _color(color) {}
 
-  pixel_data(const color4<uint8_t> &color, uint16_t feature_id = -1)
+  pixel_data(const openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t> &color,
+             uint16_t feature_id = -1)
       : _type(type_t::color), _material_id(0), _color(color) {}
 
   pixel_data(uint8_t material, uint16_t feature_id = -1)
       : _type(type_t::material) {
     _material_id = material;
-  }
-
-  template <typename Describer> auto describe_type(Describer f) {
-    return f(_type, _color, _material_id, _feature_id);
   }
 
   bool has_color() const {
@@ -54,7 +56,7 @@ public:
   type_t _type;
   uint8_t _material_id = 0;
   uint16_t _feature_id = 0;
-  color4<uint8_t> _color;
+  openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t> _color;
 };
 
 class pixel {
@@ -175,18 +177,20 @@ inline bool operator>=(const T &t, const pixel &c) {
 inline std::ostream &operator<<(std::ostream &os, const pixel &s) { return os; }
 
 } // namespace voxelize
+} // namespace flywave
 
+namespace openvdb {
 namespace math {
 
-inline constexpr bool is_approx_equal(const flywave::voxelize::pixel &a,
-                                      const flywave::voxelize::pixel &b) {
-  return is_approx_equal(a._value, b._value);
+inline bool isApproxEqual(const flywave::voxelize::pixel &a,
+                          const flywave::voxelize::pixel &b) {
+  return isApproxEqual(a._value, b._value);
 }
 
-inline constexpr bool is_approx_equal(const voxelize::pixel &a,
-                                      const voxelize::pixel &b,
-                                      const voxelize::pixel &t) {
-  return is_approx_equal(a._value, b._value, t._value);
+inline bool isApproxEqual(const flywave::voxelize::pixel &a,
+                          const flywave::voxelize::pixel &b,
+                          const flywave::voxelize::pixel &t) {
+  return isApproxEqual(a._value, b._value, t._value);
 }
 
 inline flywave::voxelize::pixel abs(const flywave::voxelize::pixel &v) {
@@ -197,10 +201,13 @@ inline flywave::voxelize::pixel abs(const flywave::voxelize::pixel &v) {
 
 } // namespace math
 
-template <> struct zero<voxelize::pixel> {
-  operator voxelize::pixel() const { return voxelize::pixel(0); }
-};
-} // namespace flywave
+namespace OPENVDB_VERSION_NAME {
+template <>
+inline flywave::voxelize::pixel zeroVal<flywave::voxelize::pixel>() {
+  return flywave::voxelize::pixel(0);
+}
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 namespace std {
 

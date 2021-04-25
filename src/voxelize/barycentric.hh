@@ -2,24 +2,23 @@
 
 #include "triangle.hh"
 
+#include <openvdb/Types.h>
+
 namespace flywave {
 namespace voxelize {
 
 class bary_convert {
   struct bary_convert_impl {
-    Eigen::Matrix<double, 3, 1> a, b, c;    // verts
-    Eigen::Matrix<double, 2, 1> ka, kb, kc; // coords in kudzu space
+    openvdb::Vec3d a, b, c;    // verts
+    openvdb::Vec2d ka, kb, kc; // coords in kudzu space
 
-    Eigen::Matrix<double, 3, 1> nrm; // triangle norm
+    openvdb::Vec3d nrm; // triangle norm
 
     // barycentric stuff
-    Eigen::Matrix<double, 3, 1> uv2bary(const Eigen::Matrix<double, 2, 1> &uv);
-    Eigen::Matrix<double, 3, 1>
-    pos2bary(const Eigen::Matrix<double, 3, 1> &pos);
-    Eigen::Matrix<double, 3, 1>
-    bary2pos(const Eigen::Matrix<double, 3, 1> &bary);
-    Eigen::Matrix<double, 2, 1>
-    bary2uv(const Eigen::Matrix<double, 3, 1> &bary);
+    openvdb::Vec3d uv2bary(const openvdb::Vec2d &uv);
+    openvdb::Vec3d pos2bary(const openvdb::Vec3d &pos);
+    openvdb::Vec3d bary2pos(const openvdb::Vec3d &bary);
+    openvdb::Vec2d bary2uv(const openvdb::Vec3d &bary);
   };
 
 public:
@@ -35,26 +34,23 @@ public:
     _impl.kb = uv[1];
     _impl.kc = uv[2];
 
-    Eigen::Matrix<double, 3, 1> a, b;
-    a = (tri[1] - tri[0]).normalized();
-    b = (tri[2] - tri[1]).normalized();
-    _impl.nrm = (a * b).normalized();
+    openvdb::Vec3d a, b;
+    a = (tri[1] - tri[0]).unitSafe();
+    b = (tri[2] - tri[1]).unitSafe();
+    _impl.nrm = (a * b).unitSafe();
   }
 
-  Eigen::Matrix<double, 3, 1> uv2bary(const Eigen::Matrix<double, 2, 1> &uv) {
-    return _impl.uv2bary(uv);
-  }
+  openvdb::Vec3d uv2bary(const openvdb::Vec2d &uv) { return _impl.uv2bary(uv); }
 
-  Eigen::Matrix<double, 3, 1> pos2bary(const Eigen::Matrix<double, 3, 1> &pos) {
+  openvdb::Vec3d pos2bary(const openvdb::Vec3d &pos) {
     return _impl.pos2bary(pos);
   }
 
-  Eigen::Matrix<double, 3, 1>
-  bary2pos(const Eigen::Matrix<double, 3, 1> &bary) {
+  openvdb::Vec3d bary2pos(const openvdb::Vec3d &bary) {
     return _impl.bary2pos(bary);
   }
 
-  Eigen::Matrix<double, 2, 1> bary2uv(const Eigen::Matrix<double, 3, 1> &bary) {
+  openvdb::Vec2d bary2uv(const openvdb::Vec3d &bary) {
     return _impl.bary2uv(bary);
   }
 

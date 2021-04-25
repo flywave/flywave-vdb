@@ -5,30 +5,30 @@
 namespace flywave {
 namespace voxelize {
 
-using index_type = Eigen::Matrix<uint32_t, 3, 1>;
+using index_type = openvdb::math::Vec3<uint32_t>;
 
-using quad_type = Eigen::Matrix<int32_t, 3, 1>;
+using quad_type = openvdb::math::Vec3<int32_t>;
 
-using triangle_type = Eigen::Matrix<int32_t, 3, 1>;
+using triangle_type = openvdb::math::Vec3<int32_t>;
 
-using vertext_type = Eigen::Matrix<float, 3, 1>;
+using vertext_type = openvdb::math::Vec3<float>;
 
 using local_feature_id_t = uint16_t;
 using globe_feature_id_t = uint64_t;
 
 struct fmesh_tri_patch {
-  Eigen::Matrix<float, 3, 1> p1;
-  Eigen::Matrix<float, 3, 1> p2;
-  Eigen::Matrix<float, 3, 1> p3;
+  openvdb::Vec3f p1;
+  openvdb::Vec3f p2;
+  openvdb::Vec3f p3;
 
-  Eigen::Matrix<float, 3, 1> tp1;
-  Eigen::Matrix<float, 3, 1> tp2;
-  Eigen::Matrix<float, 3, 1> tp3;
+  openvdb::Vec3f tp1;
+  openvdb::Vec3f tp2;
+  openvdb::Vec3f tp3;
 };
 
-using color_type = Eigen::Matrix<uint8_t, 4, 1>;
+using color_type = openvdb::math::Vec4<uint8_t>;
 
-using uv_type = Eigen::Matrix<float, 2, 1>;
+using uv_type = openvdb::math::Vec2<float>;
 
 enum class sampler_type { level_set, surface };
 
@@ -38,7 +38,7 @@ using face_index_t = uint32_t;
 template <typename T> struct approx_value {
   inline T operator()(T value) const {
     T c = std::ceil(value);
-    if (::flywave::math::is_approx_equal(float(tol), float(c - value)))
+    if (openvdb::math::isApproxEqual(float(tol), float(c - value)))
       return c;
     return value;
   }

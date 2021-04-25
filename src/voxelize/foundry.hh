@@ -52,9 +52,8 @@ public:
       : _grid(vgrid), _seam_repair(repair) {}
 
   void make_mesh(std::vector<vertext_type> &points,
-                     std::vector<triangle_type> &tri,
-                     std::vector<quad_type> &quads, double isovalue = 0.0,
-                     double adapter = 0.01);
+                 std::vector<triangle_type> &tri, std::vector<quad_type> &quads,
+                 double isovalue = 0.0, double adapter = 0.01);
 
   std::shared_ptr<seam_repair> make_mesh_mark_seam(
       const seam_box_setting &mbox, std::vector<vertext_type> &points,
@@ -113,7 +112,6 @@ public:
 private:
   shared_ptr<textute_foundry> _tfoundry;
 };
-
 
 } // namespace voxelize
 } // namespace flywave

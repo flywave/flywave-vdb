@@ -7,8 +7,8 @@ namespace voxelize {
 
 class resolution {
 public:
-  vdb::math::transform::ptr eval_resolution(const float &precision) const {
-    return vdb::math::transform::create_linear_transform(1.0 / precision);
+  openvdb::math::Transform::Ptr eval_resolution(const float &precision) const {
+    return openvdb::math::Transform::createLinearTransform(1.0 / precision);
   }
 };
 

@@ -183,8 +183,8 @@ public:
 
       {
 
-        _size.x = atlas->width;
-        _size.y = atlas->height;
+        _size.first = atlas->width;
+        _size.second = atlas->height;
 
         auto nb_vert = output_mesh.vertexCount;
         auto nb_face = output_mesh.indexCount / 3;
@@ -227,13 +227,13 @@ public:
     }
   }
 
-  Eigen::Matrix<uint32_t, 2, 1> image_size() { return _size; }
+  std::pair<uint32_t, uint32_t> image_size() { return _size; }
 
   Mesh &mesh() { return _curmesh; }
 
 private:
   Mesh &_curmesh;
-  Eigen::Matrix<uint32_t, 2, 1> _size;
+  std::pair<uint32_t, uint32_t> _size;
   double _tquality;
 };
 

@@ -12,7 +12,7 @@ class material_group;
 class color_extract {
 public:
   virtual color_type extract(const material_group &fgroup,
-                             const Eigen::Matrix<float, 2, 1> &uv,
+                             const openvdb::Vec2d &uv,
                              const triangle3<float> &tri) = 0;
 };
 

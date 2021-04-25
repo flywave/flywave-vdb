@@ -28,13 +28,13 @@ template <typename GridT>
 class near_voxels_index : public closest_points_index {
 public:
   near_voxels_index(typename GridT::ConstPtr grid)
-      : _grid(grid), inAccessor(grid->get_const_accessor()), _pixel_counts(0) {}
+      : _grid(grid), inAccessor(grid->getConstAccessor()), _pixel_counts(0) {}
 
   void search(const std::vector<openvdb::Vec3d> &points,
               std::vector<closest_points_type> &distances) override {
     size_t i = 0;
     auto scale =
-        _grid->transform_ptr()->template map<openvdb::math::UniformScaleMap>();
+        _grid->transformPtr()->template map<openvdb::math::UniformScaleMap>();
     for (auto &point : points) {
       openvdb::Vec3f P =
           openvdb::math::CPT<openvdb::math::ScaleMap, openvdb::math::CD_2ND>::
@@ -84,7 +84,7 @@ private:
   template <typename T> struct approx_value {
     inline T operator()(T value) const {
       T c = std::ceil(value);
-      if (::flywave::math::is_approx_equal(float(tol), float(c - value)))
+      if (openvdb::math::isApproxEqual(float(tol), float(c - value)))
         return c;
       return value;
     }
@@ -103,11 +103,11 @@ private:
       if (!value.b)
         continue;
       auto index =
-          openvdb::Coord(value._coord.x, value._coord.y, value._coord.z);
+          openvdb::math::Coord(value._coord.x, value._coord.y, value._coord.z);
       auto val = _accessor.get_value(index);
       if (val._data._type == pixel_data::type_t::invalid)
         val = _accessor.get_value(
-            openvdb::Coord(value._point.x, value._point.y, value._point.z));
+            openvdb::math::Coord(value._point.x, value._point.y, value._point.z));
 #if false
       if (val._color.r <= 15 && val._color.g < 4 &&
           val._color.b < 4) {

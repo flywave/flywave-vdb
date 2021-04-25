@@ -4,6 +4,8 @@
 #include "st_policy.hh"
 #include "types.hh"
 
+#include <openvdb/Types.h>
+
 namespace flywave {
 namespace voxelize {
 
@@ -51,29 +53,29 @@ struct material_data {
       switch (type) {
       case BASE:
         return mode == p.mode && color == p.color &&
-               flywave::math::is_approx_equal(opacity, p.opacity);
+              openvdb::math::isApproxEqual(opacity, p.opacity);
       case LAMBERT:
         return mode == p.mode && color == p.color &&
-               flywave::math::is_approx_equal(opacity, p.opacity) &&
+              openvdb::math::isApproxEqual(opacity, p.opacity) &&
                ambient == p.ambient && emissive == p.emissive;
       case PHONG:
         return mode == p.mode && color == p.color &&
-               flywave::math::is_approx_equal(opacity, p.opacity) &&
+              openvdb::math::isApproxEqual(opacity, p.opacity) &&
                ambient == p.ambient && emissive == p.emissive &&
                specular == p.specular &&
-               flywave::math::is_approx_equal(shininess, p.shininess);
+              openvdb::math::isApproxEqual(shininess, p.shininess);
       case PBR:
         return mode == p.mode && color == p.color &&
-               flywave::math::is_approx_equal(opacity, p.opacity) &&
-               flywave::math::is_approx_equal(metallic, p.metallic) &&
-               flywave::math::is_approx_equal(roughness, p.roughness) &&
-               flywave::math::is_approx_equal(reflectance, p.reflectance) &&
-               flywave::math::is_approx_equal(clearcoat_thickness,
+              openvdb::math::isApproxEqual(opacity, p.opacity) &&
+              openvdb::math::isApproxEqual(metallic, p.metallic) &&
+              openvdb::math::isApproxEqual(roughness, p.roughness) &&
+              openvdb::math::isApproxEqual(reflectance, p.reflectance) &&
+              openvdb::math::isApproxEqual(clearcoat_thickness,
                                               p.clearcoat_thickness) &&
-               flywave::math::is_approx_equal(clearcoat_roughness,
+              openvdb::math::isApproxEqual(clearcoat_roughness,
                                               p.clearcoat_roughness) &&
-               flywave::math::is_approx_equal(anisotropy, p.anisotropy) &&
-               flywave::math::is_approx_equal(anisotropy_rotation,
+              openvdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
+              openvdb::math::isApproxEqual(anisotropy_rotation,
                                               p.anisotropy_rotation);
       default:
         break;
@@ -113,8 +115,8 @@ private:
 struct data_triangle {
   triangle3<float> _triangle;
   uint16_t _material_id;
-
-  const Eigen::Matrix<float, 3, 1> &operator[](size_t index) {
+    
+  const openvdb::Vec3f &operator[](size_t index) {
     return _triangle[index];
   }
 };
@@ -142,19 +144,19 @@ public:
     _xform = xfrom;
   }
 
-  virtual void set_matrix(Eigen::Matrix<double, 4, 4> matrix) {
+  virtual void set_matrix(openvdb::Mat4d matrix) {
     _matrix44 = matrix;
   }
 
-  bbox3d compute_boundbox() {
-    bbox3d box;
+  openvdb::BBoxd compute_boundbox() {
+    openvdb::BBoxd box;
     auto pc = polygon_count();
 
     for (auto i = 0; i < pc; i++) {
       auto tri = find_triangle_transfromed(i);
-      box.extend(tri[0]);
-      box.extend(tri[1]);
-      box.extend(tri[2]);
+      box.expand(tri[0]);
+      box.expand(tri[1]);
+      box.expand(tri[2]);
     }
     return box;
   }
@@ -167,7 +169,7 @@ private:
   openvdb::math::Transform::Ptr _xform;
 
 protected:
-  Eigen::Matrix<double, 4, 4> _matrix44;
+  openvdb::Mat4d _matrix44;
 };
 
 class mesh_adapter {

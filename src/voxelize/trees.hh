@@ -1,10 +1,12 @@
 #pragma once
 
-#include <openvdb/tree/Tree.h>
 #include <openvdb/Grid.h>
+#include <openvdb/Types.h>
+#include <openvdb/math/Transform.h>
+#include <openvdb/tree/Tree.h>
 
-#include "types.hh"
 #include "pixel.hh"
+#include "types.hh"
 
 namespace flywave {
 namespace voxelize {
@@ -19,9 +21,10 @@ using vertex_grid = float_grid;
 
 class clip_box_createor {
 public:
-  virtual bool operator()(vertex_grid::Ptr vertex,
-                          openvdb::math::Transform::Ptr resolution,
-                          const bbox3d &sbox, bbox3d &cbox) = 0;
+  virtual bool
+  operator()(vertex_grid::Ptr vertex,
+             openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr resolution,
+             const openvdb::BBoxd &sbox, openvdb::BBoxd &cbox) = 0;
 };
 
 } // namespace voxelize

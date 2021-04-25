@@ -1,19 +1,16 @@
 #pragma once
-#include <flywave/math/camera.hh>
-#include <flywave/math/matrix44.hh>
-#include <flywave/voxelize/foundry.hh>
-#include <flywave/voxelize/index.hh>
-#include <flywave/voxelize/projection.hh>
-#include <flywave/voxelize/resolution.hh>
-#include <flywave/voxelize/sampler.hh>
-#include <flywave/voxelize/voxel_pot.hh>
 
-#include <flywave/math/tolerance.hh>
+#include "foundry.hh"
+#include "index.hh"
+#include "projection.hh"
+#include "resolution.hh"
+#include "sampler.hh"
+#include "voxel_pot.hh"
+
+#include "tolerance.hh"
+
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/VolumeToMesh.h>
-
-#include <flywave/lm/mesh.hh>
-#include <flywave/lm/texture_mesh.hh>
 
 #include <wrap/io_trimesh/export_obj.h>
 
@@ -25,7 +22,7 @@ public:
   using sampler_type = sampling_result<pixel_grid::ValueType>;
 
 public:
-  impl(vertex_grid::ptr cgrid, pixel_grid::ptr pgrid) {
+  impl(vertex_grid::Ptr cgrid, pixel_grid::Ptr pgrid) {
     _query = make_near_voxels_index<vertex_grid, pixel_grid>(cgrid, pgrid);
   }
 
@@ -43,7 +40,7 @@ private:
   std::unique_ptr<triangle_range_query<pixel_grid>> _query;
 };
 
-textute_foundry::textute_foundry(vertex_grid::ptr cgrid, pixel_grid::ptr pgrid,
+textute_foundry::textute_foundry(vertex_grid::Ptr cgrid, pixel_grid::Ptr pgrid,
                                  float tquality, float pixel_pad)
     : _query(std::make_unique<impl>(cgrid, pgrid)), _grid(cgrid),
       _texture_quality(tquality), _pixel_pad(pixel_pad) {}
@@ -206,7 +203,7 @@ future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,
 
       auto get_mt_config = [&](const vertext_type &p) {
         auto pt = pot.voxel_resolution()->world_to_index(p);
-        auto &pix = assess.get_value(openvdb::Coord(pt[0], pt[1], pt[2]));
+        auto &pix = assess.get_value(openvdb::math::Coord(pt[0], pt[1], pt[2]));
 
         mtsetting mtconfig;
 
@@ -262,11 +259,11 @@ future<> make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,
 
       if (repair) {
         _v0.b = repair->_seam_index_tree->is_value_on(
-            openvdb::Coord(pt[0], pt[1], pt[2]));
+            openvdb::math::Coord(pt[0], pt[1], pt[2]));
         _v1.b = repair->_seam_index_tree->is_value_on(
-            openvdb::Coord(pt1[0], pt1[1], pt1[2]));
+            openvdb::math::Coord(pt1[0], pt1[1], pt1[2]));
         _v2.b = repair->_seam_index_tree->is_value_on(
-            openvdb::Coord(pt2[0], pt2[1], pt2[2]));
+            openvdb::math::Coord(pt2[0], pt2[1], pt2[2]));
       }
       _v0.v[0] = v0[0];
       _v0.v[1] = v0[1];

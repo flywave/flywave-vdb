@@ -3,17 +3,18 @@
 #include "ray.hh"
 #include "tolerance.hh"
 
-#include <openvdb/math/Vec2.h>
-#include <openvdb/math/Vec3.h>
+#include <openvdb/Types.h>
 
 namespace flywave {
+
+namespace vdb = openvdb::v8_1;
 
 template <typename scalar_type> class bbox2 {
 public:
   typedef scalar_type value_type;
   typedef std::decay_t<scalar_type> value_type_t;
-  typedef openvdb::math::Vec2<scalar_type> vector_type;
-  typedef openvdb::math::Vec3<scalar_type> vector3_type;
+  typedef vdb::math::Vec2<scalar_type> vector_type;
+  typedef vdb::math::Vec3<scalar_type> vector3_type;
 
   constexpr static const size_t SIZE = 4;
 
@@ -52,18 +53,18 @@ public:
   }
 
   void extend(const vector3_type &v) {
-    min = openvdb::math::minComponent(min, vector_type(v.x(), v.y()));
-    max = openvdb::math::maxComponent(max, vector_type(v.x(), v.y()));
+    min = vdb::math::minComponent(min, vector_type(v.x(), v.y()));
+    max = vdb::math::maxComponent(max, vector_type(v.x(), v.y()));
   }
 
   void extend(const vector_type &v) {
-    min = openvdb::math::minComponent(min, v);
-    max = openvdb::math::maxComponent(max, v);
+    min = vdb::math::minComponent(min, v);
+    max = vdb::math::maxComponent(max, v);
   }
 
   void extend(const bbox2 &box) {
-    min = openvdb::math::minComponent(min, box.min);
-    max = openvdb::math::maxComponent(max, box.max);
+    min = vdb::math::minComponent(min, box.min);
+    max = vdb::math::maxComponent(max, box.max);
   }
 
   void expand(const vector_type &xyMin, const scalar_type &length) {
@@ -156,8 +157,8 @@ public:
     if (std::is_integral<scalar_type>::value) {
       return min == rhs.min && max == rhs.max;
     } else {
-      return openvdb::math::isApproxEqual(min, rhs.min) &&
-             openvdb::math::isApproxEqual(max, rhs.max);
+      return vdb::math::isApproxEqual(min, rhs.min) &&
+             vdb::math::isApproxEqual(max, rhs.max);
     }
   }
 
@@ -183,8 +184,8 @@ public:
     vector_type t1 = (v1 - r.origin) / div;
     vector_type t2 = (v2 - r.origin) / div;
 
-    vector_type tmin = openvdb::math::minComponent(t1, t2);
-    vector_type tmax = openvdb::math::maxComponent(t1, t2);
+    vector_type tmin = vdb::math::minComponent(t1, t2);
+    vector_type tmax = vdb::math::maxComponent(t1, t2);
 
     return {std::max(tmin.x(), tmin.y()), std::min(tmax.x(), tmax.y())};
   }
@@ -238,7 +239,7 @@ template <typename T> bbox2<T> operator*(const float &a, const bbox2<T> &b) {
 }
 
 template <typename T>
-bbox2<T> operator*(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
+bbox2<T> operator*(const vdb::math::Vec2<T> &a,
                    const bbox2<T> &b) {
   return bbox2<T>(a * b.min, a * b.max);
 }
@@ -253,40 +254,40 @@ template <typename T> bbox2<T> operator-(const bbox2<T> &a, const bbox2<T> &b) {
 
 template <typename T>
 bbox2<T> operator+(const bbox2<T> &a,
-                   const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
+                   const vdb::math::Vec2<T> &b) {
   return bbox2<T>(a.min + b, a.max + b);
 }
 
 template <typename T>
 bbox2<T> operator-(const bbox2<T> &a,
-                   const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
+                   const vdb::math::Vec2<T> &b) {
   return bbox2<T>(a.min - b, a.max - b);
 }
 
 template <typename T>
 bbox2<T> enlarge(const bbox2<T> &a,
-                 const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
+                 const vdb::math::Vec2<T> &b) {
   return bbox2<T>(a.min - b, a.max + b);
 }
 
 template <typename T>
 const bbox2<T> merge(const bbox2<T> &a,
-                     const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
-  return bbox2<T>(openvdb::math::minComponent(a.min, b),
-                  openvdb::math::maxComponent(a.max, b));
+                     const vdb::math::Vec2<T> &b) {
+  return bbox2<T>(vdb::math::minComponent(a.min, b),
+                  vdb::math::maxComponent(a.max, b));
 }
 
 template <typename T>
-const bbox2<T> merge(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
+const bbox2<T> merge(const vdb::math::Vec2<T> &a,
                      const bbox2<T> &b) {
-  return bbox2<T>(openvdb::math::minComponent(a, b.min),
-                  openvdb::math::maxComponent(a, b.max));
+  return bbox2<T>(vdb::math::minComponent(a, b.min),
+                  vdb::math::maxComponent(a, b.max));
 }
 
 template <typename T>
 const bbox2<T> merge(const bbox2<T> &a, const bbox2<T> &b) {
-  return bbox2<T>(openvdb::math::minComponent(a.min, b.min),
-                  openvdb::math::maxComponent(a.max, b.max));
+  return bbox2<T>(vdb::math::minComponent(a.min, b.min),
+                  vdb::math::maxComponent(a.max, b.max));
 }
 
 template <typename T>
@@ -302,8 +303,8 @@ bbox2<T> merge(const bbox2<T> &a, const bbox2<T> &b, const bbox2<T> &c,
 
 template <typename T>
 const bbox2<T> intersect(const bbox2<T> &a, const bbox2<T> &b) {
-  return bbox2<T>(openvdb::math::maxComponent(a.min, b.min),
-                  openvdb::math::minComponent(a.max, b.max));
+  return bbox2<T>(vdb::math::maxComponent(a.min, b.min),
+                  vdb::math::minComponent(a.max, b.max));
 }
 
 template <typename T>
@@ -324,12 +325,12 @@ template <typename T> bool disjoint(const bbox2<T> &a, const bbox2<T> &b) {
 
 template <typename T>
 bool disjoint(const bbox2<T> &a,
-              const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
+              const vdb::math::Vec2<T> &b) {
   return disjoint(a, bbox2<T>(b));
 }
 
 template <typename T>
-bool disjoint(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
+bool disjoint(const vdb::math::Vec2<T> &a,
               const bbox2<T> &b) {
   return disjoint(bbox2<T>(a), b);
 }
@@ -340,12 +341,12 @@ template <typename T> bool conjoint(const bbox2<T> &a, const bbox2<T> &b) {
 
 template <typename T>
 bool conjoint(const bbox2<T> &a,
-              const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &b) {
+              const vdb::math::Vec2<T> &b) {
   return conjoint(a, bbox2<T>(b));
 }
 
 template <typename T>
-bool conjoint(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
+bool conjoint(const vdb::math::Vec2<T> &a,
               const bbox2<T> &b) {
   return conjoint(bbox2<T>(a), b);
 }
@@ -353,8 +354,8 @@ bool conjoint(const openvdb::OPENVDB_VERSION_NAME::math::Vec2<T> &a,
 template <typename T>
 void subtract(const bbox2<T> &a, const bbox2<T> &b, bbox2<T> &c, bbox2<T> &d) {
   c.min = a.min;
-  c.max = openvdb::math::minComponent(a.max, b.min);
-  d.min = openvdb::math::maxComponent(a.min, b.max);
+  c.max = vdb::math::minComponent(a.max, b.min);
+  d.min = vdb::math::maxComponent(a.min, b.max);
   d.max = a.max;
 }
 

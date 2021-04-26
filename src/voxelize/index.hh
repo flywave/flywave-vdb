@@ -2,8 +2,12 @@
 
 #include <openvdb/tools/GridOperators.h>
 
+#include "pquery.hh"
+
 namespace flywave {
 namespace voxelize {
+
+namespace vdb = openvdb::v8_1;
 
 struct closest_points_type {
   float _distance;
@@ -36,12 +40,12 @@ public:
               std::vector<closest_points_type> &distances) override {
     size_t i = 0;
     auto scale =
-        _grid->transformPtr()->template map<openvdb::math::UniformScaleMap>();
+        _grid->transformPtr()->template map<vdb::UniformScaleMap>();
     for (auto &point : points) {
       openvdb::Vec3f P =
-          openvdb::math::CPT<openvdb::math::ScaleMap, openvdb::math::CD_2ND>::
+          vdb::CPT<vdb::ScaleMap, vdb::CD_2ND>::
               result<float>(*scale, inAccessor,
-                            openvdb::math::Coord(point.x, point.y, point.z));
+                            vdb::Coord(point.x, point.y, point.z));
       distances[i++] = closest_points_type{0, P, point, true};
     }
   }
@@ -86,7 +90,7 @@ private:
   template <typename T> struct approx_value {
     inline T operator()(T value) const {
       T c = std::ceil(value);
-      if (openvdb::math::isApproxEqual(float(tol), float(c - value)))
+      if (vdb::isApproxEqual(float(tol), float(c - value)))
         return c;
       return value;
     }
@@ -104,18 +108,18 @@ private:
     for (auto &value : instanceRadius) {
       if (!value.b)
         continue;
-      auto index =
-          openvdb::math::Coord(value._coord.x, value._coord.y, value._coord.z);
-      auto val = _accessor.get_value(index);
-      if (val._data._type == pixel_data::type_t::invalid)
-        val = _accessor.get_value(openvdb::math::Coord(
-            value._point.x, value._point.y, value._point.z));
-#if false
-      if (val._color.r <= 15 && val._color.g < 4 &&
-          val._color.b < 4) {
-        val._color = color4<uint8_t>(255, 0, 0, 255);
+      vdb::Coord index(value._point.x, value._point.y,
+                                 value._point.z);
+      vdb::Coord rindex(value._coord.x, value._coord.y,
+                                  value._coord.z);
+      pixel pix;
+      if (_accessor.isValueOn(index))
+        pix = _accessor.getValue(index);
+      else if (_accessor.isValueOn(rindex)) {
+        pix = _accessor.getValue(rindex);
+      } else if (!seach_vertex_value(_accessor, index, pix)) {
+        seach_vertex_value(_accessor, rindex, pix);
       }
-#endif
       result.emplace_back(sampling_result<typename GridType::ValueType>{
           value._coord, value._point, val});
     }

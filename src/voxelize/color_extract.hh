@@ -7,12 +7,13 @@
 namespace flywave {
 namespace voxelize {
 
+namespace vdb = openvdb::v8_1;
+
 class material_group;
 
 class color_extract {
 public:
-  virtual color_type extract(const material_group &fgroup,
-                             const openvdb::Vec2d &uv,
+  virtual color_type extract(const material_group &fgroup, const vdb::Vec2d &uv,
                              const triangle3<float> &tri) = 0;
 };
 

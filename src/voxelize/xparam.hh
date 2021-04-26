@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vcg/complex/complex.h>
-
 #include <vcg/math/quadric.h>
 
 #include <vcg/complex/algorithms/clean.h>
@@ -45,6 +43,10 @@ public:
 
     Mesh atlas_mesh;
     Mesh no_atlas_mesh;
+
+    auto _globe_node_id = _curmesh.face[0].node;
+    auto _globe_mtl_id = _curmesh.face[0].mtl;
+    auto _globe_tex_id = _curmesh.face[0].tex;
     {
       size_t atlas_face_count = 0;
       size_t no_atlas_face_count = 0;
@@ -66,25 +68,20 @@ public:
 
       size_t atlas_face_index = 0;
       size_t no_atlas_face_index = 0;
+
       for (auto &face : _curmesh.face) {
         if (face.tex != -1) {
           auto &v0 = atlas_mesh.vert[atlas_face_index * 3 + 0];
           v0 = *face.V(0);
           v0.node = face.node;
-          v0.tmp_tex = face.tex;
-          v0.tmp_mtl = face.mtl;
 
           auto &v1 = atlas_mesh.vert[atlas_face_index * 3 + 1];
           v1 = *face.V(1);
           v1.node = face.node;
-          v1.tmp_tex = face.tex;
-          v1.tmp_mtl = face.mtl;
 
           auto &v2 = atlas_mesh.vert[atlas_face_index * 3 + 2];
           v2 = *face.V(2);
           v2.node = face.node;
-          v2.tmp_tex = face.tex;
-          v2.tmp_mtl = face.mtl;
 
           atlas_mesh.face[atlas_face_index] = face;
           atlas_mesh.face[atlas_face_index].V(0) =
@@ -172,8 +169,8 @@ public:
     }
 
     xatlas::AddMeshError::Enum error = xatlas::AddMesh(atlas, input_mesh, 1);
-
-    // xatlas::AddMeshJoin(atlas);
+    assert(error == xatlas::AddMeshError::Success);
+    
     xatlas::Generate(atlas);
 
     {
@@ -243,11 +240,9 @@ public:
           _curmesh.face[face_index].WT(1) = _curmesh.face[face_index].V(1)->T();
           _curmesh.face[face_index].WT(2) = _curmesh.face[face_index].V(2)->T();
 
-          _curmesh.face[face_index].node = _curmesh.face[face_index].V(0)->node;
-          _curmesh.face[face_index].mtl =
-              _curmesh.face[face_index].V(0)->tmp_mtl;
-          _curmesh.face[face_index].tex =
-              _curmesh.face[face_index].V(0)->tmp_tex;
+          _curmesh.face[face_index].node = _globe_node_id;
+          _curmesh.face[face_index].mtl = _globe_mtl_id;
+          _curmesh.face[face_index].tex = _globe_tex_id;
         }
 
         xatlas::Destroy(atlas);

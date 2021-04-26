@@ -13,6 +13,7 @@ class pixel;
 } // namespace flywave
 
 namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
 namespace math {
 
 inline bool isApproxEqual(const flywave::voxelize::pixel &a,
@@ -28,6 +29,8 @@ inline bool isApproxEqual(const flywave::voxelize::pixel &a,
 namespace flywave {
 namespace voxelize {
 
+namespace vdb = openvdb::v8_1;
+
 class pixel_data {
 public:
   enum class type_t : uint8_t { color, material, material_and_color, invalid };
@@ -35,12 +38,12 @@ public:
   pixel_data() : _type(type_t::invalid) {}
 
   pixel_data(uint8_t material,
-             const openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t> &color,
+             const vdb::math::Vec4<uint8_t> &color,
              uint16_t feature_id = -1)
       : _type(type_t::material_and_color), _material_id(material),
         _feature_id(feature_id), _color(color) {}
 
-  pixel_data(const openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t> &color,
+  pixel_data(const vdb::math::Vec4<uint8_t> &color,
              uint16_t feature_id = -1)
       : _type(type_t::color), _material_id(0), _color(color) {}
 
@@ -56,7 +59,7 @@ public:
   type_t _type;
   uint8_t _material_id = 0;
   uint16_t _feature_id = 0;
-  openvdb::OPENVDB_VERSION_NAME::math::Vec4<uint8_t> _color;
+  vdb::math::Vec4<uint8_t> _color;
 };
 
 class pixel {

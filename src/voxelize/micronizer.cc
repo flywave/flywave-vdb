@@ -9,7 +9,7 @@ namespace voxelize {
 
 void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               vertext_sampler::int32_grid::Ptr index,
-              openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr transform,
+              vdb::math::Transform::Ptr transform,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id);
 
@@ -42,7 +42,7 @@ struct paint_color_on_surface {
       std::vector<typename vertext_sampler::int32_grid::TreeType::LeafNodeType
                       *> &nodes,
       vertex_grid::TreeType &vertex, pixel_grid::TreeType &pixel,
-      openvdb::OPENVDB_VERSION_NAME::math::Transform &transform,
+      vdb::math::Transform &transform,
       const material_merge_transfrom &tmtl, mesh_adapter &adapter,
       local_feature_id_t local_feature)
       : _nodes(nodes), _vertex(vertex), _pixel(&pixel), _transform(transform),
@@ -123,7 +123,7 @@ struct paint_color_on_surface {
   vertex_grid::TreeType &_vertex;
   pixel_grid::TreeType _local_tree;
   pixel_grid::TreeType *_pixel;
-  openvdb::OPENVDB_VERSION_NAME::math::Transform &_transform;
+  vdb::math::Transform &_transform;
   const material_merge_transfrom &_tmtl;
   mesh_adapter &_adapter;
   local_feature_id_t _local_feature_id;
@@ -131,7 +131,7 @@ struct paint_color_on_surface {
 
 void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               vertext_sampler::int32_grid::Ptr index,
-              openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr transform,
+              vdb::math::Transform::Ptr transform,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id) {
 

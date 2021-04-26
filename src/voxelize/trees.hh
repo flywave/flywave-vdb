@@ -2,7 +2,6 @@
 
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
-#include <openvdb/math/Transform.h>
 #include <openvdb/tree/Tree.h>
 
 #include "pixel.hh"
@@ -10,6 +9,8 @@
 
 namespace flywave {
 namespace voxelize {
+
+namespace vdb = openvdb::v8_1;
 
 using float_tree = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
 using pixel_tree = openvdb::tree::Tree4<pixel, 5, 4, 3>::Type;
@@ -23,8 +24,8 @@ class clip_box_createor {
 public:
   virtual bool
   operator()(vertex_grid::Ptr vertex,
-             openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr resolution,
-             const openvdb::BBoxd &sbox, openvdb::BBoxd &cbox) = 0;
+             vdb::math::Transform::Ptr resolution,
+             const vdb::BBoxd &sbox, vdb::BBoxd &cbox) = 0;
 };
 
 } // namespace voxelize

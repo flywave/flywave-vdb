@@ -9,6 +9,8 @@
 namespace flywave {
 namespace voxelize {
 
+namespace vdb = openvdb::v8_1;
+
 struct texture_sampler {
   std::shared_ptr<st_policy> _policy;
   std::shared_ptr<color_extract> _extract;
@@ -23,12 +25,12 @@ struct material_data {
   uint32_t type = 0;
   uint16_t mode{0};
 
-  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> color{255, 255, 255};
+  vdb::math::Vec3<uint8_t> color{255, 255, 255};
 
-  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> ambient{255, 255, 255};
-  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> emissive{0, 0, 0};
+  vdb::math::Vec3<uint8_t> ambient{255, 255, 255};
+  vdb::math::Vec3<uint8_t> emissive{0, 0, 0};
 
-  openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint8_t> specular{0, 0, 0};
+  vdb::math::Vec3<uint8_t> specular{0, 0, 0};
 
   float opacity{1.0};
 
@@ -53,29 +55,29 @@ struct material_data {
       switch (type) {
       case BASE:
         return mode == p.mode && color == p.color &&
-               openvdb::math::isApproxEqual(opacity, p.opacity);
+               vdb::math::isApproxEqual(opacity, p.opacity);
       case LAMBERT:
         return mode == p.mode && color == p.color &&
-               openvdb::math::isApproxEqual(opacity, p.opacity) &&
+               vdb::math::isApproxEqual(opacity, p.opacity) &&
                ambient == p.ambient && emissive == p.emissive;
       case PHONG:
         return mode == p.mode && color == p.color &&
-               openvdb::math::isApproxEqual(opacity, p.opacity) &&
+               vdb::math::isApproxEqual(opacity, p.opacity) &&
                ambient == p.ambient && emissive == p.emissive &&
                specular == p.specular &&
-               openvdb::math::isApproxEqual(shininess, p.shininess);
+               vdb::math::isApproxEqual(shininess, p.shininess);
       case PBR:
         return mode == p.mode && color == p.color &&
-               openvdb::math::isApproxEqual(opacity, p.opacity) &&
-               openvdb::math::isApproxEqual(metallic, p.metallic) &&
-               openvdb::math::isApproxEqual(roughness, p.roughness) &&
-               openvdb::math::isApproxEqual(reflectance, p.reflectance) &&
-               openvdb::math::isApproxEqual(clearcoat_thickness,
+               vdb::math::isApproxEqual(opacity, p.opacity) &&
+               vdb::math::isApproxEqual(metallic, p.metallic) &&
+               vdb::math::isApproxEqual(roughness, p.roughness) &&
+               vdb::math::isApproxEqual(reflectance, p.reflectance) &&
+               vdb::math::isApproxEqual(clearcoat_thickness,
                                             p.clearcoat_thickness) &&
-               openvdb::math::isApproxEqual(clearcoat_roughness,
+               vdb::math::isApproxEqual(clearcoat_roughness,
                                             p.clearcoat_roughness) &&
-               openvdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
-               openvdb::math::isApproxEqual(anisotropy_rotation,
+               vdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
+               vdb::math::isApproxEqual(anisotropy_rotation,
                                             p.anisotropy_rotation);
       default:
         break;
@@ -139,7 +141,7 @@ public:
   virtual size_t polygon_count() const = 0;
 
   virtual void
-  set_transfrom(openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr xfrom) {
+  set_transfrom(vdb::math::Transform::Ptr xfrom) {
     _xform = xfrom;
   }
 
@@ -162,8 +164,10 @@ public:
 
   virtual data_triangle find_triangle(uint32_t face_index) = 0;
 
+  openvdb::Mat4d world_to_local(){return _matrix44.inverse();}
+  
 private:
-  openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr _xform;
+  vdb::math::Transform::Ptr _xform;
 
 protected:
   openvdb::Mat4d _matrix44;

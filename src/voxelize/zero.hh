@@ -12,9 +12,9 @@ template <> struct zero<bool> {
   operator bool() const { return false; }
 };
 
-template <> struct zero<openvdb::OPENVDB_VERSION_NAME::math::half> {
-  operator openvdb::OPENVDB_VERSION_NAME::math::half() const {
-    return openvdb::OPENVDB_VERSION_NAME::math::half();
+template <> struct zero<openvdb::math::half> {
+  operator openvdb::math::half() const {
+    return openvdb::math::half();
   }
 };
 

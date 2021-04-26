@@ -10,14 +10,14 @@ namespace flywave {
 namespace voxelize {
 
 voxel_pot::voxel_pot(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
-                     openvdb::OPENVDB_VERSION_NAME::math::Transform::Ptr res)
+                     openvdb::math::Transform::Ptr res)
     : _resolution(res), _vertex(vertex), _pixel(pixel) {
   _vertex->setGridClass(openvdb::GRID_LEVEL_SET);
   _vertex->setTransform(_resolution);
 }
 
 bool voxel_pot::ray_test(
-    const openvdb::OPENVDB_VERSION_NAME::math::Ray<double> &ray,
+    const openvdb::math::Ray<double> &ray,
     openvdb::Vec3d &p) {
   if (_vertex->empty())
     return false;
@@ -60,10 +60,11 @@ void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
   auto vaccess = tpot.voxel_grid()->getAccessor();
 
   while (iter) {
-    if (!vaccess.isValueOn(iter.getCoord())) {
+    if (vaccess.isValueOn(iter.getCoord())) {
+      paccess.setValue(iter.getCoord(), iter.getValue());
+    } else {
       paccess.setValueOff(iter.getCoord());
     }
-
     ++iter;
   }
 

@@ -1,11 +1,11 @@
 #pragma once
 
 #include "bbox.hh"
+#include "plan.hh"
 
 #include <array>
 
-#include <openvdb/math/Vec2.h>
-#include <openvdb/math/Vec3.h>
+#include <openvdb/Types.h>
 
 namespace flywave {
 namespace voxelize {
@@ -179,6 +179,13 @@ public:
     return ((data_array[1] - data_array[0])
                 .cross(data_array[2] - data_array[0]))
         .unitSafe();
+  }
+
+  plan<scalar_type> plane() const noexcept {
+    auto n =
+        (data_array[1] - data_array[0]).cross(data_array[2] - data_array[0]);
+    n.unitSafe();
+    return plan<scalar_type>(n, data_array[0]);
   }
 
   vector_type barycentric_from_point(const vector_type &p) {

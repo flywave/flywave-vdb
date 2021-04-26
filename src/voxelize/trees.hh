@@ -22,10 +22,9 @@ using vertex_grid = float_grid;
 
 class clip_box_createor {
 public:
-  virtual bool
-  operator()(vertex_grid::Ptr vertex,
-             vdb::math::Transform::Ptr resolution,
-             const vdb::BBoxd &sbox, vdb::BBoxd &cbox) = 0;
+  virtual bool operator()(vertex_grid::Ptr vertex,
+                          vdb::math::Transform::Ptr resolution,
+                          const vdb::BBoxd &sbox, vdb::BBoxd &cbox) = 0;
 };
 
 } // namespace voxelize

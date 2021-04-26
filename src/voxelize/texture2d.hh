@@ -187,13 +187,13 @@ public:
     return it;
   }
 
-  bool operator==(const const_texture_row_iterator<ColorType> &it) const
-      noexcept {
+  bool
+  operator==(const const_texture_row_iterator<ColorType> &it) const noexcept {
     return row_ == it.row_;
   }
 
-  bool operator!=(const const_texture_row_iterator<ColorType> &it) const
-      noexcept {
+  bool
+  operator!=(const const_texture_row_iterator<ColorType> &it) const noexcept {
     return row_ != it.row_;
   }
 
@@ -240,20 +240,14 @@ struct color_value_type<vdb::math::Vec4<T>, S> {
 };
 
 template <typename C> C pixel_get(const C &c, int);
-template <typename C>
-C pixel_get(const vdb::math::Vec2<C> &c, int i);
-template <typename C>
-C pixel_get(const vdb::math::Vec3<C> &c, int i);
-template <typename C>
-C pixel_get(const vdb::math::Vec4<C> &c, int i);
+template <typename C> C pixel_get(const vdb::math::Vec2<C> &c, int i);
+template <typename C> C pixel_get(const vdb::math::Vec3<C> &c, int i);
+template <typename C> C pixel_get(const vdb::math::Vec4<C> &c, int i);
 
 template <typename C> C &pixel_get(C &c, int);
-template <typename C>
-C &pixel_get(vdb::math::Vec2<C> &c, int i);
-template <typename C>
-C &pixel_get(vdb::math::Vec3<C> &c, int i);
-template <typename C>
-C &pixel_get(vdb::math::Vec4<C> &c, int i);
+template <typename C> C &pixel_get(vdb::math::Vec2<C> &c, int i);
+template <typename C> C &pixel_get(vdb::math::Vec3<C> &c, int i);
+template <typename C> C &pixel_get(vdb::math::Vec4<C> &c, int i);
 
 template <> uint8_t pixel_get<uint8_t>(const uint8_t &c, int) { return c; }
 
@@ -262,53 +256,38 @@ template <> uint16_t pixel_get<uint16_t>(const uint16_t &c, int) { return c; }
 template <> float pixel_get<float>(const float &c, int) { return c; }
 
 template <>
-uint8_t
-pixel_get<uint8_t>(const vdb::math::Vec2<uint8_t> &c,
-                   int i) {
+uint8_t pixel_get<uint8_t>(const vdb::math::Vec2<uint8_t> &c, int i) {
   return c(i);
 }
 template <>
-uint16_t pixel_get<uint16_t>(
-    const vdb::math::Vec2<uint16_t> &c, int i) {
+uint16_t pixel_get<uint16_t>(const vdb::math::Vec2<uint16_t> &c, int i) {
   return c(i);
 }
-template <>
-float pixel_get<float>(
-    const vdb::math::Vec2<float> &c, int i) {
+template <> float pixel_get<float>(const vdb::math::Vec2<float> &c, int i) {
   return c(i);
 }
 
 template <>
-uint8_t
-pixel_get<uint8_t>(const vdb::math::Vec3<uint8_t> &c,
-                   int i) {
+uint8_t pixel_get<uint8_t>(const vdb::math::Vec3<uint8_t> &c, int i) {
   return c(i);
 }
 template <>
-uint16_t pixel_get<uint16_t>(
-    const vdb::math::Vec3<uint16_t> &c, int i) {
+uint16_t pixel_get<uint16_t>(const vdb::math::Vec3<uint16_t> &c, int i) {
   return c(i);
 }
-template <>
-float pixel_get<float>(
-    const vdb::math::Vec3<float> &c, int i) {
+template <> float pixel_get<float>(const vdb::math::Vec3<float> &c, int i) {
   return c(i);
 }
 
 template <>
-uint8_t
-pixel_get<uint8_t>(const vdb::math::Vec4<uint8_t> &c,
-                   int i) {
+uint8_t pixel_get<uint8_t>(const vdb::math::Vec4<uint8_t> &c, int i) {
   return c(i);
 }
 template <>
-uint16_t pixel_get<uint16_t>(
-    const vdb::math::Vec4<uint16_t> &c, int i) {
+uint16_t pixel_get<uint16_t>(const vdb::math::Vec4<uint16_t> &c, int i) {
   return c(i);
 }
-template <>
-float pixel_get<float>(
-    const vdb::math::Vec4<float> &c, int i) {
+template <> float pixel_get<float>(const vdb::math::Vec4<float> &c, int i) {
   return c(i);
 }
 
@@ -318,57 +297,33 @@ template <> uint16_t &pixel_get<uint16_t>(uint16_t &c, int) { return c; }
 
 template <> float &pixel_get<float>(float &c, int) { return c; }
 
-template <>
-uint8_t &
-pixel_get<uint8_t>(vdb::math::Vec2<uint8_t> &c,
-                   int i) {
+template <> uint8_t &pixel_get<uint8_t>(vdb::math::Vec2<uint8_t> &c, int i) {
   return c(i);
 }
-template <>
-uint16_t &
-pixel_get<uint16_t>(vdb::math::Vec2<uint16_t> &c,
-                    int i) {
+template <> uint16_t &pixel_get<uint16_t>(vdb::math::Vec2<uint16_t> &c, int i) {
   return c(i);
 }
-template <>
-float &pixel_get<float>(vdb::math::Vec2<float> &c,
-                        int i) {
+template <> float &pixel_get<float>(vdb::math::Vec2<float> &c, int i) {
   return c(i);
 }
 
-template <>
-uint8_t &
-pixel_get<uint8_t>(vdb::math::Vec3<uint8_t> &c,
-                   int i) {
+template <> uint8_t &pixel_get<uint8_t>(vdb::math::Vec3<uint8_t> &c, int i) {
   return c(i);
 }
-template <>
-uint16_t &
-pixel_get<uint16_t>(vdb::math::Vec3<uint16_t> &c,
-                    int i) {
+template <> uint16_t &pixel_get<uint16_t>(vdb::math::Vec3<uint16_t> &c, int i) {
   return c(i);
 }
-template <>
-float &pixel_get<float>(vdb::math::Vec3<float> &c,
-                        int i) {
+template <> float &pixel_get<float>(vdb::math::Vec3<float> &c, int i) {
   return c(i);
 }
 
-template <>
-uint8_t &
-pixel_get<uint8_t>(vdb::math::Vec4<uint8_t> &c,
-                   int i) {
+template <> uint8_t &pixel_get<uint8_t>(vdb::math::Vec4<uint8_t> &c, int i) {
   return c(i);
 }
-template <>
-uint16_t &
-pixel_get<uint16_t>(vdb::math::Vec4<uint16_t> &c,
-                    int i) {
+template <> uint16_t &pixel_get<uint16_t>(vdb::math::Vec4<uint16_t> &c, int i) {
   return c(i);
 }
-template <>
-float &pixel_get<float>(vdb::math::Vec4<float> &c,
-                        int i) {
+template <> float &pixel_get<float>(vdb::math::Vec4<float> &c, int i) {
   return c(i);
 }
 
@@ -376,26 +331,21 @@ template <typename V> struct color_channel {
   constexpr operator size_t() const { return size_t(1); }
 };
 
-template <typename T>
-struct color_channel<vdb::math::Vec2<T>> {
+template <typename T> struct color_channel<vdb::math::Vec2<T>> {
   constexpr operator size_t() const { return size_t(2); }
 };
 
-template <typename T>
-struct color_channel<vdb::math::Vec3<T>> {
+template <typename T> struct color_channel<vdb::math::Vec3<T>> {
   constexpr operator size_t() const { return size_t(3); }
 };
 
-template <typename T>
-struct color_channel<vdb::math::Vec4<T>> {
+template <typename T> struct color_channel<vdb::math::Vec4<T>> {
   constexpr operator size_t() const { return size_t(4); }
 };
 
 template <class Scalar, class ScalarInterpType>
-void lerp(vdb::math::Vec2<Scalar> &c,
-          vdb::math::Vec2<Scalar> c0,
-          vdb::math::Vec2<Scalar> c1,
-          ScalarInterpType x) {
+void lerp(vdb::math::Vec2<Scalar> &c, vdb::math::Vec2<Scalar> c0,
+          vdb::math::Vec2<Scalar> c1, ScalarInterpType x) {
   assert(x >= 0);
   assert(x <= 1);
 
@@ -404,12 +354,9 @@ void lerp(vdb::math::Vec2<Scalar> &c,
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp_range(
-    vdb::math::Vec2<Scalar> &c,
-    vdb::math::Vec2<Scalar> c0,
-    vdb::math::Vec2<Scalar> c1,
-    vdb::math::Vec2<Scalar> c2,
-    vdb::math::Vec2<ScalarInterpType> ip) {
+void lerp_range(vdb::math::Vec2<Scalar> &c, vdb::math::Vec2<Scalar> c0,
+                vdb::math::Vec2<Scalar> c1, vdb::math::Vec2<Scalar> c2,
+                vdb::math::Vec2<ScalarInterpType> ip) {
 
   assert(std::abs(ip(0) + ip(1) + ip(2) - 1) < 0.00001);
 
@@ -418,10 +365,8 @@ void lerp_range(
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp_cube(vdb::math::Vec2<Scalar> &c,
-               vdb::math::Vec2<Scalar> c0,
-               vdb::math::Vec2<Scalar> c1,
-               vdb::math::Vec2<Scalar> c2,
+void lerp_cube(vdb::math::Vec2<Scalar> &c, vdb::math::Vec2<Scalar> c0,
+               vdb::math::Vec2<Scalar> c1, vdb::math::Vec2<Scalar> c2,
                vdb::math::Vec2<Scalar> c3,
                vdb::math::Vec4<ScalarInterpType> ip) {
 
@@ -434,10 +379,8 @@ void lerp_cube(vdb::math::Vec2<Scalar> &c,
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp(vdb::math::Vec3<Scalar> &c,
-          vdb::math::Vec3<Scalar> c0,
-          vdb::math::Vec3<Scalar> c1,
-          ScalarInterpType x) {
+void lerp(vdb::math::Vec3<Scalar> &c, vdb::math::Vec3<Scalar> c0,
+          vdb::math::Vec3<Scalar> c1, ScalarInterpType x) {
   assert(x >= 0);
   assert(x <= 1);
 
@@ -447,12 +390,9 @@ void lerp(vdb::math::Vec3<Scalar> &c,
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp_range(
-    vdb::math::Vec3<Scalar> &c,
-    vdb::math::Vec3<Scalar> c0,
-    vdb::math::Vec3<Scalar> c1,
-    vdb::math::Vec3<Scalar> c2,
-    vdb::math::Vec3<ScalarInterpType> ip) {
+void lerp_range(vdb::math::Vec3<Scalar> &c, vdb::math::Vec3<Scalar> c0,
+                vdb::math::Vec3<Scalar> c1, vdb::math::Vec3<Scalar> c2,
+                vdb::math::Vec3<ScalarInterpType> ip) {
 
   assert(std::abs(ip(0) + ip(1) + ip(2) - 1) < 0.00001);
 
@@ -462,10 +402,8 @@ void lerp_range(
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp_cube(vdb::math::Vec3<Scalar> &c,
-               vdb::math::Vec3<Scalar> c0,
-               vdb::math::Vec3<Scalar> c1,
-               vdb::math::Vec3<Scalar> c2,
+void lerp_cube(vdb::math::Vec3<Scalar> &c, vdb::math::Vec3<Scalar> c0,
+               vdb::math::Vec3<Scalar> c1, vdb::math::Vec3<Scalar> c2,
                vdb::math::Vec3<Scalar> c3,
                vdb::math::Vec4<ScalarInterpType> ip) {
 
@@ -480,10 +418,9 @@ void lerp_cube(vdb::math::Vec3<Scalar> &c,
 }
 
 template <class Scalar, class ScalarInterpType>
-vdb::math::Vec4<Scalar>
-lerp(vdb::math::Vec4<Scalar> &c,
-     vdb::math::Vec4<Scalar> c0,
-     vdb::math::Vec4<Scalar> c1, ScalarInterpType x) {
+vdb::math::Vec4<Scalar> lerp(vdb::math::Vec4<Scalar> &c,
+                             vdb::math::Vec4<Scalar> c0,
+                             vdb::math::Vec4<Scalar> c1, ScalarInterpType x) {
   c(0) = (Scalar)(c1(0) * x + c0(0) * (1.0f - x));
   c(1) = (Scalar)(c1(1) * x + c0(1) * (1.0f - x));
   c(2) = (Scalar)(c1(2) * x + c0(2) * (1.0f - x));
@@ -491,12 +428,9 @@ lerp(vdb::math::Vec4<Scalar> &c,
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp_range(
-    vdb::math::Vec4<Scalar> &c,
-    vdb::math::Vec4<Scalar> c0,
-    vdb::math::Vec4<Scalar> c1,
-    vdb::math::Vec4<Scalar> c2,
-    vdb::math::Vec3<ScalarInterpType> ip) {
+void lerp_range(vdb::math::Vec4<Scalar> &c, vdb::math::Vec4<Scalar> c0,
+                vdb::math::Vec4<Scalar> c1, vdb::math::Vec4<Scalar> c2,
+                vdb::math::Vec3<ScalarInterpType> ip) {
   c(0) = (Scalar)(c0(0) * ip(0) + c1(0) * ip(1) + c2(0) * ip(2));
   c(1) = (Scalar)(c0(1) * ip(0) + c1(1) * ip(1) + c2(1) * ip(2));
   c(2) = (Scalar)(c0(2) * ip(0) + c1(2) * ip(1) + c2(2) * ip(2));
@@ -504,10 +438,8 @@ void lerp_range(
 }
 
 template <class Scalar, class ScalarInterpType>
-void lerp_cube(vdb::math::Vec4<Scalar> &c,
-               vdb::math::Vec4<Scalar> c0,
-               vdb::math::Vec4<Scalar> c1,
-               vdb::math::Vec4<Scalar> c2,
+void lerp_cube(vdb::math::Vec4<Scalar> &c, vdb::math::Vec4<Scalar> c0,
+               vdb::math::Vec4<Scalar> c1, vdb::math::Vec4<Scalar> c2,
                vdb::math::Vec4<Scalar> c3,
                vdb::math::Vec4<ScalarInterpType> ip) {
   c(0) =
@@ -559,16 +491,15 @@ interpolate(unsigned char const &v1, unsigned char const &v2,
 }
 
 template <typename T, typename ScalarInterpType>
-inline constexpr T interpolate(
-    T const &v1, T const &v2,
-    const vdb::math::Vec2<ScalarInterpType> &t) {
+inline constexpr T interpolate(T const &v1, T const &v2,
+                               const vdb::math::Vec2<ScalarInterpType> &t) {
   return v1 * t.x() + v2 * t.y();
 }
 
 template <typename ScalarInterpType>
-inline constexpr unsigned char interpolate(
-    unsigned char const &v1, unsigned char const &v2,
-    const vdb::math::Vec2<ScalarInterpType> &t) {
+inline constexpr unsigned char
+interpolate(unsigned char const &v1, unsigned char const &v2,
+            const vdb::math::Vec2<ScalarInterpType> &t) {
   return (unsigned char)((ScalarInterpType)v1 * t.x() +
                          (ScalarInterpType)v2 * t.y() + 0.5f);
 }
@@ -590,16 +521,16 @@ interpolate(unsigned char const &v1, unsigned char const &v2,
 }
 
 template <typename T, typename ScalarInterpType>
-inline constexpr T interpolate(
-    T const &v1, T const &v2, T const &v3,
-    const vdb::math::Vec3<ScalarInterpType> &t) {
+inline constexpr T interpolate(T const &v1, T const &v2, T const &v3,
+                               const vdb::math::Vec3<ScalarInterpType> &t) {
   return v1 * t.x() + v2 * t.y() + v3 * t.z();
 }
 
 template <typename ScalarInterpType>
-inline constexpr unsigned char interpolate(
-    unsigned char const &v1, unsigned char const &v2, unsigned char const &v3,
-    const vdb::math::Vec3<ScalarInterpType> &t) {
+inline constexpr unsigned char
+interpolate(unsigned char const &v1, unsigned char const &v2,
+            unsigned char const &v3,
+            const vdb::math::Vec3<ScalarInterpType> &t) {
   return (unsigned char)((ScalarInterpType)v1 * t.x() +
                          (ScalarInterpType)v2 * t.y() +
                          (ScalarInterpType)v3 * t.z() + 0.5f);
@@ -625,17 +556,16 @@ interpolate(unsigned char const &v1, unsigned char const &v2,
 }
 
 template <typename T, typename ScalarInterpType>
-inline T interpolate(
-    T const &v1, T const &v2, T const &v3, T const &v4,
-    const vdb::math::Vec4<ScalarInterpType> &t) {
+inline T interpolate(T const &v1, T const &v2, T const &v3, T const &v4,
+                     const vdb::math::Vec4<ScalarInterpType> &t) {
   return v1 * t.x() + v2 * t.y() + v3 * t.z() + v4 * t.w();
 }
 
 template <typename ScalarInterpType>
-inline unsigned char interpolate(
-    unsigned char const &v1, unsigned char const &v2, unsigned char const &v3,
-    unsigned char const &v4,
-    const vdb::math::Vec4<ScalarInterpType> &t) {
+inline unsigned char
+interpolate(unsigned char const &v1, unsigned char const &v2,
+            unsigned char const &v3, unsigned char const &v4,
+            const vdb::math::Vec4<ScalarInterpType> &t) {
   return (unsigned char)((ScalarInterpType)v1 * t.x() +
                          (ScalarInterpType)v2 * t.y() +
                          (ScalarInterpType)v3 * t.z() +
@@ -645,8 +575,7 @@ inline unsigned char interpolate(
 template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec2<fp_type>
 interpolate(const vdb::math::Vec2<fp_type> &a,
-            const vdb::math::Vec2<fp_type> &b,
-            const ScalarInterpType &t) {
+            const vdb::math::Vec2<fp_type> &b, const ScalarInterpType &t) {
   vdb::math::Vec2<fp_type> e;
   lerp(e, a, b, t);
   return e;
@@ -655,8 +584,7 @@ interpolate(const vdb::math::Vec2<fp_type> &a,
 template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec3<fp_type>
 interpolate(const vdb::math::Vec3<fp_type> &a,
-            const vdb::math::Vec3<fp_type> &b,
-            const ScalarInterpType &t) {
+            const vdb::math::Vec3<fp_type> &b, const ScalarInterpType &t) {
   vdb::math::Vec3<fp_type> e;
   lerp(e, a, b, t);
   return e;
@@ -665,41 +593,40 @@ interpolate(const vdb::math::Vec3<fp_type> &a,
 template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec4<fp_type>
 interpolate(const vdb::math::Vec4<fp_type> &a,
-            const vdb::math::Vec4<fp_type> &b,
-            const ScalarInterpType &t) {
+            const vdb::math::Vec4<fp_type> &b, const ScalarInterpType &t) {
   vdb::math::Vec4<fp_type> e;
   lerp(e, a, b, t);
   return e;
 }
 
 template <typename fp_type, typename ScalarInterpType>
-constexpr vdb::math::Vec2<fp_type> interpolate(
-    const vdb::math::Vec2<fp_type> &a,
-    const vdb::math::Vec2<fp_type> &b,
-    const vdb::math::Vec2<fp_type> &c,
-    const vdb::math::Vec3<ScalarInterpType> &t) {
+constexpr vdb::math::Vec2<fp_type>
+interpolate(const vdb::math::Vec2<fp_type> &a,
+            const vdb::math::Vec2<fp_type> &b,
+            const vdb::math::Vec2<fp_type> &c,
+            const vdb::math::Vec3<ScalarInterpType> &t) {
   vdb::math::Vec2<fp_type> e;
   lerp_range(e, a, b, c, t);
   return e;
 }
 
 template <typename fp_type, typename ScalarInterpType>
-constexpr vdb::math::Vec3<fp_type> interpolate(
-    const vdb::math::Vec3<fp_type> &a,
-    const vdb::math::Vec3<fp_type> &b,
-    const vdb::math::Vec3<fp_type> &c,
-    const vdb::math::Vec3<ScalarInterpType> &t) {
+constexpr vdb::math::Vec3<fp_type>
+interpolate(const vdb::math::Vec3<fp_type> &a,
+            const vdb::math::Vec3<fp_type> &b,
+            const vdb::math::Vec3<fp_type> &c,
+            const vdb::math::Vec3<ScalarInterpType> &t) {
   vdb::math::Vec3<fp_type> e;
   lerp_range(e, a, b, c, t);
   return e;
 }
 
 template <typename fp_type, typename ScalarInterpType>
-constexpr vdb::math::Vec4<fp_type> interpolate(
-    const vdb::math::Vec4<fp_type> &a,
-    const vdb::math::Vec4<fp_type> &b,
-    const vdb::math::Vec4<fp_type> &c,
-    const vdb::math::Vec3<ScalarInterpType> &t) {
+constexpr vdb::math::Vec4<fp_type>
+interpolate(const vdb::math::Vec4<fp_type> &a,
+            const vdb::math::Vec4<fp_type> &b,
+            const vdb::math::Vec4<fp_type> &c,
+            const vdb::math::Vec3<ScalarInterpType> &t) {
   vdb::math::Vec4<fp_type> e;
   lerp_range(e, a, b, c, t);
   return e;
@@ -709,12 +636,10 @@ template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec2<fp_type>
 interpolate(const vdb::math::Vec2<fp_type> &a,
             const vdb::math::Vec2<fp_type> &b,
-            const vdb::math::Vec2<fp_type> &c,
-            ScalarInterpType w1, ScalarInterpType w2, ScalarInterpType w3) {
+            const vdb::math::Vec2<fp_type> &c, ScalarInterpType w1,
+            ScalarInterpType w2, ScalarInterpType w3) {
   vdb::math::Vec2<fp_type> e;
-  lerp_range(
-      e, a, b, c,
-      vdb::math::Vec3<ScalarInterpType>{w1, w2, w3});
+  lerp_range(e, a, b, c, vdb::math::Vec3<ScalarInterpType>{w1, w2, w3});
   return e;
 }
 
@@ -722,12 +647,10 @@ template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec3<fp_type>
 interpolate(const vdb::math::Vec3<fp_type> &a,
             const vdb::math::Vec3<fp_type> &b,
-            const vdb::math::Vec3<fp_type> &c,
-            ScalarInterpType w1, ScalarInterpType w2, ScalarInterpType w3) {
+            const vdb::math::Vec3<fp_type> &c, ScalarInterpType w1,
+            ScalarInterpType w2, ScalarInterpType w3) {
   vdb::math::Vec3<fp_type> e;
-  lerp_range(
-      e, a, b, c,
-      vdb::math::Vec3<ScalarInterpType>{w1, w2, w3});
+  lerp_range(e, a, b, c, vdb::math::Vec3<ScalarInterpType>{w1, w2, w3});
   return e;
 }
 
@@ -735,21 +658,17 @@ template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec4<fp_type>
 interpolate(const vdb::math::Vec4<fp_type> &a,
             const vdb::math::Vec4<fp_type> &b,
-            const vdb::math::Vec4<fp_type> &c,
-            ScalarInterpType w1, ScalarInterpType w2, ScalarInterpType w3) {
+            const vdb::math::Vec4<fp_type> &c, ScalarInterpType w1,
+            ScalarInterpType w2, ScalarInterpType w3) {
   vdb::math::Vec4<fp_type> e;
-  lerp_range(
-      e, a, b, c,
-      vdb::math::Vec3<ScalarInterpType>{w1, w2, w3});
+  lerp_range(e, a, b, c, vdb::math::Vec3<ScalarInterpType>{w1, w2, w3});
   return e;
 }
 
 template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec2<fp_type> interpolate(
-    const vdb::math::Vec2<fp_type> &a,
-    const vdb::math::Vec2<fp_type> &b,
-    const vdb::math::Vec2<fp_type> &c,
-    const vdb::math::Vec2<fp_type> &d,
+    const vdb::math::Vec2<fp_type> &a, const vdb::math::Vec2<fp_type> &b,
+    const vdb::math::Vec2<fp_type> &c, const vdb::math::Vec2<fp_type> &d,
     const vdb::math::Vec4<ScalarInterpType> &t) {
   vdb::math::Vec2<fp_type> e;
   lerp_cube(e, a, b, c, d, t);
@@ -758,10 +677,8 @@ constexpr vdb::math::Vec2<fp_type> interpolate(
 
 template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec3<fp_type> interpolate(
-    const vdb::math::Vec3<fp_type> &a,
-    const vdb::math::Vec3<fp_type> &b,
-    const vdb::math::Vec3<fp_type> &c,
-    const vdb::math::Vec3<fp_type> &d,
+    const vdb::math::Vec3<fp_type> &a, const vdb::math::Vec3<fp_type> &b,
+    const vdb::math::Vec3<fp_type> &c, const vdb::math::Vec3<fp_type> &d,
     const vdb::math::Vec4<ScalarInterpType> &t) {
   vdb::math::Vec3<fp_type> e;
   lerp_cube(e, a, b, c, d, t);
@@ -770,10 +687,8 @@ constexpr vdb::math::Vec3<fp_type> interpolate(
 
 template <typename fp_type, typename ScalarInterpType>
 constexpr vdb::math::Vec4<fp_type> interpolate(
-    const vdb::math::Vec4<fp_type> &a,
-    const vdb::math::Vec4<fp_type> &b,
-    const vdb::math::Vec4<fp_type> &c,
-    const vdb::math::Vec4<fp_type> &d,
+    const vdb::math::Vec4<fp_type> &a, const vdb::math::Vec4<fp_type> &b,
+    const vdb::math::Vec4<fp_type> &c, const vdb::math::Vec4<fp_type> &d,
     const vdb::math::Vec4<ScalarInterpType> &t) {
   vdb::math::Vec4<fp_type> e;
   lerp_cube(e, a, b, c, d, t);
@@ -785,13 +700,10 @@ constexpr vdb::math::Vec2<fp_type>
 interpolate(const vdb::math::Vec2<fp_type> &a,
             const vdb::math::Vec2<fp_type> &b,
             const vdb::math::Vec2<fp_type> &c,
-            const vdb::math::Vec2<fp_type> &d,
-            ScalarInterpType w1, ScalarInterpType w2, ScalarInterpType w3,
-            ScalarInterpType w4) {
+            const vdb::math::Vec2<fp_type> &d, ScalarInterpType w1,
+            ScalarInterpType w2, ScalarInterpType w3, ScalarInterpType w4) {
   vdb::math::Vec2<fp_type> e;
-  lerp_cube(e, a, b, c, d,
-            vdb::math::Vec4<ScalarInterpType>{
-                w1, w2, w3, w4});
+  lerp_cube(e, a, b, c, d, vdb::math::Vec4<ScalarInterpType>{w1, w2, w3, w4});
   return e;
 }
 
@@ -800,12 +712,10 @@ constexpr vdb::math::Vec3<fp_type>
 interpolate(const vdb::math::Vec3<fp_type> &a,
             const vdb::math::Vec3<fp_type> &b,
             const vdb::math::Vec3<fp_type> &c,
-            const vdb::math::Vec3<fp_type> &d,
-            ScalarInterpType w1, ScalarInterpType w2, ScalarInterpType w3,
-            ScalarInterpType w4) {
+            const vdb::math::Vec3<fp_type> &d, ScalarInterpType w1,
+            ScalarInterpType w2, ScalarInterpType w3, ScalarInterpType w4) {
   vdb::math::Vec3<fp_type> e;
-  lerp_cube(e, a, b, c, d,
-            vdb::math::Vec4<ScalarInterpType>{w1, w2, w3, w4});
+  lerp_cube(e, a, b, c, d, vdb::math::Vec4<ScalarInterpType>{w1, w2, w3, w4});
   return e;
 }
 
@@ -814,13 +724,10 @@ constexpr vdb::math::Vec4<fp_type>
 interpolate(const vdb::math::Vec4<fp_type> &a,
             const vdb::math::Vec4<fp_type> &b,
             const vdb::math::Vec4<fp_type> &c,
-            const vdb::math::Vec4<fp_type> &d,
-            ScalarInterpType w1, ScalarInterpType w2, ScalarInterpType w3,
-            ScalarInterpType w4) {
+            const vdb::math::Vec4<fp_type> &d, ScalarInterpType w1,
+            ScalarInterpType w2, ScalarInterpType w3, ScalarInterpType w4) {
   vdb::math::Vec4<fp_type> e;
-  lerp_cube(e, a, b, c, d,
-            vdb::math::Vec4<ScalarInterpType>{
-                w1, w2, w3, w4});
+  lerp_cube(e, a, b, c, d, vdb::math::Vec4<ScalarInterpType>{w1, w2, w3, w4});
   return e;
 }
 

@@ -1,8 +1,11 @@
 #include "sampler.hh"
 #include "mesh_adapter.hh"
 
+#include <openvdb/Types.h>
+#include <openvdb/tools/LevelSetFilter.h>
+#include <openvdb/tools/LevelSetMorph.h>
+#include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/Clip.h>
-#include <openvdb/tools/MeshToVolume.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -201,7 +204,7 @@ public:
         vertex_grid::TreeType, triangles_stream,
         openvdb::util::NullInterrupter>;
 
-    const tbb::blocked_range<size_t> polygonRange(0, stream.polygon_count());
+    const tbb::blocked_range<size_t> polygonRange(0, stream.polygonCount());
 
     tbb::parallel_for(polygonRange, Voxelizer(data, stream, &interrupter));
 

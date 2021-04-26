@@ -34,18 +34,18 @@ template <typename GridT>
 class near_voxels_index : public closest_points_index {
 public:
   near_voxels_index(typename GridT::ConstPtr grid)
-      : _grid(grid), inAccessor(grid->getConstAccessor()), _pixel_counts(0) {}
+      : _pixel_counts(0),  _grid(grid), inAccessor(grid->getConstAccessor()) {}
 
   void search(const std::vector<openvdb::Vec3d> &points,
               std::vector<closest_points_type> &distances) override {
     size_t i = 0;
     auto scale =
-        _grid->transformPtr()->template map<vdb::UniformScaleMap>();
+        _grid->transformPtr()->template map<vdb::math::UniformScaleMap>();
     for (auto &point : points) {
+      vdb::Coord coord(point.x(), point.y(), point.z());
       openvdb::Vec3f P =
-          vdb::CPT<vdb::ScaleMap, vdb::CD_2ND>::
-              result<float>(*scale, inAccessor,
-                            vdb::Coord(point.x, point.y, point.z));
+          vdb::math::CPT<vdb::math::UniformScaleMap, vdb::math::CD_2ND>::
+              result(*scale, inAccessor, coord);
       distances[i++] = closest_points_type{0, P, point, true};
     }
   }
@@ -77,8 +77,8 @@ template <typename GridType> class triangle_range_query {
 public:
   triangle_range_query(std::unique_ptr<closest_points_index> index,
                        typename GridType::ConstPtr grid)
-      : _closest_points_index(std::move(index)), _grid(grid),
-        _accessor(grid->tree()) {}
+      : _closest_points_index(std::move(index)),
+        _accessor(grid->tree()), _grid(grid) {}
 
   sampling_voxels extract(std::vector<openvdb::Vec3d> coords) {
     return sampling(std::move(coords));
@@ -90,7 +90,7 @@ private:
   template <typename T> struct approx_value {
     inline T operator()(T value) const {
       T c = std::ceil(value);
-      if (vdb::isApproxEqual(float(tol), float(c - value)))
+      if (vdb::math::isApproxEqual(float(tol), float(c - value)))
         return c;
       return value;
     }
@@ -108,10 +108,10 @@ private:
     for (auto &value : instanceRadius) {
       if (!value.b)
         continue;
-      vdb::Coord index(value._point.x, value._point.y,
-                                 value._point.z);
-      vdb::Coord rindex(value._coord.x, value._coord.y,
-                                  value._coord.z);
+      vdb::Coord index(value._point.x(), value._point.y(),
+                                 value._point.z());
+      vdb::Coord rindex(value._coord.x(), value._coord.y(),
+                                  value._coord.z());
       pixel pix;
       if (_accessor.isValueOn(index))
         pix = _accessor.getValue(index);
@@ -121,7 +121,7 @@ private:
         seach_vertex_value(_accessor, rindex, pix);
       }
       result.emplace_back(sampling_result<typename GridType::ValueType>{
-          value._coord, value._point, val});
+          value._coord, value._point, pix});
     }
 
     return std::move(result);

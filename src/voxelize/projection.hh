@@ -11,6 +11,7 @@ class triangle_projection {
 public:
   triangle_projection(const fmesh_tri_patch &tri, double pad = 2)
       : box2(), _tri(tri) {
+        
     box2.extend(_tri.tp1);
     box2.extend(_tri.tp2);
     box2.extend(_tri.tp3);
@@ -78,9 +79,6 @@ public:
         std::ceil(box2.max.x()) - std::floor(box2.min.x()),
         std::ceil(box2.max.y()) - std::floor(box2.min.y()));
   }
-
-private:
-  bool approx_inside() {}
 
 private:
   approx_value<double> app_value;

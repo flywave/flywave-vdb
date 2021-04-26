@@ -10,6 +10,8 @@ namespace voxelize {
 
 class st_policy {
 public:
+  virtual ~st_policy() = default;
+
   virtual void start_triangle(const face_index_t &index,
                               const triangle3<double> &tri) = 0;
 
@@ -20,6 +22,8 @@ public:
 
 class uv_coord_reader {
 public:
+  virtual ~uv_coord_reader() = default;
+
   virtual triangle2<double> get(face_index_t index) = 0;
 };
 

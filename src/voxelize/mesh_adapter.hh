@@ -138,7 +138,14 @@ public:
                             _xform->worldToIndex(tri._triangle[2]));
   }
 
-  virtual size_t polygon_count() const = 0;
+  virtual size_t polygonCount() const = 0;
+
+  virtual size_t pointCount() const = 0;
+
+  virtual size_t vertexCount(size_t n) const { return 3; }
+
+  virtual void getIndexSpacePoint(size_t n, size_t v,
+                                  openvdb::Vec3d &pos) const = 0;
 
   virtual void set_transfrom(vdb::math::Transform::Ptr xfrom) {
     _xform = xfrom;
@@ -148,7 +155,7 @@ public:
 
   openvdb::BBoxd compute_boundbox() {
     openvdb::BBoxd box;
-    auto pc = polygon_count();
+    auto pc = polygonCount();
 
     for (auto i = 0; i < pc; i++) {
       auto tri = find_triangle_transfromed(i);
@@ -179,7 +186,6 @@ public:
 
   void add_material(const material_group &group) {
     auto gp = group;
-    //    gp.material_ptr()->_material_id = _materials.size();
     _materials.emplace(gp.material_id(), gp);
   }
 

@@ -42,9 +42,8 @@ struct paint_color_on_surface {
       std::vector<typename vertext_sampler::int32_grid::TreeType::LeafNodeType
                       *> &nodes,
       vertex_grid::TreeType &vertex, pixel_grid::TreeType &pixel,
-      vdb::math::Transform &transform,
-      const material_merge_transfrom &tmtl, mesh_adapter &adapter,
-      local_feature_id_t local_feature)
+      vdb::math::Transform &transform, const material_merge_transfrom &tmtl,
+      mesh_adapter &adapter, local_feature_id_t local_feature)
       : _nodes(nodes), _vertex(vertex), _pixel(&pixel), _transform(transform),
         _tmtl(tmtl), _adapter(adapter), _local_feature_id(local_feature) {}
 

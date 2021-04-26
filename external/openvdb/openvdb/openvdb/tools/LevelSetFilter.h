@@ -325,10 +325,10 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offset(ValueType value)
 
     mParent->leafs().removeAuxBuffers();// no auxiliary buffers required
 
-    const ValueType CFL = ValueType(0.5) * mParent->voxelSize(), offset = openvdb::math::Abs(value);
+    const ValueType CFL = ValueType(0.5) * mParent->voxelSize(), offset = math::Abs(value);
     ValueType dist = 0.0;
     while (offset-dist > ValueType(0.001)*CFL && mParent->checkInterrupter()) {
-        const ValueType delta = openvdb::math::Min(offset-dist, CFL);
+        const ValueType delta = math::Min(offset-dist, CFL);
         dist += delta;
 
         mTask = std::bind(&Filter::offsetImpl,

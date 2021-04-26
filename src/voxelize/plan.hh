@@ -57,8 +57,7 @@ public:
     return (point).dot(normal) + distance;
   }
 
-  vector_type
-  project_point(const vdb::math::Vec3<scalar_type> &point) const {
+  vector_type project_point(const vdb::math::Vec3<scalar_type> &point) const {
     return normal * (-distance_to_point(point)) + point;
   }
 
@@ -70,9 +69,7 @@ public:
     return dot(point) < 0.f;
   }
 
-  vdb::math::Vec3<scalar_type> position() const {
-    return normal * distance;
-  }
+  vdb::math::Vec3<scalar_type> position() const { return normal * distance; }
 
   bool intersects(const vdb::math::Ray<scalar_type> &ray) const {
     scalar_type t0 = vdb::math::Delta<scalar_type>();

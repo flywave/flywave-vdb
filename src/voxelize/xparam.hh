@@ -2,25 +2,7 @@
 
 #include <vcg/math/quadric.h>
 
-#include <vcg/complex/algorithms/clean.h>
-#include <vcg/complex/algorithms/clip.h>
-#include <vcg/complex/algorithms/crease_cut.h>
-#include <vcg/complex/algorithms/hole.h>
-#include <vcg/complex/algorithms/outline_support.h>
-#include <vcg/complex/algorithms/point_sampling.h>
-#include <vcg/complex/algorithms/update/bounding.h>
-#include <vcg/complex/algorithms/update/color.h>
-#include <vcg/complex/algorithms/update/curvature.h>
-#include <vcg/complex/algorithms/update/curvature_fitting.h>
-#include <vcg/complex/algorithms/update/normal.h>
-#include <vcg/complex/algorithms/update/position.h>
-#include <vcg/complex/algorithms/update/quality.h>
-#include <vcg/complex/algorithms/update/selection.h>
-#include <vcg/complex/algorithms/update/texture.h>
-#include <vcg/complex/algorithms/update/topology.h>
-#include <vcg/complex/allocate.h>
-#include <vcg/complex/append.h>
-#include <vcg/complex/complex.h>
+#include "mesh.hh"
 
 #include <vcg/simplex/face/pos.h>
 #include <vcg/space/outline2_packer.h>

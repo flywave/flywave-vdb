@@ -1032,7 +1032,6 @@ public:
   }
 
   RowPointersType row_pointers() {
-    using size_type = typename RowPointersType::size_type;
     RowPointersType row_pointers(this->height());
 
     for (size_t y = 0; y < this->height(); ++y) {
@@ -1043,7 +1042,6 @@ public:
   }
 
   ConstRowPointersType const_row_pointers() {
-    using size_type = typename ConstRowPointersType::size_type;
     ConstRowPointersType row_pointers(this->height());
 
     for (size_t y = 0; y < this->height(); ++y) {

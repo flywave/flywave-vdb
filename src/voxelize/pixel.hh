@@ -37,14 +37,12 @@ public:
 
   pixel_data() : _type(type_t::invalid) {}
 
-  pixel_data(uint8_t material,
-             const vdb::math::Vec4<uint8_t> &color,
+  pixel_data(uint8_t material, const vdb::math::Vec4<uint8_t> &color,
              uint16_t feature_id = -1)
       : _type(type_t::material_and_color), _material_id(material),
         _feature_id(feature_id), _color(color) {}
 
-  pixel_data(const vdb::math::Vec4<uint8_t> &color,
-             uint16_t feature_id = -1)
+  pixel_data(const vdb::math::Vec4<uint8_t> &color, uint16_t feature_id = -1)
       : _type(type_t::color), _material_id(0), _color(color) {}
 
   pixel_data(uint8_t material, uint16_t feature_id = -1)

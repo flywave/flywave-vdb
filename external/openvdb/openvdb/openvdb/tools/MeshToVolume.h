@@ -230,7 +230,7 @@ private:
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     float halfWidth = float(LEVEL_SET_HALF_WIDTH));
@@ -240,7 +240,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToLevelSet(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     float halfWidth = float(LEVEL_SET_HALF_WIDTH));
@@ -264,7 +264,7 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec4I>& quads,
     float halfWidth = float(LEVEL_SET_HALF_WIDTH));
@@ -274,7 +274,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToLevelSet(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec4I>& quads,
     float halfWidth = float(LEVEL_SET_HALF_WIDTH));
@@ -299,7 +299,7 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -310,7 +310,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToLevelSet(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -338,7 +338,7 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToSignedDistanceField(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -350,7 +350,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToSignedDistanceField(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -375,7 +375,7 @@ meshToSignedDistanceField(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToUnsignedDistanceField(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -386,7 +386,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToUnsignedDistanceField(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -405,7 +405,7 @@ meshToUnsignedDistanceField(
 template<typename GridType, typename VecType>
 inline typename GridType::Ptr
 createLevelSetBox(const math::BBox<VecType>& bbox,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     typename VecType::ValueType halfWidth = LEVEL_SET_HALF_WIDTH);
 
 
@@ -3443,7 +3443,7 @@ inline typename std::enable_if<std::is_floating_point<typename GridType::ValueTy
     typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -3538,7 +3538,7 @@ doMeshConversion(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     float halfWidth)
@@ -3554,7 +3554,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToLevelSet(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     float halfWidth)
@@ -3568,7 +3568,7 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec4I>& quads,
     float halfWidth)
@@ -3584,7 +3584,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToLevelSet(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec4I>& quads,
     float halfWidth)
@@ -3598,7 +3598,7 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -3614,7 +3614,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToLevelSet(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -3628,7 +3628,7 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToSignedDistanceField(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -3645,7 +3645,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToSignedDistanceField(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -3660,7 +3660,7 @@ meshToSignedDistanceField(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToUnsignedDistanceField(
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -3676,7 +3676,7 @@ template<typename GridType, typename Interrupter>
 inline typename GridType::Ptr
 meshToUnsignedDistanceField(
     Interrupter& interrupter,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
     const std::vector<Vec4I>& quads,
@@ -4201,7 +4201,7 @@ MeshToVoxelEdgeData::getEdgeData(
 template<typename GridType, typename VecType>
 inline typename GridType::Ptr
 createLevelSetBox(const math::BBox<VecType>& bbox,
-    const openvdb::math::Transform& xform,
+    const math::Transform& xform,
     typename VecType::ValueType halfWidth)
 {
     const Vec3s pmin = Vec3s(xform.worldToIndex(bbox.min()));

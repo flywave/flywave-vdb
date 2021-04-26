@@ -5,9 +5,10 @@
 namespace flywave {
 namespace voxelize {
 
+namespace vdb = openvdb::v8_1;
+
 template <typename AccessorT>
-inline bool seach_vertex_value(const AccessorT &accessor,
-                               openvdb::math::Coord ijk,
+inline bool seach_vertex_value(const AccessorT &accessor, vdb::math::Coord ijk,
                                typename AccessorT::ValueType &value) {
   if (accessor.isValueOn(ijk)) {
     value = accessor.getValue(ijk);

@@ -73,12 +73,12 @@ struct material_data {
                vdb::math::isApproxEqual(roughness, p.roughness) &&
                vdb::math::isApproxEqual(reflectance, p.reflectance) &&
                vdb::math::isApproxEqual(clearcoat_thickness,
-                                            p.clearcoat_thickness) &&
+                                        p.clearcoat_thickness) &&
                vdb::math::isApproxEqual(clearcoat_roughness,
-                                            p.clearcoat_roughness) &&
+                                        p.clearcoat_roughness) &&
                vdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
                vdb::math::isApproxEqual(anisotropy_rotation,
-                                            p.anisotropy_rotation);
+                                        p.anisotropy_rotation);
       default:
         break;
       }
@@ -140,8 +140,7 @@ public:
 
   virtual size_t polygon_count() const = 0;
 
-  virtual void
-  set_transfrom(vdb::math::Transform::Ptr xfrom) {
+  virtual void set_transfrom(vdb::math::Transform::Ptr xfrom) {
     _xform = xfrom;
   }
 
@@ -164,8 +163,8 @@ public:
 
   virtual data_triangle find_triangle(uint32_t face_index) = 0;
 
-  openvdb::Mat4d world_to_local(){return _matrix44.inverse();}
-  
+  openvdb::Mat4d world_to_local() { return _matrix44.inverse(); }
+
 private:
   vdb::math::Transform::Ptr _xform;
 

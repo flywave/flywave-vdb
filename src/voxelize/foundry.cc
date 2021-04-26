@@ -33,6 +33,7 @@ public:
   static texture2d<vdb::math::Vec4<uint8_t>>::Ptr
   project_to_image(std::vector<sampler_type> points,
                    const triangle_projection &prj,
+                   const std::vector<vdb::math::Vec2<int>> &coord,
                    texture2d<vdb::math::Vec4<uint8_t>>::Ptr);
 
   size_t pixel_size() const { return _query->pixel_count(); }
@@ -56,7 +57,7 @@ texture2d<vdb::math::Vec4<uint8_t>>::Ptr textute_foundry::extract(
 
   triangle_projection proj(ptri, _pixel_pad);
 
-  std::vector<vector2<int>> outcoordl;
+  std::vector<vdb::math::Vec2<int>> outcoordl;
   auto q = proj.to_voxels(outcoordl);
   return impl::project_to_image(_query->extract(std::move(q)), proj,
                                 std::move(outcoordl), texture);
@@ -69,24 +70,24 @@ textute_foundry::~textute_foundry() = default;
 texture2d<vdb::math::Vec4<uint8_t>>::Ptr
 textute_foundry::impl::project_to_image(
     std::vector<sampler_type> points, const triangle_projection &prj,
+    const std::vector<vdb::math::Vec2<int>> &coord,
     texture2d<vdb::math::Vec4<uint8_t>>::Ptr img) {
 
   auto h = img->height();
 
-  for (auto &it : points) {
-    auto uv = prj.point_to_uv(it._tri_coord);
-    if (uv.x() >= 0 && uv.y() >= 0) {
+  for (int i = 0; i < points.size(); i++) {
 
-      uint64_t min_x = std::min(uint64_t(std::floor(uv.x())), img->width() - 1);
-      uint64_t min_y = std::min(uint64_t(std::floor(h - uv.y() - 1)), h - 1);
-      uint64_t max_x = std::min(uint64_t(std::ceil(uv.x())), img->width() - 1);
-      uint64_t max_y = std::min(uint64_t(std::ceil(h - uv.y() - 1)), h - 1);
+    auto &uv = coord[i];
+    auto &pt = points[i];
+    uint64_t min_x = std::min(uint64_t(std::floor(uv.x())), img->width() - 1);
+    uint64_t min_y = std::min(uint64_t(std::floor(h - uv.y() - 1)), h - 1);
+    uint64_t max_x = std::min(uint64_t(std::ceil(uv.x())), img->width() - 1);
+    uint64_t max_y = std::min(uint64_t(std::ceil(h - uv.y() - 1)), h - 1);
 
-      img->color(min_x, min_y) = it._value._data._color;
-      img->color(max_x, max_y) = it._value._data._color;
-      img->color(min_x, max_y) = it._value._data._color;
-      img->color(max_x, min_y) = it._value._data._color;
-    }
+    img->color(min_x, min_y) = pt._value._data._color;
+    img->color(max_x, max_y) = pt._value._data._color;
+    img->color(min_x, max_y) = pt._value._data._color;
+    img->color(max_x, min_y) = pt._value._data._color;
   }
   return img;
 }
@@ -95,9 +96,7 @@ void triangle_foundry::make_mesh_mark_seam(std::vector<vertext_type> &points,
                                            std::vector<triangle_type> &tri,
                                            std::vector<quad_type> &quads,
                                            double isovalue, double adapter) {
-  auto ptr = make_shared<out_setting_volume_mesh_func>();
-  vdb::tools::volume_to_mesh(*_grid, points, tri, quads, isovalue, ptr,
-                             adapter);
+  vdb::tools::volumeToMesh(*_grid, points, tri, quads, isovalue, adapter, true);
 }
 
 void make_io_triangles(lm::virtual_array<lm::io_triangle> &rettriangles,

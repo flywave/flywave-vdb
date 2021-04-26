@@ -6,12 +6,14 @@
 
 namespace flywave {
 
+namespace vdb = openvdb::v8_1;
+
 template <typename T> struct tolerance {
   operator T() const { return zero<T>(); }
 };
 
-template <> struct tolerance<openvdb::math::half> {
-  operator openvdb::math::half() const { return {1e-6f}; }
+template <> struct tolerance<vdb::math::half> {
+  operator vdb::math::half() const { return {1e-6f}; }
 };
 
 template <> struct tolerance<float> {

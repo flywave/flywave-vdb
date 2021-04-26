@@ -1,8 +1,8 @@
 #include "sampler.hh"
 #include "mesh_adapter.hh"
 
-#include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/Clip.h>
+#include <openvdb/tools/MeshToVolume.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -24,8 +24,7 @@ public:
   adjust_unclosest_face(
       std::vector<typename vertex_grid::TreeType::LeafNodeType *> &node,
       triangles_stream &stream, int32_grid &pri_grid, int32_grid &grid,
-      std::vector<std::set<int32_t>> &polygons,
-      openvdb::math::Transform &transfrom)
+      std::vector<std::set<int32_t>> &polygons, vdb::math::Transform &transfrom)
       : _nodes(node), _polygons(polygons), _grid(grid), _pri_grid(pri_grid),
         _stream(stream), _transfrom(transfrom) {}
 
@@ -57,13 +56,13 @@ public:
           p = p - pl.project_point(p);
           p.normalize();
           auto dot = pl.normal.dot(p);
-          // auto ang = std::acos(dot);
+
           if (dot >= 0) {
             is_ng = false;
             break;
           }
 
-          openvdb::math::Ray<double> ray(it.getCoord().asVec3d(), -p);
+          vdb::math::Ray<double> ray(it.getCoord().asVec3d(), -p);
           if (intersects_triangle(ray, tri[0], tri[1], tri[2])) {
             is_inter = true;
           }
@@ -76,11 +75,11 @@ public:
     }
   }
 
-  bool intersects_triangle(const openvdb::math::Ray<double> &ray,
-                           const openvdb::math::Vec3<double> &a,
-                           const openvdb::math::Vec3<double> &b,
-                           const openvdb::math::Vec3<double> &c) const {
-    openvdb::math::Vec3<double> target;
+  bool intersects_triangle(const vdb::math::Ray<double> &ray,
+                           const vdb::math::Vec3<double> &a,
+                           const vdb::math::Vec3<double> &b,
+                           const vdb::math::Vec3<double> &c) const {
+    vdb::math::Vec3<double> target;
     bool backfaceCulling = false;
     auto edge1 = b - a;
     auto edge2 = c - a;
@@ -104,32 +103,26 @@ public:
     edge2 = diff.cross(edge2);
     auto DdQxE2 = sign * ray.dir().dot(edge2);
 
-    // b1 < 0, no intersection
     if (DdQxE2 < 0) {
       return false;
     }
 
     auto DdE1xQ = sign * ray.dir().dot(edge1.cross(diff));
 
-    // b2 < 0, no intersection
     if (DdE1xQ < 0) {
       return false;
     }
 
-    // b1+b2 > 1, no intersection
     if (DdQxE2 + DdE1xQ > DdN) {
       return false;
     }
 
-    // Line intersects triangle, check if ray does.
     auto QdN = -sign * diff.dot(normal);
 
-    // t < 0, no intersection
     if (QdN < 0) {
       return false;
     }
 
-    // Ray intersects triangle.
     target = ray.dir() * (QdN / DdN) + ray.eye();
     return true;
   }
@@ -140,14 +133,14 @@ private:
   int32_grid &_grid;
   int32_grid &_pri_grid;
   triangles_stream &_stream;
-  openvdb::math::Transform &_transfrom;
+  vdb::math::Transform &_transfrom;
 };
 
 void fix_unclosest_face(triangles_stream &stream, vertex_grid::Ptr ptr,
                         adjust_unclosest_face::int32_grid::Ptr _pri_index,
                         adjust_unclosest_face::int32_grid::Ptr _index,
                         std::vector<std::set<int32_t>> &polygons,
-                        openvdb::math::Transform &tran) {
+                        vdb::math::Transform &tran) {
   std::vector<typename vertex_grid::TreeType::LeafNodeType *> nodes;
   nodes.reserve(ptr->tree().leafCount());
   ptr->tree().getNodes(nodes);
@@ -223,7 +216,7 @@ public:
 };
 
 std::unique_ptr<vertext_sampler>
-vertext_sampler::make_mesh_sampler(openvdb::math::Transform::Ptr xform,
+vertext_sampler::make_mesh_sampler(vdb::math::Transform::Ptr xform,
                                    sampler_type type) {
   switch (type) {
   case sampler_type::level_set:

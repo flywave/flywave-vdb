@@ -10,13 +10,15 @@
 namespace flywave {
 namespace voxelize {
 
+namespace vdb = openvdb::v8_1;
+
 template <typename scalar_type> class triangle2 {
 public:
   typedef triangle2<scalar_type> triangle2_type;
   typedef scalar_type value_type;
   typedef std::decay_t<scalar_type> value_type_t;
-  typedef openvdb::math::Vec2<scalar_type> vector_type;
-  typedef openvdb::math::Vec3<scalar_type> vector3_type;
+  typedef vdb::math::Vec2<scalar_type> vector_type;
+  typedef vdb::math::Vec3<scalar_type> vector3_type;
 
   std::array<vector_type, 3> data_array;
 
@@ -153,7 +155,7 @@ public:
   typedef triangle3<scalar_type> triangle3_type;
   typedef scalar_type value_type;
   typedef std::decay_t<scalar_type> value_type_t;
-  typedef openvdb::math::Vec3<scalar_type> vector_type;
+  typedef vdb::math::Vec3<scalar_type> vector_type;
 
   std::array<vector_type, 3> data_array;
 

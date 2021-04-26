@@ -10,15 +10,13 @@ namespace flywave {
 namespace voxelize {
 
 voxel_pot::voxel_pot(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
-                     openvdb::math::Transform::Ptr res)
+                     vdb::math::Transform::Ptr res)
     : _resolution(res), _vertex(vertex), _pixel(pixel) {
   _vertex->setGridClass(openvdb::GRID_LEVEL_SET);
   _vertex->setTransform(_resolution);
 }
 
-bool voxel_pot::ray_test(
-    const openvdb::math::Ray<double> &ray,
-    openvdb::Vec3d &p) {
+bool voxel_pot::ray_test(const vdb::math::Ray<double> &ray, openvdb::Vec3d &p) {
   if (_vertex->empty())
     return false;
 

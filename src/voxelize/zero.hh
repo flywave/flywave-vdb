@@ -4,6 +4,8 @@
 
 namespace flywave {
 
+namespace vdb = openvdb::v8_1;
+
 template <typename V> struct zero {
   operator V() const { return 0; }
 };
@@ -12,10 +14,8 @@ template <> struct zero<bool> {
   operator bool() const { return false; }
 };
 
-template <> struct zero<openvdb::math::half> {
-  operator openvdb::math::half() const {
-    return openvdb::math::half();
-  }
+template <> struct zero<vdb::math::half> {
+  operator vdb::math::half() const { return vdb::math::half(); }
 };
 
 template <> struct zero<float> {

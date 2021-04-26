@@ -4,12 +4,14 @@
 
 namespace flywave {
 
+namespace vdb = openvdb::v8_1;
+
 template <typename scalar_type> class ray2 {
 public:
   typedef ray2<scalar_type> ray_type;
   typedef scalar_type value_type;
   typedef std::decay_t<scalar_type> value_type_t;
-  typedef openvdb::math::Vec2<scalar_type> vector_type;
+  typedef vdb::math::Vec2<scalar_type> vector_type;
 
   vector_type origin;
   vector_type direction;

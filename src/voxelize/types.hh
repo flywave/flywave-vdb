@@ -11,7 +11,7 @@ namespace vdb = openvdb::v8_1;
 
 using index_type = vdb::math::Vec3<uint32_t>;
 
-using quad_type = vdb::math::Vec3<uint32_t>;
+using quad_type = vdb::math::Vec4<uint32_t>;
 
 using triangle_type = vdb::math::Vec3<uint32_t>;
 

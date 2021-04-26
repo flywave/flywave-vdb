@@ -7,6 +7,8 @@
 namespace flywave {
 namespace voxelize {
 
+namespace vdb = openvdb::v8_1;
+
 class Edge {
 public:
   int X1, Y1, X2, Y2;
@@ -47,14 +49,14 @@ protected:
   inline void draw_spans_between_edges(const Edge &e1, const Edge &e2);
 
 public:
-  std::vector<openvdb::math::Vec2<unsigned int>>
+  std::vector<vdb::math::Vec2<unsigned int>>
   rasterize_triangle(float x1, float y1, float x2, float y2, float x3,
                      float y3) {
     draw_triangle(x1, y1, x2, y2, x3, y3);
     return std::move(result);
   }
 
-  std::vector<openvdb::math::Vec2<unsigned int>>
+  std::vector<vdb::math::Vec2<unsigned int>>
   rasterize_line(float x1, float y1, float x2, float y2) {
     draw_line(x1, y1, x2, y2);
     return std::move(result);
@@ -70,7 +72,7 @@ private:
 
   inline void draw_line(float x1, float y1, float x2, float y2);
 
-  std::vector<openvdb::math::Vec2<unsigned int>> result;
+  std::vector<vdb::math::Vec2<unsigned int>> result;
 };
 
 void rasterizer::set_pixel(unsigned int x, unsigned int y) {

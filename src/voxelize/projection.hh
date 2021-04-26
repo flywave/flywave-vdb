@@ -20,7 +20,8 @@ public:
         triangle2<double>(_tri.tp1, _tri.tp2, _tri.tp3));
   }
 
-  std::vector<openvdb::Vec3d> to_voxels() const {
+  std::vector<openvdb::Vec3d>
+  to_voxels(std::vector<vdb::math::Vec2<int>> &uvcoord) const {
     std::vector<openvdb::Vec3d> coords;
     if (box2.width() == 0 && box2.height() == 0)
       return std::vector<openvdb::Vec3d>();
@@ -48,6 +49,7 @@ public:
             barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x + 1, y - 1)))) {
           coords.emplace_back(uv_to_point(openvdb::Vec2d(x, y)));
+          uvcoord.emplace_back(vdb::math::Vec2<int>(x, y));
         }
       }
     }

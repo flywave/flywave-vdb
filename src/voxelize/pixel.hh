@@ -180,6 +180,7 @@ inline std::ostream &operator<<(std::ostream &os, const pixel &s) { return os; }
 } // namespace flywave
 
 namespace openvdb {
+namespace OPENVDB_VERSION_NAME {
 namespace math {
 
 inline bool isApproxEqual(const flywave::voxelize::pixel &a,
@@ -196,8 +197,8 @@ inline bool isApproxEqual(const flywave::voxelize::pixel &a,
 inline flywave::voxelize::pixel abs(const flywave::voxelize::pixel &v) {
   return flywave::voxelize::pixel(std::abs(v._value));
 }
-
 } // namespace math
+} // namespace OPENVDB_VERSION_NAME
 
 namespace OPENVDB_VERSION_NAME {
 template <>

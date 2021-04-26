@@ -183,13 +183,13 @@ public:
     return it;
   }
 
-  bool
-  operator==(const const_texture_row_iterator<ColorType> &it) const noexcept {
+  bool operator==(const const_texture_row_iterator<ColorType> &it) const
+      noexcept {
     return row_ == it.row_;
   }
 
-  bool
-  operator!=(const const_texture_row_iterator<ColorType> &it) const noexcept {
+  bool operator!=(const const_texture_row_iterator<ColorType> &it) const
+      noexcept {
     return row_ != it.row_;
   }
 
@@ -834,10 +834,10 @@ public:
   typedef std::vector<uint8_t *> RowPointersType;
   typedef std::vector<const uint8_t *> ConstRowPointersType;
 
+  std::unique_ptr<uint8_t[]> data;
   std::pair<uint32_t, uint32_t> size;
   static constexpr size_t channels_ = color_channel<Color>();
   static constexpr size_t color_size = sizeof(Color);
-  std::unique_ptr<uint8_t[]> data;
 
 public:
   texture2d() = default;
@@ -858,9 +858,9 @@ public:
 
   texture2d(std::pair<uint32_t, uint32_t> size_,
             std::unique_ptr<uint8_t[]> data_)
-      : base_texture(std::move(data_)), size(size_) {}
+      : data(std::move(data_)), size(size_) {}
 
-  texture2d(texture2d &&o) : base_texture(std::move(o.data)), size(o.size) {
+  texture2d(texture2d &&o) : data(std::move(o.data)), size(o.size) {
     o.size.first = o.size.second = 0;
   }
 
@@ -898,19 +898,6 @@ public:
   inline uint8_t *raw_data() { return data.get(); }
 
   inline const uint8_t *raw_data() const { return data.get(); }
-
-  static texture_type get_type_for_string(std::string const &type_string) {
-    if (type_string == "uint8")
-      return TEXTURE_TYPE_UINT8;
-    else if (type_string == "uint16")
-      return TEXTURE_TYPE_UINT16;
-    else if (type_string == "float")
-      return TEXTURE_TYPE_FLOAT;
-    else if (type_string == "double")
-      return TEXTURE_TYPE_DOUBLE;
-
-    return TEXTURE_TYPE_UNKNOWN;
-  }
 
   explicit operator bool() const { return valid(); }
 
@@ -974,7 +961,7 @@ public:
     std::fill(color_begin(), color_end(), color);
   }
 
-  void fill_pixel(pixel_type value) {
+  void fill_pixel(PixelType value) {
     std::fill(pixel_begin(), pixel_end(), value);
   }
 
@@ -997,27 +984,27 @@ public:
   inline size_t color_count() const { return size.first * size.second; }
   inline size_t pixel_count() const { return color_count() * channels_; }
 
-  inline iterator begin() noexcept {
+  inline Iterator begin() noexcept {
     return impl::texture_row_iterator<Color>(impl::texture_row<Color>(this, 0));
   }
-  inline const_iterator begin() const noexcept {
+  inline ConstIterator begin() const noexcept {
     return impl::const_texture_row_iterator<Color>(
         impl::const_texture_row<Color>(this, 0));
   }
-  inline const_iterator cbegin() const noexcept {
+  inline ConstIterator cbegin() const noexcept {
     return impl::const_texture_row_iterator<Color>(
         impl::const_texture_row<Color>(this, 0));
   }
 
-  inline iterator end() noexcept {
+  inline Iterator end() noexcept {
     return impl::texture_row_iterator<Color>(
         impl::texture_row<Color>(this, this->size.second));
   }
-  inline const_iterator end() const noexcept {
+  inline ConstIterator end() const noexcept {
     return impl::const_texture_row_iterator<Color>(
         impl::const_texture_row<Color>(this, this->size.second));
   }
-  inline const_iterator cend() const noexcept {
+  inline ConstIterator cend() const noexcept {
     return impl::const_texture_row_iterator<Color>(
         impl::const_texture_row<Color>(this, this->size.second));
   }
@@ -1064,12 +1051,12 @@ public:
     return row_pointers;
   }
 
-  inline pixel_type *pixel_begin() noexcept { return pixel_data(); }
-  inline pixel_type const *pixel_begin() const noexcept { return pixel_data(); }
-  inline pixel_type *pixel_end() noexcept {
+  inline PixelType *pixel_begin() noexcept { return pixel_data(); }
+  inline PixelType const *pixel_begin() const noexcept { return pixel_data(); }
+  inline PixelType *pixel_end() noexcept {
     return pixel_data() + pixel_count();
   }
-  inline pixel_type const *pixel_end() const noexcept {
+  inline PixelType const *pixel_end() const noexcept {
     return pixel_data() + pixel_count();
   }
 
@@ -1079,7 +1066,7 @@ public:
     return *reinterpret_cast<const Color *>(raw_data() +
                                             (y * stride() + x * color_size));
   }
-  inline pixel_type at(size_t x, size_t y, size_t c) const {
+  inline PixelType at(size_t x, size_t y, size_t c) const {
     return pixel_get(at(x, y), c);
   }
 
@@ -1089,7 +1076,7 @@ public:
     return *reinterpret_cast<Color *>(raw_data() +
                                       (y * stride() + x * color_size));
   }
-  inline pixel_type &at(size_t x, size_t y, size_t c) {
+  inline PixelType &at(size_t x, size_t y, size_t c) {
     return pixel_get(at(x, y), c);
   }
 
@@ -1114,18 +1101,18 @@ public:
                                             (y * stride() + x * color_size));
   }
 
-  inline pixel_type &operator()(size_t x, size_t y, size_t c) {
+  inline PixelType &operator()(size_t x, size_t y, size_t c) {
     return pixel_get(at(x, y), c);
   }
-  inline pixel_type operator()(size_t x, size_t y, size_t c) const {
+  inline PixelType operator()(size_t x, size_t y, size_t c) const {
     return pixel_get(at(x, y), c);
   }
 
-  inline pixel_type *pixel_data() {
-    return reinterpret_cast<pixel_type *>(raw_data());
+  inline PixelType *pixel_data() {
+    return reinterpret_cast<PixelType *>(raw_data());
   }
-  inline const pixel_type *pixel_data() const {
-    return reinterpret_cast<const pixel_type *>(raw_data());
+  inline const PixelType *pixel_data() const {
+    return reinterpret_cast<const PixelType *>(raw_data());
   }
 
   inline Color *color_data() { return reinterpret_cast<Color *>(raw_data()); }
@@ -1169,11 +1156,11 @@ public:
         raw_data() + (i.second * stride() + i.first * color_size));
   }
 
-  inline pixel_type &pixel(std::pair<uint32_t, uint32_t> i, size_t c) {
+  inline PixelType &pixel(std::pair<uint32_t, uint32_t> i, size_t c) {
     return pixel_get(color(i), c);
   }
 
-  inline pixel_type pixel(std::pair<uint32_t, uint32_t> i, size_t c) const {
+  inline PixelType pixel(std::pair<uint32_t, uint32_t> i, size_t c) const {
     return pixel_get(color(i), c);
   }
 
@@ -1189,11 +1176,11 @@ public:
                                             (y * stride() + x * color_size));
   }
 
-  inline pixel_type &pixel(size_t x, size_t y, size_t c) {
+  inline PixelType &pixel(size_t x, size_t y, size_t c) {
     return pixel_get(color(x, y), c);
   }
 
-  inline pixel_type pixel(size_t x, size_t y, size_t c) const {
+  inline PixelType pixel(size_t x, size_t y, size_t c) const {
     return pixel_get(color(x, y), c);
   }
 

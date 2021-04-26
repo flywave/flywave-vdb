@@ -31,7 +31,7 @@ void voxel_pot::clear_unuse_materials() {
     mapping.emplace(pt->_material_id, true);
   }
 
-  auto iter = pixel_grid()->tree().beginValueOn();
+  auto iter = get_pixel_grid()->tree().beginValueOn();
   while (iter) {
     mapping[iter.getValue()._data._material_id] = false;
     ++iter;
@@ -44,18 +44,18 @@ void voxel_pot::clear_unuse_materials() {
 }
 
 void voxel_pot_intersection(voxel_pot &tpot, voxel_pot &spot) {
-  openvdb::tools::csgIntersection(tpot.voxel_grid()->tree(),
-                                  spot.voxel_grid()->tree(), true);
+  openvdb::tools::csgIntersection(tpot.get_voxel_grid()->tree(),
+                                  spot.get_voxel_grid()->tree(), true);
 }
 
 void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
-  openvdb::tools::csgUnion(tpot.voxel_grid()->tree(), spot.voxel_grid()->tree(),
-                           true);
-  tpot.pixel_grid()->tree().merge(spot.pixel_grid()->tree());
+  openvdb::tools::csgUnion(tpot.get_voxel_grid()->tree(),
+                           spot.get_voxel_grid()->tree(), true);
+  tpot.get_pixel_grid()->tree().merge(spot.get_pixel_grid()->tree());
 
-  auto iter = spot.voxel_grid()->tree().beginValueOn();
-  auto paccess = tpot.pixel_grid()->getAccessor();
-  auto vaccess = tpot.voxel_grid()->getAccessor();
+  auto iter = spot.get_voxel_grid()->tree().beginValueOn();
+  auto paccess = tpot.get_pixel_grid()->getAccessor();
+  auto vaccess = tpot.get_voxel_grid()->getAccessor();
 
   while (iter) {
     if (vaccess.isValueOn(iter.getCoord())) {
@@ -66,12 +66,12 @@ void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
     ++iter;
   }
 
-  openvdb::tools::pruneLevelSet(tpot.voxel_grid()->tree());
+  openvdb::tools::pruneLevelSet(tpot.get_voxel_grid()->tree());
 }
 
 void voxel_pot_difference(voxel_pot &tpot, voxel_pot &spot) {
-  openvdb::tools::csgDifference(tpot.voxel_grid()->tree(),
-                                spot.voxel_grid()->tree(), true);
+  openvdb::tools::csgDifference(tpot.get_voxel_grid()->tree(),
+                                spot.get_voxel_grid()->tree(), true);
 }
 
 void voxel_pot::composite(voxel_pot &pot, const composite_type &type) {

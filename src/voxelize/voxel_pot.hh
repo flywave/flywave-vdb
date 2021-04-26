@@ -36,9 +36,9 @@ public:
 
   vdb::math::Transform::Ptr voxel_resolution() const { return _resolution; }
 
-  vertex_grid::Ptr voxel_grid() const { return _vertex; }
+  vertex_grid::Ptr get_voxel_grid() const { return _vertex; }
 
-  pixel_grid::Ptr pixel_grid() const { return _pixel; }
+  pixel_grid::Ptr get_pixel_grid() const { return _pixel; }
 
   void set_voxel_grid(vertex_grid::Ptr ptr) {
     _vertex = ptr;

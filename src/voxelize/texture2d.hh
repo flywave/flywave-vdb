@@ -2,6 +2,8 @@
 
 #include <openvdb/Types.h>
 
+#include <cstring>
+
 namespace flywave {
 
 namespace vdb = openvdb::v8_1;

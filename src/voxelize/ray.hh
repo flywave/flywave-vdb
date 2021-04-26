@@ -4,7 +4,7 @@
 
 namespace flywave {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 template <typename scalar_type> class ray2 {
 public:

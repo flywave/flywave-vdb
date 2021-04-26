@@ -7,7 +7,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 using index_type = vdb::math::Vec3<uint32_t>;
 

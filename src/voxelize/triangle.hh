@@ -10,7 +10,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 template <typename scalar_type> class triangle2 {
 public:

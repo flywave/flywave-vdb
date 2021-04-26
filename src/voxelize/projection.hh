@@ -11,7 +11,7 @@ class triangle_projection {
 public:
   triangle_projection(const fmesh_tri_patch &tri, double pad = 2)
       : box2(), _tri(tri) {
-        
+
     box2.extend(_tri.tp1);
     box2.extend(_tri.tp2);
     box2.extend(_tri.tp3);

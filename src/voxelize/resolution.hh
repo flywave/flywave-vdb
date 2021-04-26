@@ -5,7 +5,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 class resolution {
 public:

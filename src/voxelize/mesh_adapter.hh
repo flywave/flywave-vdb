@@ -9,7 +9,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 struct texture_sampler {
   std::shared_ptr<st_policy> _policy;

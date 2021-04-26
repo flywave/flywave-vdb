@@ -7,7 +7,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 struct closest_points_type {
   float _distance;
@@ -124,7 +124,7 @@ private:
           value._coord, value._point, pix});
     }
 
-    return std::move(result);
+    return result;
   }
 
 private:

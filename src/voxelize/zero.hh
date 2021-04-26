@@ -4,7 +4,7 @@
 
 namespace flywave {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 template <typename V> struct zero {
   operator V() const { return 0; }

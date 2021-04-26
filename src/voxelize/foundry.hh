@@ -10,7 +10,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 class textute_foundry {
   class impl;
@@ -48,7 +48,6 @@ public:
 };
 
 class triangle_foundry {
-
 public:
   triangle_foundry(vertex_grid::Ptr vgrid) : _grid(vgrid) {}
 

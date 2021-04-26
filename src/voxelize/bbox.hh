@@ -7,7 +7,7 @@
 
 namespace flywave {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 template <typename scalar_type> class bbox2 {
 public:
@@ -239,8 +239,7 @@ template <typename T> bbox2<T> operator*(const float &a, const bbox2<T> &b) {
 }
 
 template <typename T>
-bbox2<T> operator*(const vdb::math::Vec2<T> &a,
-                   const bbox2<T> &b) {
+bbox2<T> operator*(const vdb::math::Vec2<T> &a, const bbox2<T> &b) {
   return bbox2<T>(a * b.min, a * b.max);
 }
 
@@ -253,33 +252,28 @@ template <typename T> bbox2<T> operator-(const bbox2<T> &a, const bbox2<T> &b) {
 }
 
 template <typename T>
-bbox2<T> operator+(const bbox2<T> &a,
-                   const vdb::math::Vec2<T> &b) {
+bbox2<T> operator+(const bbox2<T> &a, const vdb::math::Vec2<T> &b) {
   return bbox2<T>(a.min + b, a.max + b);
 }
 
 template <typename T>
-bbox2<T> operator-(const bbox2<T> &a,
-                   const vdb::math::Vec2<T> &b) {
+bbox2<T> operator-(const bbox2<T> &a, const vdb::math::Vec2<T> &b) {
   return bbox2<T>(a.min - b, a.max - b);
 }
 
 template <typename T>
-bbox2<T> enlarge(const bbox2<T> &a,
-                 const vdb::math::Vec2<T> &b) {
+bbox2<T> enlarge(const bbox2<T> &a, const vdb::math::Vec2<T> &b) {
   return bbox2<T>(a.min - b, a.max + b);
 }
 
 template <typename T>
-const bbox2<T> merge(const bbox2<T> &a,
-                     const vdb::math::Vec2<T> &b) {
+const bbox2<T> merge(const bbox2<T> &a, const vdb::math::Vec2<T> &b) {
   return bbox2<T>(vdb::math::minComponent(a.min, b),
                   vdb::math::maxComponent(a.max, b));
 }
 
 template <typename T>
-const bbox2<T> merge(const vdb::math::Vec2<T> &a,
-                     const bbox2<T> &b) {
+const bbox2<T> merge(const vdb::math::Vec2<T> &a, const bbox2<T> &b) {
   return bbox2<T>(vdb::math::minComponent(a, b.min),
                   vdb::math::maxComponent(a, b.max));
 }
@@ -324,14 +318,12 @@ template <typename T> bool disjoint(const bbox2<T> &a, const bbox2<T> &b) {
 }
 
 template <typename T>
-bool disjoint(const bbox2<T> &a,
-              const vdb::math::Vec2<T> &b) {
+bool disjoint(const bbox2<T> &a, const vdb::math::Vec2<T> &b) {
   return disjoint(a, bbox2<T>(b));
 }
 
 template <typename T>
-bool disjoint(const vdb::math::Vec2<T> &a,
-              const bbox2<T> &b) {
+bool disjoint(const vdb::math::Vec2<T> &a, const bbox2<T> &b) {
   return disjoint(bbox2<T>(a), b);
 }
 
@@ -340,14 +332,12 @@ template <typename T> bool conjoint(const bbox2<T> &a, const bbox2<T> &b) {
 }
 
 template <typename T>
-bool conjoint(const bbox2<T> &a,
-              const vdb::math::Vec2<T> &b) {
+bool conjoint(const bbox2<T> &a, const vdb::math::Vec2<T> &b) {
   return conjoint(a, bbox2<T>(b));
 }
 
 template <typename T>
-bool conjoint(const vdb::math::Vec2<T> &a,
-              const bbox2<T> &b) {
+bool conjoint(const vdb::math::Vec2<T> &a, const bbox2<T> &b) {
   return conjoint(bbox2<T>(a), b);
 }
 

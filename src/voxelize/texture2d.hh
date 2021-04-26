@@ -6,7 +6,7 @@
 
 namespace flywave {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 template <typename Color> class texture2d;
 

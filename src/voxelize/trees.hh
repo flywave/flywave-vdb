@@ -10,7 +10,7 @@
 namespace flywave {
 namespace voxelize {
 
-namespace vdb = openvdb::v8_1;
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 using float_tree = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
 using pixel_tree = openvdb::tree::Tree4<pixel, 5, 4, 3>::Type;

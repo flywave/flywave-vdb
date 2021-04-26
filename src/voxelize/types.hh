@@ -7,9 +7,9 @@ namespace voxelize {
 
 using index_type = openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint32_t>;
 
-using quad_type = openvdb::OPENVDB_VERSION_NAME::math::Vec3<int32_t>;
+using quad_type = openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint32_t>;
 
-using triangle_type = openvdb::OPENVDB_VERSION_NAME::math::Vec3<int32_t>;
+using triangle_type = openvdb::OPENVDB_VERSION_NAME::math::Vec3<uint32_t>;
 
 using vertext_type = openvdb::OPENVDB_VERSION_NAME::math::Vec3<float>;
 

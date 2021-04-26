@@ -9,7 +9,7 @@
 namespace flywave {
 namespace voxelize {
 class pixel;
-}
+} // namespace voxelize
 } // namespace flywave
 
 namespace openvdb {
@@ -194,8 +194,6 @@ inline bool isApproxEqual(const flywave::voxelize::pixel &a,
 }
 
 inline flywave::voxelize::pixel abs(const flywave::voxelize::pixel &v) {
-  // auto pix = v;
-  // pix._value = std::abs(v._value);
   return flywave::voxelize::pixel(std::abs(v._value));
 }
 

@@ -9,7 +9,8 @@ namespace voxelize {
 
 class triangle_projection {
 public:
-  triangle_projection(const fmesh_tri_patch &tri, double pad = 2) : _tri(tri) {
+  triangle_projection(const fmesh_tri_patch &tri, double pad = 2)
+      : _tri(tri), box2() {
     box2.extend(_tri.tp1);
     box2.extend(_tri.tp2);
     box2.extend(_tri.tp3);
@@ -28,23 +29,23 @@ public:
          y++) {
       for (double x = std::floor(box2.min.x()); x <= std::ceil(box2.max.x());
            x++) {
-        if (BarycentricCoordsAreValid(
+        if (barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x, y))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x + 1, y))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x - 1, y))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x, y + 1))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x, y - 1))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x - 1, y + 1))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x + 1, y + 1))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x - 1, y - 1))) ||
-            BarycentricCoordsAreValid(
+            barycentric_coords_are_valid(
                 _convert->uv2bary(openvdb::Vec2d(x + 1, y - 1)))) {
           coords.emplace_back(uv_to_point(openvdb::Vec2d(x, y)));
         }
@@ -53,8 +54,8 @@ public:
     return std::move(coords);
   }
 
-  bool
-  BarycentricCoordsAreValid(const openvdb::Vec3d &p_barycentricCoords) const {
+  bool barycentric_coords_are_valid(
+      const openvdb::Vec3d &p_barycentricCoords) const {
     return p_barycentricCoords.x() >= 0.0f && p_barycentricCoords.y() >= 0.0f &&
            p_barycentricCoords.x() + p_barycentricCoords.y() <= 1.05f;
   }

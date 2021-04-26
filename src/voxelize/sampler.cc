@@ -21,7 +21,6 @@ public:
 
   std::tuple<vertex_grid::Ptr, int32_grid::Ptr>
   sampler(triangles_stream &stream, clip_box_createor &bc) override {
-
     auto grid = int32_grid::create(int32_t(openvdb::util::INVALID_IDX));
     stream.set_transfrom(_xform);
     auto ptr = openvdb::tools::meshToVolume<vertex_grid>(stream, *_xform, 3.0f,

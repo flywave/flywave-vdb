@@ -20,23 +20,23 @@ public:
   vector_type min{std::numeric_limits<scalar_type>::max()};
   vector_type max{-std::numeric_limits<scalar_type>::max()};
 
-  bbox2() noexcept = default;
-  bbox2(const bbox2 &box) noexcept : min(box.min), max(box.max) {}
-  bbox2(const vector_type &v) noexcept : min(v), max(v) {}
-  bbox2(const vector_type &bmin, const vector_type &bmax) noexcept
+  bbox2() = default;
+  bbox2(const bbox2 &box) : min(box.min), max(box.max) {}
+  bbox2(const vector_type &v) : min(v), max(v) {}
+  bbox2(const vector_type &bmin, const vector_type &bmax)
       : min(bmin), max(bmax) {}
-  bbox2(const vector_type &bmin, const vector_type &bmax, bool sorted) noexcept
+  bbox2(const vector_type &bmin, const vector_type &bmax, bool sorted)
       : min(bmin), max(bmax) {
     if (!sorted)
       this->sort();
   }
 
-  bbox2(const vector_type &bmin, scalar_type length) noexcept
+  bbox2(const vector_type &bmin, scalar_type length)
       : min(bmin),
         max(bmin +
             (std::is_integral<scalar_type>::value ? length - 1 : length)) {}
 
-  bbox2(const scalar_type *xy, bool sorted = true) noexcept
+  bbox2(const scalar_type *xy, bool sorted = true)
       : min(xy[0], xy[1]), max(xy[2], xy[3]) {
     if (!sorted)
       this->sort();

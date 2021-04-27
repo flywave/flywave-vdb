@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-struct _voxelize_t {
+struct _voxelizer_t {
   
 };
 

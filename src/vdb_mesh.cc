@@ -1,4 +1,4 @@
-#include "mesh.hh"
+#include "vdb_mesh.hh"
 
 namespace flywave {
 

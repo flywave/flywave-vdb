@@ -1,7 +1,7 @@
 #pragma once
 
-#include "mesh.hh"
 #include "particle.hh"
+#include "vdb_mesh.hh"
 
 #include <openvdb/openvdb.h>
 

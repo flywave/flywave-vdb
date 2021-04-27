@@ -2,7 +2,7 @@
 #include "grid_api_impl.hh"
 
 #include "grid.hh"
-#include "mesh.hh"
+#include "vdb_mesh.hh"
 #include "particle.hh"
 
 #include <openvdb/tools/Dense.h>

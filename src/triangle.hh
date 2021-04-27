@@ -27,7 +27,7 @@ public:
 
   triangle2(const vector_type &p0_, const vector_type &p1_,
             const vector_type &p2_) noexcept
-      : data_array(p0_, p1_, p2_) {}
+      : data_array({p0_, p1_, p2_}) {}
 
   triangle2(const vector3_type &p0_, const vector3_type &p1_,
             const vector3_type &p2_) noexcept

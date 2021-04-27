@@ -86,8 +86,6 @@ bool sampleVolume(const openvdb::Coord &extents, SamplingFunc sampling_func,
   cancelled = false;
   tbb::parallel_for(domain, [&sampling_func, &stride, &ranges, out_samples,
                              &cancelled](const openvdb::CoordBBox &bbox) {
-    const auto local_extents = bbox.extents();
-
     PerThreadRange::reference this_thread_range = ranges.local();
     for (auto z = bbox.min().z(); z <= bbox.max().z(); ++z) {
       for (auto y = bbox.min().y(); y <= bbox.max().y(); ++y) {

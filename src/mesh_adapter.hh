@@ -114,10 +114,10 @@ private:
 };
 
 struct data_triangle {
-  triangle3<float> _triangle;
+  triangle3<double> _triangle;
   uint16_t _material_id;
 
-  const openvdb::Vec3f &operator[](size_t index) { return _triangle[index]; }
+  const openvdb::Vec3d &operator[](size_t index) { return _triangle[index]; }
 };
 
 class mesh_adapter;
@@ -130,11 +130,11 @@ class triangles_stream {
   friend class micronizer;
 
 public:
-  triangle3<float> find_triangle_transfromed(uint32_t face_index) {
+  triangle3<double> find_triangle_transfromed(uint32_t face_index) {
     data_triangle tri = find_triangle(face_index);
-    return triangle3<float>(_xform->worldToIndex(tri._triangle[0]),
-                            _xform->worldToIndex(tri._triangle[1]),
-                            _xform->worldToIndex(tri._triangle[2]));
+    return triangle3<double>(_xform->worldToIndex(tri._triangle[0]),
+                             _xform->worldToIndex(tri._triangle[1]),
+                             _xform->worldToIndex(tri._triangle[2]));
   }
 
   virtual size_t polygonCount() const = 0;
@@ -168,7 +168,7 @@ public:
   virtual ~triangles_stream() = default;
 
   virtual data_triangle find_triangle(uint32_t face_index) = 0;
-
+    
   openvdb::Mat4d world_to_local() { return _matrix44.inverse(); }
 
 private:

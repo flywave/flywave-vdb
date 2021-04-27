@@ -10,11 +10,11 @@ using namespace flywave;
 extern "C" {
 #endif
 
-FLYWAVE_VDB_API voxelizer_t *voxelizer_create() { return nullptr; }
+FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_create() { return nullptr; }
 
-FLYWAVE_VDB_API void voxelizer_free(voxelizer_t *vox) {}
+FLYWAVE_VDB_API void voxel_pixel_free(voxel_pixel_t *vox) {}
 
-FLYWAVE_VDB_API voxelizer_t *voxelizer_duplicate(voxelizer_t *vox) {
+FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_duplicate(voxel_pixel_t *vox) {
   return nullptr;
 }
 

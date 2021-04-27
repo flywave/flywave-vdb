@@ -93,5 +93,4 @@ triangle2<double> uv_reader_impl::get(uint32_t index) {
   auto tri = _hm.find_triangle(index);
   return triangle2<double>{tri.texcoord[0], tri.texcoord[1], tri.texcoord[2]};
 }
-
 } // namespace flywave

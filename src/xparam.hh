@@ -2,7 +2,11 @@
 
 #include <vcg/math/quadric.h>
 
-#include "vcg_mesh.hh"
+#include <vcg/complex/algorithms/clean.h>
+#include <vcg/complex/algorithms/clip.h>
+#include <vcg/complex/algorithms/update/bounding.h>
+#include <vcg/complex/algorithms/update/normal.h>
+#include <vcg/complex/algorithms/update/topology.h>
 
 #include <vcg/simplex/face/pos.h>
 #include <vcg/space/outline2_packer.h>
@@ -21,7 +25,6 @@ public:
   xparam(Mesh &_mesh, double tquality) : _curmesh(_mesh), _tquality(tquality) {}
 
   void parameter() {
-
     Mesh atlas_mesh;
     Mesh no_atlas_mesh;
 
@@ -151,7 +154,7 @@ public:
 
     xatlas::AddMeshError::Enum error = xatlas::AddMesh(atlas, input_mesh, 1);
     assert(error == xatlas::AddMeshError::Success);
-    
+
     xatlas::Generate(atlas);
 
     {

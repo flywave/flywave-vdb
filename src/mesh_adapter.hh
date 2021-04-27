@@ -1,5 +1,8 @@
 #pragma once
 
+#include <fstream>
+#include <iostream>
+
 #include "color_extract.hh"
 #include "st_policy.hh"
 #include "types.hh"
@@ -84,6 +87,24 @@ struct material_data {
     }
     return false;
   }
+
+  void read(std::istream &is) {
+    is >> _material_id >> type >> mode >> color.x() >> color.y() >> color.z() >>
+        ambient.x() >> ambient.y() >> ambient.z() >> emissive.x() >>
+        emissive.y() >> emissive.z() >> specular.x() >> specular.y() >>
+        specular.z() >> opacity >> shininess >> metallic >> roughness >>
+        reflectance >> clearcoat_thickness >> clearcoat_roughness >>
+        anisotropy >> anisotropy_rotation;
+  }
+
+  void write(std::ostream &os) const {
+    os << _material_id << type << mode << color.x() << color.y() << color.z()
+       << ambient.x() << ambient.y() << ambient.z() << emissive.x()
+       << emissive.y() << emissive.z() << specular.x() << specular.y()
+       << specular.z() << opacity << shininess << metallic << roughness
+       << reflectance << clearcoat_thickness << clearcoat_roughness
+       << anisotropy << anisotropy_rotation;
+  }
 };
 
 class material_group {
@@ -130,6 +151,8 @@ class triangles_stream {
   friend class micronizer;
 
 public:
+  virtual ~triangles_stream() = default;
+
   triangle3<double> find_triangle_transfromed(uint32_t face_index) {
     data_triangle tri = find_triangle(face_index);
     return triangle3<double>(_xform->worldToIndex(tri._triangle[0]),
@@ -165,10 +188,8 @@ public:
     return box;
   }
 
-  virtual ~triangles_stream() = default;
-
   virtual data_triangle find_triangle(uint32_t face_index) = 0;
-    
+
   openvdb::Mat4d world_to_local() { return _matrix44.inverse(); }
 
 private:

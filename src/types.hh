@@ -24,9 +24,9 @@ struct fmesh_tri_patch {
   openvdb::Vec3d p2;
   openvdb::Vec3d p3;
 
-  openvdb::Vec3d tp1;
-  openvdb::Vec3d tp2;
-  openvdb::Vec3d tp3;
+  openvdb::Vec2d tp1;
+  openvdb::Vec2d tp2;
+  openvdb::Vec2d tp3;
 };
 
 using color_type = vdb::math::Vec4<uint8_t>;

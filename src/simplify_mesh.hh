@@ -19,7 +19,7 @@
 #include <vcg/complex/algorithms/local_optimization/tri_edge_collapse_quadric_tex.h>
 
 #include "texture2d.hh"
-#include "vcg_mesh.hh"
+#include "voxelizer_api_impl.hh"
 
 namespace flywave {
 
@@ -78,9 +78,14 @@ class simplify_face
                        vcg::face::WedgeTexCoord2f, vcg::face::BitFlags> {
 public:
   uint32_t node;
-  int tex;
-  int mtl{-1};
-  bool operator<(const simplify_face &t) const { return node < t.node; }
+  uint32_t tex;
+  uint32_t mtl;
+  uint64_t feature_id;
+  bool operator<(const simplify_face &t) const {
+    if (node == t.node)
+      return mtl < t.mtl;
+    return node < t.node;
+  }
 };
 
 class simplify_mesh : public vcg::tri::TriMesh<std::vector<simplify_vertex>,
@@ -94,6 +99,12 @@ public:
   std::string texture;
   simplify_mesh() = default;
   simplify_mesh(const simplify_mesh &m);
+
+  void lock(std::vector<bool> &locked);
+  void get_triangles(struct _triangle_t *triangles, uint32_t node);
+
+  void unlock_border();
+  void lock_border();
 
   void quadric_simplify_with_tex(uint32_t target);
 

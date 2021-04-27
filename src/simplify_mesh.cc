@@ -1,7 +1,5 @@
 #include "simplify_mesh.hh"
 
-#include "vcg_mesh.hh"
-
 namespace flywave {
 
 class union_find {
@@ -112,6 +110,58 @@ void simplify_mesh::reset_fv() {
   vcg::tri::Allocator<simplify_mesh>::CompactEveryVector(*this);
   vert.resize(vn);
   face.resize(fn);
+}
+
+void simplify_mesh::lock(std::vector<bool> &locked) {
+  for (uint32_t i = 0; i < face.size(); i++)
+    if (locked[i])
+      face[i].ClearW();
+}
+
+void simplify_mesh::get_triangles(struct _triangle_t *triangles,
+                                  uint32_t node) {
+  int count = 0;
+  for (uint32_t i = 0; i < face.size(); i++) {
+    simplify_face &t = face[i];
+    if (t.IsD())
+      continue;
+
+    struct _triangle_t &triangle = triangles[count++];
+    for (uint32_t k = 0; k < 3; k++) {
+      struct _io_vertex_t &vertex = triangle.vertices[k];
+      simplify_vertex &v = *t.V(k);
+      vertex.v[0] = v.P()[0];
+      vertex.v[1] = v.P()[1];
+      vertex.v[2] = v.P()[2];
+      vertex.c[0] = v.C()[0];
+      vertex.c[1] = v.C()[1];
+      vertex.c[2] = v.C()[2];
+      vertex.c[3] = v.C()[3];
+      vertex.t[0] = t.WT(k).U();
+      vertex.t[1] = t.WT(k).V();
+      vertex.b = v.IsB();
+    }
+    triangle.node = node;
+    triangle.tex = t.tex;
+    triangle.mtl = t.mtl;
+    triangle.feature_id = t.feature_id;
+  }
+}
+
+void simplify_mesh::unlock_border() {
+  simplify_mesh::VertexIterator vi;
+  for (vi = this->vert.begin(); vi != this->vert.end(); ++vi) {
+    if ((*vi).IsB())
+      (*vi).ClearW();
+  }
+}
+
+void simplify_mesh::lock_border() {
+  simplify_mesh::VertexIterator vi;
+  for (vi = this->vert.begin(); vi != this->vert.end(); ++vi) {
+    if ((*vi).IsB())
+      (*vi).SetW();
+  }
 }
 
 } // namespace flywave

@@ -11,13 +11,12 @@ namespace flywave {
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 class micronizer;
-class voxel_pot;
 
-class voxel_pot {
+class voxel_pixel {
   friend class micronizer;
 
 public:
-  voxel_pot()
+  voxel_pixel()
       : _resolution(vdb::math::Transform::createLinearTransform()),
         _vertex(vertex_grid::create(std::numeric_limits<float>::max())),
         _pixel(pixel_grid::create()) {
@@ -25,7 +24,7 @@ public:
     _vertex->setGridClass(openvdb::GRID_LEVEL_SET);
   }
 
-  voxel_pot(vdb::math::Transform::Ptr transfrom)
+  voxel_pixel(vdb::math::Transform::Ptr transfrom)
       : _resolution(transfrom),
         _vertex(vertex_grid::create(std::numeric_limits<float>::max())),
         _pixel(pixel_grid::create()) {
@@ -56,29 +55,26 @@ public:
     _materials = std::move(mtls);
   }
 
-private:
-  struct file_patch {
-    vdb::math::Transform::Ptr _resolution;
-    vertex_grid::Ptr _vertex;
-    pixel_grid::Ptr _pixel;
-  };
-
 public:
-  static voxel_pot create_voxel_pot() { return voxel_pot(); }
+  void write(const std::string &file);
+
+  void read(const std::string &file);
+
+  static voxel_pixel create_voxel_pixel() { return voxel_pixel(); }
 
   enum class composite_type { op_union, op_intersection, op_difference };
 
-  void composite(voxel_pot &pot, const composite_type &type);
+  void composite(voxel_pixel &pot, const composite_type &type);
 
   bool ray_test(const vdb::math::Ray<double> &ray, openvdb::Vec3d &p);
 
   void clean() { return clear_unuse_materials(); }
 
 private:
-  voxel_pot(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
-            vdb::math::Transform::Ptr);
+  voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
+              vdb::math::Transform::Ptr);
 
-  void merge_materials(voxel_pot &tpot);
+  void merge_materials(voxel_pixel &tpot);
 
   void clear_unuse_materials();
 

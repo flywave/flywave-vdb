@@ -134,5 +134,5 @@ void mapping::set_config(const Config config) {
   _logodds_thres_max =
       log(config.prob_thres_max) - log(1 - config.prob_thres_max);
   _config_set = true;
-} // namespace flywave
+}
 } // namespace flywave

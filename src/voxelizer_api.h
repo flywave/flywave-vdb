@@ -13,11 +13,13 @@ extern "C" {
 #define FLYWAVE_VDB_API
 #endif
 
-typedef struct _voxelizer_t voxelizer_t;
+typedef struct _voxel_pixel_t voxel_pixel_t;
 
-extern FLYWAVE_VDB_API voxelizer_t *voxelizer_create();
-extern FLYWAVE_VDB_API void voxelizer_free(voxelizer_t *vox);
-extern FLYWAVE_VDB_API voxelizer_t *voxelizer_duplicate(voxelizer_t *vox);
+extern FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_create();
+extern FLYWAVE_VDB_API void voxel_pixel_free(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_duplicate(voxel_pixel_t *vox);
+
+extern FLYWAVE_VDB_API void make_triangles(voxel_pixel_t *vox);
 
 #ifdef __cplusplus
 }

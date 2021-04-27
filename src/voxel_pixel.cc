@@ -1,8 +1,10 @@
 
-#include "voxel_pot.hh"
+#include "voxel_pixel.hh"
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
+
+#include <fstream>
 
 #include <openvdb/io/Compression.h>
 #include <openvdb/openvdb.h>
@@ -152,14 +154,15 @@ bool sampleGrid(const openvdb::FloatGrid &grid,
   sampleVolume(sampling_extents, sampling_func, value_range, out_data);
 }
 
-voxel_pot::voxel_pot(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
-                     vdb::math::Transform::Ptr res)
+voxel_pixel::voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
+                         vdb::math::Transform::Ptr res)
     : _resolution(res), _vertex(vertex), _pixel(pixel) {
   _vertex->setGridClass(openvdb::GRID_LEVEL_SET);
   _vertex->setTransform(_resolution);
 }
 
-bool voxel_pot::ray_test(const vdb::math::Ray<double> &ray, openvdb::Vec3d &p) {
+bool voxel_pixel::ray_test(const vdb::math::Ray<double> &ray,
+                           openvdb::Vec3d &p) {
   if (_vertex->empty())
     return false;
 
@@ -168,7 +171,7 @@ bool voxel_pot::ray_test(const vdb::math::Ray<double> &ray, openvdb::Vec3d &p) {
   return vray.intersectsWS(ray, p);
 }
 
-void voxel_pot::clear_unuse_materials() {
+void voxel_pixel::clear_unuse_materials() {
   std::map<material_id_t, bool> mapping;
   for (auto pt : _materials) {
     mapping.emplace(pt->_material_id, true);
@@ -186,12 +189,12 @@ void voxel_pot::clear_unuse_materials() {
   }
 }
 
-void voxel_pot_intersection(voxel_pot &tpot, voxel_pot &spot) {
+void voxel_pixel_intersection(voxel_pixel &tpot, voxel_pixel &spot) {
   openvdb::tools::csgIntersection(tpot.get_voxel_grid()->tree(),
                                   spot.get_voxel_grid()->tree(), true);
 }
 
-void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
+void voxel_pixel_union(voxel_pixel &tpot, voxel_pixel &spot) {
   openvdb::tools::csgUnion(tpot.get_voxel_grid()->tree(),
                            spot.get_voxel_grid()->tree(), true);
   tpot.get_pixel_grid()->tree().merge(spot.get_pixel_grid()->tree());
@@ -209,34 +212,95 @@ void voxel_pot_union(voxel_pot &tpot, voxel_pot &spot) {
     ++iter;
   }
 
-  openvdb::tools::pruneLevelSet(tpot.get_voxel_grid()->tree());
+  openvdb::tools::prune(tpot.get_voxel_grid()->tree());
 }
 
-void voxel_pot_difference(voxel_pot &tpot, voxel_pot &spot) {
+void voxel_pixel_difference(voxel_pixel &tpot, voxel_pixel &spot) {
   openvdb::tools::csgDifference(tpot.get_voxel_grid()->tree(),
                                 spot.get_voxel_grid()->tree(), true);
 }
 
-void voxel_pot::composite(voxel_pot &pot, const composite_type &type) {
-  // merge_materials(pot);
+void voxel_pixel::composite(voxel_pixel &pot, const composite_type &type) {
   _resolution = pot._resolution;
 
   if (!pot.is_empty()) {
     switch (type) {
     case composite_type::op_union:
-      voxel_pot_union(*this, pot);
+      voxel_pixel_union(*this, pot);
       break;
 
     case composite_type::op_intersection:
-      voxel_pot_intersection(*this, pot);
+      voxel_pixel_intersection(*this, pot);
       break;
 
     case composite_type::op_difference:
-      voxel_pot_difference(*this, pot);
+      voxel_pixel_difference(*this, pot);
       break;
     }
   }
   _vertex->setTransform(_resolution);
+}
+
+inline void
+write_materials(std::ofstream &os,
+                std::vector<std::shared_ptr<material_data>> &materials) {
+  uint32_t si = materials.size();
+  os.write(reinterpret_cast<const char *>(&si), sizeof(uint32_t));
+  for (int i = 0; i < si; i++) {
+    materials[i]->write(os);
+  }
+}
+
+void voxel_pixel::write(const std::string &file) {
+  std::ofstream os;
+
+  os.open(file);
+
+  if (os.is_open()) {
+    _resolution->baseMap()->write(os);
+
+    write_materials(os, _materials);
+
+    _vertex->writeTopology(os);
+    _vertex->writeBuffers(os);
+
+    _pixel->writeTopology(os);
+    _pixel->writeBuffers(os);
+  }
+  os.close();
+}
+
+inline void
+read_materials(std::ifstream &is,
+               std::vector<std::shared_ptr<material_data>> &materials) {
+  uint32_t si;
+  is.read(reinterpret_cast<char *>(&si), sizeof(uint32_t));
+  materials.resize(si);
+  for (int i = 0; i < si; i++) {
+    materials[i]->read(is);
+  }
+}
+
+void voxel_pixel::read(const std::string &file) {
+  std::ifstream is;
+
+  is.open(file);
+
+  if (is.is_open()) {
+    _resolution->baseMap()->read(is);
+
+    read_materials(is, _materials);
+
+    _vertex->readTopology(is);
+    _vertex->readBuffers(is);
+
+    _pixel->readTopology(is);
+    _pixel->readBuffers(is);
+
+    _vertex->setTransform(_resolution);
+    _vertex->setGridClass(vdb::GRID_LEVEL_SET);
+  }
+  is.close();
 }
 
 } // namespace flywave

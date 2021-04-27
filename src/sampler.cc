@@ -2,10 +2,10 @@
 #include "mesh_adapter.hh"
 
 #include <openvdb/Types.h>
+#include <openvdb/tools/Clip.h>
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetMorph.h>
 #include <openvdb/tools/VolumeToMesh.h>
-#include <openvdb/tools/Clip.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -168,7 +168,11 @@ public:
                                                          3.0f, 0, grid.get());
     assert(ptr);
     openvdb::BBoxd clip_box;
-    if (!bc(ptr, _xform, stream.compute_boundbox(), clip_box))
+    vdb::CoordBBox bbox;
+    ptr->tree().evalLeafBoundingBox(bbox);
+    if (!bc(ptr, _xform,
+            openvdb::BBoxd(bbox.min().asVec3d(), bbox.max().asVec3d()),
+            clip_box))
       return std::tuple<vertex_grid::Ptr, int32_grid::Ptr>(ptr, grid);
     else
       return std::tuple<vertex_grid::Ptr, int32_grid::Ptr>(
@@ -229,5 +233,4 @@ vertext_sampler::make_mesh_sampler(vdb::math::Transform::Ptr xform,
   }
   return nullptr;
 }
-
 } // namespace flywave

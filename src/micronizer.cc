@@ -12,10 +12,10 @@ void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id);
 
-voxel_pot micronizer::micronize(float precision, clip_box_createor &creator,
-                                sampler_type type,
-                                material_merge_transfrom &tmtl,
-                                openvdb::Mat4d matrix) {
+voxel_pixel micronizer::micronize(float precision, clip_box_createor &creator,
+                                  sampler_type type,
+                                  material_merge_transfrom &tmtl,
+                                  openvdb::Mat4d matrix) {
   auto transform = _resolution.eval_resolution(precision);
   _adapter._stream->set_matrix(matrix);
   auto vsamper = vertext_sampler::make_mesh_sampler(transform, type);
@@ -32,7 +32,7 @@ voxel_pot micronizer::micronize(float precision, clip_box_createor &creator,
   pixel_grid::Ptr pixel = pixel_grid::create();
   coloring(vgrid, pixel, fgrid, transform, tmtl, _adapter, _local_feature_id);
 
-  return voxel_pot(vgrid, pixel, transform);
+  return voxel_pixel(vgrid, pixel, transform);
 }
 
 struct paint_color_on_surface {
@@ -144,5 +144,4 @@ void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
   // op(nodeRange);
   tbb::parallel_reduce(nodeRange, op);
 }
-
 } // namespace flywave

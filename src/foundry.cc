@@ -103,7 +103,7 @@ void make_triangles(std::vector<struct _triangle_t> &rettriangles,
                     std::shared_ptr<filter_triangle> filter, double fquality,
                     double isovalue, double adapter) {
   std::shared_ptr<triangle_foundry> vfoundry =
-      make_shared<triangle_foundry>(pot.get_voxel_grid());
+      std::make_shared<triangle_foundry>(pot.get_voxel_grid());
 
   std::unique_ptr<std::vector<vertext_type>> points_ptr =
       std::make_unique<std::vector<vertext_type>>();

@@ -7,7 +7,6 @@
 #include <openvdb/Types.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -242,5 +241,5 @@ protected:
   std::vector<std::shared_ptr<material_data>> _materials;
   std::map<material_id_t, material_id_t> _mapping;
 };
-} // namespace voxelize
+
 } // namespace flywave

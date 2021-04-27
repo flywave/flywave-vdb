@@ -5,7 +5,6 @@
 #include <openvdb/Types.h>
 
 namespace flywave {
-namespace voxelize {
 
 class bary_convert {
   struct bary_convert_impl {
@@ -58,5 +57,4 @@ private:
   bary_convert_impl _impl;
 };
 
-} // namespace voxelize
 } // namespace flywave

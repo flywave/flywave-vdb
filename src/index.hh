@@ -5,7 +5,6 @@
 #include "pquery.hh"
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -140,5 +139,5 @@ make_near_voxels_index(typename Grid::ConstPtr grid,
   return std::make_unique<triangle_range_query<PixelGrid>>(
       std::make_unique<near_voxels_index<Grid>>(grid), pgrid);
 }
-} // namespace voxelize
+
 } // namespace flywave

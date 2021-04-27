@@ -1,4 +1,4 @@
-#include "mesh.hh"
+#include "vcg_mesh.hh"
 
 #include <vcg/space/index/kdtree/kdtree.h>
 

@@ -5,7 +5,6 @@
 #include "types.hh"
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -17,5 +16,4 @@ public:
                              const triangle3<float> &tri) = 0;
 };
 
-} // namespace voxelize
 } // namespace flywave

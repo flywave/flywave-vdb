@@ -7,27 +7,24 @@
 #include <openvdb/Types.h>
 
 namespace flywave {
-namespace voxelize {
+
 class pixel;
-} // namespace voxelize
+
 } // namespace flywave
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace math {
 
-inline bool isApproxEqual(const flywave::voxelize::pixel &a,
-                          const flywave::voxelize::pixel &b);
+inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b);
 
-inline bool isApproxEqual(const flywave::voxelize::pixel &a,
-                          const flywave::voxelize::pixel &b,
-                          const flywave::voxelize::pixel &);
+inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b,
+                          const flywave::pixel &);
 
 } // namespace math
 } // namespace openvdb
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -177,34 +174,30 @@ inline bool operator>=(const T &t, const pixel &c) {
 
 inline std::ostream &operator<<(std::ostream &os, const pixel &s) { return os; }
 
-} // namespace voxelize
 } // namespace flywave
 
 namespace openvdb {
 namespace OPENVDB_VERSION_NAME {
 namespace math {
 
-inline bool isApproxEqual(const flywave::voxelize::pixel &a,
-                          const flywave::voxelize::pixel &b) {
+inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b) {
   return isApproxEqual(a._value, b._value);
 }
 
-inline bool isApproxEqual(const flywave::voxelize::pixel &a,
-                          const flywave::voxelize::pixel &b,
-                          const flywave::voxelize::pixel &t) {
+inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b,
+                          const flywave::pixel &t) {
   return isApproxEqual(a._value, b._value, t._value);
 }
 
-inline flywave::voxelize::pixel abs(const flywave::voxelize::pixel &v) {
-  return flywave::voxelize::pixel(std::abs(v._value));
+inline flywave::pixel abs(const flywave::pixel &v) {
+  return flywave::pixel(std::abs(v._value));
 }
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 
 namespace OPENVDB_VERSION_NAME {
-template <>
-inline flywave::voxelize::pixel zeroVal<flywave::voxelize::pixel>() {
-  return flywave::voxelize::pixel(0);
+template <> inline flywave::pixel zeroVal<flywave::pixel>() {
+  return flywave::pixel(0);
 }
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

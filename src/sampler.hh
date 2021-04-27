@@ -8,7 +8,6 @@
 #include <openvdb/math/Transform.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -35,5 +34,4 @@ protected:
   vdb::math::Transform::Ptr _xform;
 };
 
-} // namespace voxelize
 } // namespace flywave

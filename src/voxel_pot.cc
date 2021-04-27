@@ -12,7 +12,6 @@
 #include <openvdb/tools/RayIntersector.h>
 
 namespace flywave {
-namespace voxelize {
 
 template <typename RealType> struct ValueRange {
 public:
@@ -242,5 +241,4 @@ void voxel_pot::composite(voxel_pot &pot, const composite_type &type) {
   _vertex->setTransform(_resolution);
 }
 
-} // namespace voxelize
 } // namespace flywave

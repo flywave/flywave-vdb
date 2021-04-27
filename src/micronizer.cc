@@ -5,7 +5,6 @@
 #include <tbb/parallel_reduce.h>
 
 namespace flywave {
-namespace voxelize {
 
 void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               vertext_sampler::int32_grid::Ptr index,
@@ -146,5 +145,4 @@ void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
   tbb::parallel_reduce(nodeRange, op);
 }
 
-} // namespace voxelize
 } // namespace flywave

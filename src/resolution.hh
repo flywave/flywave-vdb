@@ -3,7 +3,6 @@
 #include <openvdb/math/Transform.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -14,5 +13,4 @@ public:
   }
 };
 
-} // namespace voxelize
 } // namespace flywave

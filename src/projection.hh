@@ -5,7 +5,6 @@
 #include "triangle.hh"
 
 namespace flywave {
-namespace voxelize {
 
 class triangle_projection {
 public:
@@ -87,5 +86,5 @@ private:
 
   std::unique_ptr<bary_convert> _convert;
 };
-} // namespace voxelize
+
 } // namespace flywave

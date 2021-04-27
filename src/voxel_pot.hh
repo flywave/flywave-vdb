@@ -7,7 +7,6 @@
 #include <openvdb/math/Ray.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -90,5 +89,4 @@ private:
   std::vector<std::shared_ptr<material_data>> _materials;
 };
 
-} // namespace voxelize
 } // namespace flywave

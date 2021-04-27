@@ -1,7 +1,6 @@
 #include "barycentric.hh"
 
 namespace flywave {
-namespace voxelize {
 
 openvdb::Vec3d
 bary_convert::bary_convert_impl::uv2bary(const openvdb::Vec2d &uv) {
@@ -62,5 +61,4 @@ bary_convert::bary_convert_impl::bary2uv(const openvdb::Vec3d &bary) {
       ka.y() * bary.x() + kb.y() * bary.y() + kc.y() * bary.z());
 }
 
-} // namespace voxelize
 } // namespace flywave

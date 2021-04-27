@@ -5,7 +5,6 @@
 #include "tolerance.hh"
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -50,5 +49,4 @@ template <typename T> struct approx_value {
   T tol = tolerance<T>();
 };
 
-} // namespace voxelize
 } // namespace flywave

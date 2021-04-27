@@ -8,7 +8,6 @@
 #include "voxel_pot.hh"
 
 namespace flywave {
-namespace voxelize {
 
 class micronizer {
 public:
@@ -25,5 +24,4 @@ private:
   local_feature_id_t _local_feature_id;
 };
 
-} // namespace voxelize
 } // namespace flywave

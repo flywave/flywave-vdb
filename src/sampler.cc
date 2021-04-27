@@ -16,7 +16,6 @@
 #include <tbb/task_scheduler_init.h>
 
 namespace flywave {
-namespace voxelize {
 
 class adjust_unclosest_face {
 public:
@@ -231,5 +230,4 @@ vertext_sampler::make_mesh_sampler(vdb::math::Transform::Ptr xform,
   return nullptr;
 }
 
-} // namespace voxelize
 } // namespace flywave

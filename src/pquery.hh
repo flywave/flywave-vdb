@@ -3,7 +3,6 @@
 #include <openvdb/util/Util.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -24,5 +23,4 @@ inline bool seach_vertex_value(const AccessorT &accessor, vdb::math::Coord ijk,
   return false;
 }
 
-} // namespace voxelize
 } // namespace flywave

@@ -8,7 +8,6 @@
 #include "types.hh"
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -27,5 +26,4 @@ public:
                           const vdb::BBoxd &sbox, vdb::BBoxd &cbox) = 0;
 };
 
-} // namespace voxelize
 } // namespace flywave

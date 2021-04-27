@@ -6,7 +6,6 @@
 #include <memory>
 
 namespace flywave {
-namespace voxelize {
 
 class st_policy {
 public:
@@ -74,5 +73,4 @@ public:
   openvdb::Vec3d _up;
 };
 
-} // namespace voxelize
 } // namespace flywave

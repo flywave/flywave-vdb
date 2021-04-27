@@ -5,7 +5,6 @@
 #include <openvdb/Types.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -199,5 +198,4 @@ void rasterizer::draw_line(float x1, float y1, float x2, float y2) {
   }
 }
 
-} // namespace voxelize
 } // namespace flywave

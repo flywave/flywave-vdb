@@ -8,7 +8,6 @@
 #include <openvdb/Types.h>
 
 namespace flywave {
-namespace voxelize {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
@@ -60,5 +59,4 @@ private:
   vertex_grid::Ptr _grid;
 };
 
-} // namespace voxelize
 } // namespace flywave

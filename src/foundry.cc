@@ -13,7 +13,6 @@
 #include <wrap/io_trimesh/export_obj.h>
 
 namespace flywave {
-namespace voxelize {
 
 class textute_foundry::impl {
 public:
@@ -97,5 +96,4 @@ void triangle_foundry::make_mesh_mark_seam(std::vector<vertext_type> &points,
   vdb::tools::volumeToMesh(*_grid, points, tri, quads, isovalue, adapter, true);
 }
 
-} // namespace voxelize
 } // namespace flywave

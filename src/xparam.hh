@@ -2,7 +2,7 @@
 
 #include <vcg/math/quadric.h>
 
-#include "mesh.hh"
+#include "vcg_mesh.hh"
 
 #include <vcg/simplex/face/pos.h>
 #include <vcg/space/outline2_packer.h>
@@ -13,7 +13,6 @@
 #include <algorithm>
 
 namespace flywave {
-namespace voxelize {
 
 template <typename Mesh> class xparam {
 public:
@@ -242,5 +241,4 @@ private:
   double _tquality;
 };
 
-} // namespace voxelize
 } // namespace flywave

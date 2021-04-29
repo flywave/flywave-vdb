@@ -1,19 +1,30 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
 #include "../sys/platform.h"
-#include "../sys/intrinsics.h"
 #include "constants.h"
 #include <cmath>
 
 #include <emmintrin.h>
 #include <xmmintrin.h>
-#include <immintrin.h>
 
-#if defined(__WIN32__)
-#if (__MSV_VER <= 1700)
+#if defined(__WIN32__) && !defined(__MINGW32__)
+#if (_MSC_VER <= 1700)
 namespace std
 {
   __forceinline bool isinf ( const float x ) { return _finite(x) == 0; }
@@ -37,10 +48,7 @@ namespace embree
     union { float f; int i; } v; v.i = i; return v.f;
   }
 
-  __forceinline int   toInt  (const float& a) { return int(a); }
-  __forceinline float toFloat(const int&   a) { return float(a); }
-
-#if defined(__WIN32__)
+#if defined(__WIN32__) && !defined(__MINGW32__)
   __forceinline bool finite ( const float x ) { return _finite(x) != 0; }
 #endif
 
@@ -50,17 +58,11 @@ namespace embree
   __forceinline float rcp  ( const float x )
   {
     const __m128 a = _mm_set_ss(x);
-
-#if defined(__AVX512VL__)
-    const __m128 r = _mm_rcp14_ss(_mm_set_ss(0.0f),a);
-#else
-    const __m128 r = _mm_rcp_ss(a);
-#endif
-
+    const __m128 r = _mm_rcp_ps(a);
 #if defined(__AVX2__)
-    return _mm_cvtss_f32(_mm_mul_ss(r,_mm_fnmadd_ss(r, a, _mm_set_ss(2.0f))));
+    return _mm_cvtss_f32(_mm_mul_ps(r,_mm_fnmadd_ps(r, a, _mm_set_ss(2.0f))));
 #else
-    return _mm_cvtss_f32(_mm_mul_ss(r,_mm_sub_ss(_mm_set_ss(2.0f), _mm_mul_ss(r, a))));
+    return _mm_cvtss_f32(_mm_mul_ps(r,_mm_sub_ps(_mm_set_ss(2.0f), _mm_mul_ps(r, a))));
 #endif
   }
 
@@ -73,23 +75,17 @@ namespace embree
   __forceinline float andf( const float x, const unsigned y ) {
     return _mm_cvtss_f32(_mm_and_ps(_mm_set_ss(x),_mm_castsi128_ps(_mm_set1_epi32(y))));
   }
-  __forceinline float rsqrt( const float x )
-  {
+  __forceinline float rsqrt( const float x ) {
     const __m128 a = _mm_set_ss(x);
-#if defined(__AVX512VL__)
-    const __m128 r = _mm_rsqrt14_ss(_mm_set_ss(0.0f),a);
-#else
-    const __m128 r = _mm_rsqrt_ss(a);
-#endif
-    const __m128 c = _mm_add_ss(_mm_mul_ss(_mm_set_ss(1.5f), r),
-                                _mm_mul_ss(_mm_mul_ss(_mm_mul_ss(a, _mm_set_ss(-0.5f)), r), _mm_mul_ss(r, r)));
+    const __m128 r = _mm_rsqrt_ps(a);
+    const __m128 c = _mm_add_ps(_mm_mul_ps(_mm_set_ps(1.5f, 1.5f, 1.5f, 1.5f), r),
+                                _mm_mul_ps(_mm_mul_ps(_mm_mul_ps(a, _mm_set_ps(-0.5f, -0.5f, -0.5f, -0.5f)), r), _mm_mul_ps(r, r)));
     return _mm_cvtss_f32(c);
   }
 
-#if defined(__WIN32__) && (__MSC_VER <= 1700)
+#if defined(__WIN32__) && !defined(__MINGW32__) && (__MSC_VER <= 1700)
   __forceinline float nextafter(float x, float y) { if ((x<y) == (x>0)) return x*(1.1f+float(ulp)); else return x*(0.9f-float(ulp)); }
   __forceinline double nextafter(double x, double y) { return _nextafter(x, y); }
-  __forceinline int roundf(float f) { return (int)(f + 0.5f); }
 #else
   __forceinline float nextafter(float x, float y) { return ::nextafterf(x, y); }
   __forceinline double nextafter(double x, double y) { return ::nextafter(x, y); }
@@ -158,9 +154,6 @@ namespace embree
   }
 #endif
 
-  template<typename T>
-    __forceinline T twice(const T& a) { return a+a; }
-
   __forceinline      int min(int      a, int      b) { return a<b ? a:b; }
   __forceinline unsigned min(unsigned a, unsigned b) { return a<b ? a:b; }
   __forceinline  int64_t min(int64_t  a, int64_t  b) { return a<b ? a:b; }
@@ -174,10 +167,6 @@ namespace embree
   template<typename T> __forceinline T min(const T& a, const T& b, const T& c, const T& d) { return min(min(a,b),min(c,d)); }
   template<typename T> __forceinline T min(const T& a, const T& b, const T& c, const T& d, const T& e) { return min(min(min(a,b),min(c,d)),e); }
 
-  template<typename T> __forceinline T mini(const T& a, const T& b, const T& c) { return mini(mini(a,b),c); }
-  template<typename T> __forceinline T mini(const T& a, const T& b, const T& c, const T& d) { return mini(mini(a,b),mini(c,d)); }
-  template<typename T> __forceinline T mini(const T& a, const T& b, const T& c, const T& d, const T& e) { return mini(mini(mini(a,b),mini(c,d)),e); }
-
   __forceinline      int max(int      a, int      b) { return a<b ? b:a; }
   __forceinline unsigned max(unsigned a, unsigned b) { return a<b ? b:a; }
   __forceinline  int64_t max(int64_t  a, int64_t  b) { return a<b ? b:a; }
@@ -190,10 +179,6 @@ namespace embree
   template<typename T> __forceinline T max(const T& a, const T& b, const T& c) { return max(max(a,b),c); }
   template<typename T> __forceinline T max(const T& a, const T& b, const T& c, const T& d) { return max(max(a,b),max(c,d)); }
   template<typename T> __forceinline T max(const T& a, const T& b, const T& c, const T& d, const T& e) { return max(max(max(a,b),max(c,d)),e); }
-
-  template<typename T> __forceinline T maxi(const T& a, const T& b, const T& c) { return maxi(maxi(a,b),c); }
-  template<typename T> __forceinline T maxi(const T& a, const T& b, const T& c, const T& d) { return maxi(maxi(a,b),maxi(c,d)); }
-  template<typename T> __forceinline T maxi(const T& a, const T& b, const T& c, const T& d, const T& e) { return maxi(maxi(maxi(a,b),maxi(c,d)),e); }
 
 #if defined(__MACOSX__)
   __forceinline ssize_t min(ssize_t a, ssize_t b) { return a<b ? a:b; }
@@ -259,15 +244,15 @@ namespace embree
   __forceinline int   select(bool s, int   t,   int f) { return s ? t : f; }
   __forceinline float select(bool s, float t, float f) { return s ? t : f; }
 
-  __forceinline bool all(bool s) { return s; }
 
-  __forceinline float lerp(const float v0, const float v1, const float t) {
-    return madd(1.0f-t,v0,t*v1);
+  template<typename V>
+    __forceinline V lerp(const V &v0, const V &v1, const float t) {
+    return (1.0f-t)*v0 + t*v1;
   }
 
   template<typename T>
     __forceinline T lerp2(const float x0, const float x1, const float x2, const float x3, const T& u, const T& v) {
-    return madd((1.0f-u),madd((1.0f-v),T(x0),v*T(x2)),u*madd((1.0f-v),T(x1),v*T(x3)));
+    return (1.0f-u)*(1.0f-v)*x0 + u*(1.0f-v)*x1 + (1.0f-u)*v*x2 + u*v*x3;
   }
 
   /*! exchange */
@@ -308,19 +293,6 @@ namespace embree
 
     return x | (y << 1) | (z << 2);
   }
-
-#if defined(__AVX2__)
-
-  template<>
-    __forceinline unsigned int bitInterleave(const unsigned int &xi, const unsigned int& yi, const unsigned int& zi)
-  {
-    const unsigned int xx = pdep(xi,0x49249249 /* 0b01001001001001001001001001001001 */ );
-    const unsigned int yy = pdep(yi,0x92492492 /* 0b10010010010010010010010010010010 */);
-    const unsigned int zz = pdep(zi,0x24924924 /* 0b00100100100100100100100100100100 */);
-    return xx | yy | zz;
-  }
-
-#endif
 
   /*! bit interleave operation for 64bit data types*/
   template<class T>

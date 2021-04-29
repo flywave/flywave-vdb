@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "subdivpatch1base.h"
 
@@ -15,8 +28,6 @@ namespace embree
         return ((BSplinePatch3fa*)patch.patch_v)->eval(uu,vv);
       else if (likely(patch.type == SubdivPatch1Base::GREGORY_PATCH))
         return ((DenseGregoryPatch3fa*)patch.patch_v)->eval(uu,vv);
-      else if (likely(patch.type == SubdivPatch1Base::BILINEAR_PATCH))
-        return ((BilinearPatch3fa*)patch.patch_v)->eval(uu,vv);
       return Vec3fa( zero );
     }
 
@@ -28,8 +39,6 @@ namespace embree
         return ((BSplinePatch3fa*)patch.patch_v)->normal(uu,vv);
       else if (likely(patch.type == SubdivPatch1Base::GREGORY_PATCH))
         return ((DenseGregoryPatch3fa*)patch.patch_v)->normal(uu,vv);
-      else if (likely(patch.type == SubdivPatch1Base::BILINEAR_PATCH))
-        return ((BilinearPatch3fa*)patch.patch_v)->normal(uu,vv);
       return Vec3fa( zero );
     }
 
@@ -42,8 +51,6 @@ namespace embree
         return ((BSplinePatch3fa*)patch.patch_v)->eval(uu,vv);
       else if (likely(patch.type == SubdivPatch1Base::GREGORY_PATCH))
         return ((DenseGregoryPatch3fa*)patch.patch_v)->eval(uu,vv);
-      else if (likely(patch.type == SubdivPatch1Base::BILINEAR_PATCH))
-        return ((BilinearPatch3fa*)patch.patch_v)->eval(uu,vv);
       return Vec3<simdf>( zero );
     }
 
@@ -56,8 +63,6 @@ namespace embree
         return ((BSplinePatch3fa*)patch.patch_v)->normal(uu,vv);
       else if (likely(patch.type == SubdivPatch1Base::GREGORY_PATCH))
         return ((DenseGregoryPatch3fa*)patch.patch_v)->normal(uu,vv);
-      else if (likely(patch.type == SubdivPatch1Base::BILINEAR_PATCH))
-        return ((BilinearPatch3fa*)patch.patch_v)->normal(uu,vv);
       return Vec3<simdf>( zero );
     }
 
@@ -82,14 +87,14 @@ namespace embree
       {
         const bool displ = geom->displFunc;
         const unsigned N = displ ? M : 0;
-        dynamic_large_stack_array(float,grid_Ng_x,N,32*32*sizeof(float));
-        dynamic_large_stack_array(float,grid_Ng_y,N,32*32*sizeof(float));
-        dynamic_large_stack_array(float,grid_Ng_z,N,32*32*sizeof(float));
+        dynamic_large_stack_array(float,grid_Ng_x,N,64*64*sizeof(float));
+        dynamic_large_stack_array(float,grid_Ng_y,N,64*64*sizeof(float));
+        dynamic_large_stack_array(float,grid_Ng_z,N,64*64*sizeof(float));
         
         if (geom->patch_eval_trees.size())
         {
           feature_adaptive_eval_grid<PatchEvalGrid> 
-            (geom->patch_eval_trees[geom->numTimeSteps*patch.primID()+patch.time()], patch.subPatch(), patch.needsStitching() ? patch.level : nullptr,
+            (geom->patch_eval_trees[patch.prim], patch.subPatch(), patch.needsStitching() ? patch.level : nullptr,
              x0,x1,y0,y1,swidth,sheight,
              grid_x,grid_y,grid_z,grid_u,grid_v,
              displ ? (float*)grid_Ng_x : nullptr, displ ? (float*)grid_Ng_y : nullptr, displ ? (float*)grid_Ng_z : nullptr,
@@ -97,7 +102,7 @@ namespace embree
         }
         else 
         {
-          GeneralCatmullClarkPatch3fa ccpatch(patch.edge(),geom->getVertexBuffer(patch.time()));
+          GeneralCatmullClarkPatch3fa ccpatch(patch.edge(),geom->getVertexBuffer(0));
           
           feature_adaptive_eval_grid<FeatureAdaptiveEvalGrid,GeneralCatmullClarkPatch3fa> 
             (ccpatch, patch.subPatch(), patch.needsStitching() ? patch.level : nullptr,
@@ -123,24 +128,8 @@ namespace embree
         }
 
         /* call displacement shader */
-        if (unlikely(geom->displFunc)) {
-          RTCDisplacementFunctionNArguments args;
-          args.geometryUserPtr = geom->userPtr;
-          args.geometry = (RTCGeometry)geom;
-          //args.geomID = patch.geomID();
-          args.primID = patch.primID();
-          args.timeStep = patch.time();
-          args.u = grid_u;
-          args.v = grid_v;
-          args.Ng_x = grid_Ng_x;
-          args.Ng_y = grid_Ng_y;
-          args.Ng_z = grid_Ng_z;
-          args.P_x = grid_x;
-          args.P_y = grid_y;
-          args.P_z = grid_z;
-          args.N = dwidth*dheight;
-          geom->displFunc(&args);
-        }
+        if (geom->displFunc) 
+          geom->displFunc(geom->userPtr,patch.geom,patch.prim,grid_u,grid_v,grid_Ng_x,grid_Ng_y,grid_Ng_z,grid_x,grid_y,grid_z,dwidth*dheight);
 
         /* set last elements in u,v array to 1.0f */
         const float last_u = grid_u[dwidth*dheight-1];
@@ -179,30 +168,17 @@ namespace embree
         {
           const vfloatx u = vfloatx::load(&grid_u[i*VSIZEX]);
           const vfloatx v = vfloatx::load(&grid_v[i*VSIZEX]);
-          Vec3vfx vtx = patchEval(patch,u,v);
+          Vec3<vfloatx> vtx = patchEval(patch,u,v);
         
           /* evaluate displacement function */
           if (unlikely(geom->displFunc != nullptr))
           {
-            const Vec3vfx normal = normalize_safe(patchNormal(patch, u, v));
-            RTCDisplacementFunctionNArguments args;
-            args.geometryUserPtr = geom->userPtr;
-            args.geometry = (RTCGeometry)geom;
-            //args.geomID = patch.geomID();
-            args.primID = patch.primID();
-            args.timeStep = patch.time();
-            args.u = &u[0];
-            args.v = &v[0];
-            args.Ng_x = &normal.x[0];
-            args.Ng_y = &normal.y[0];
-            args.Ng_z = &normal.z[0];
-            args.P_x = &vtx.x[0];
-            args.P_y = &vtx.y[0];
-            args.P_z = &vtx.z[0];
-            args.N = VSIZEX;
-            geom->displFunc(&args);
+            const Vec3<vfloatx> normal = normalize_safe(patchNormal(patch, u, v));
+            geom->displFunc(geom->userPtr,patch.geom,patch.prim,
+                            &u[0],&v[0],&normal.x[0],&normal.y[0],&normal.z[0],
+                            &vtx.x[0],&vtx.y[0],&vtx.z[0],VSIZEX);
+          
           }
-
           vfloatx::store(&grid_x[i*VSIZEX],vtx.x);
           vfloatx::store(&grid_y[i*VSIZEX],vtx.y);
           vfloatx::store(&grid_z[i*VSIZEX],vtx.z);
@@ -239,7 +215,7 @@ namespace embree
         if (geom->patch_eval_trees.size())
         {
           feature_adaptive_eval_grid<PatchEvalGrid> 
-            (geom->patch_eval_trees[geom->numTimeSteps*patch.primID()+patch.time()], patch.subPatch(), patch.needsStitching() ? patch.level : nullptr,
+            (geom->patch_eval_trees[patch.prim], patch.subPatch(), patch.needsStitching() ? patch.level : nullptr,
              x0,x1,y0,y1,swidth,sheight,
              grid_x,grid_y,grid_z,grid_u,grid_v,
              displ ? (float*)grid_Ng_x : nullptr, displ ? (float*)grid_Ng_y : nullptr, displ ? (float*)grid_Ng_z : nullptr,
@@ -247,7 +223,7 @@ namespace embree
         } 
         else 
         {
-          GeneralCatmullClarkPatch3fa ccpatch(patch.edge(),geom->getVertexBuffer(patch.time()));
+          GeneralCatmullClarkPatch3fa ccpatch(patch.edge(),geom->getVertexBuffer(0));
           
           feature_adaptive_eval_grid <FeatureAdaptiveEvalGrid,GeneralCatmullClarkPatch3fa>
             (ccpatch, patch.subPatch(), patch.needsStitching() ? patch.level : nullptr,
@@ -258,25 +234,8 @@ namespace embree
         }
 
         /* call displacement shader */
-        if (unlikely(geom->displFunc))
-        {
-          RTCDisplacementFunctionNArguments args;
-          args.geometryUserPtr = geom->userPtr;
-          args.geometry = (RTCGeometry)geom;
-          //args.geomID = patch.geomID();
-          args.primID = patch.primID();
-          args.timeStep = patch.time();
-          args.u = grid_u;
-          args.v = grid_v;
-          args.Ng_x = grid_Ng_x;
-          args.Ng_y = grid_Ng_y;
-          args.Ng_z = grid_Ng_z;
-          args.P_x = grid_x;
-          args.P_y = grid_y;
-          args.P_z = grid_z;
-          args.N = dwidth*dheight;
-          geom->displFunc(&args);
-        }
+        if (geom->displFunc) 
+          geom->displFunc(geom->userPtr,patch.geom,patch.prim,grid_u,grid_v,grid_Ng_x,grid_Ng_y,grid_Ng_z,grid_x,grid_y,grid_z,dwidth*dheight);
 
         /* set last elements in u,v array to 1.0f */
         const float last_u = grid_u[dwidth*dheight-1];
@@ -341,12 +300,12 @@ namespace embree
           stitchUVGrid(patch.level,swidth,sheight,x0,y0,dwidth,dheight,grid_u,grid_v);
       
         /* iterates over all grid points */
-        Vec3vfx bounds_min;
+        Vec3<vfloatx> bounds_min;
         bounds_min[0] = pos_inf;
         bounds_min[1] = pos_inf;
         bounds_min[2] = pos_inf;
 
-        Vec3vfx bounds_max;
+        Vec3<vfloatx> bounds_max;
         bounds_max[0] = neg_inf;
         bounds_max[1] = neg_inf;
         bounds_max[2] = neg_inf;
@@ -355,30 +314,17 @@ namespace embree
         {
           const vfloatx u = vfloatx::load(&grid_u[i*VSIZEX]);
           const vfloatx v = vfloatx::load(&grid_v[i*VSIZEX]);
-          Vec3vfx vtx = patchEval(patch,u,v);
+          Vec3<vfloatx> vtx = patchEval(patch,u,v);
         
           /* evaluate displacement function */
           if (unlikely(geom->displFunc != nullptr))
           {
-            const Vec3vfx normal = normalize_safe(patchNormal(patch,u,v));
-            RTCDisplacementFunctionNArguments args;
-            args.geometryUserPtr = geom->userPtr;
-            args.geometry = (RTCGeometry)geom;
-            //args.geomID = patch.geomID();
-            args.primID = patch.primID();
-            args.timeStep = patch.time();
-            args.u = &u[0];
-            args.v = &v[0];
-            args.Ng_x = &normal.x[0];
-            args.Ng_y = &normal.y[0];
-            args.Ng_z = &normal.z[0];
-            args.P_x = &vtx.x[0];
-            args.P_y = &vtx.y[0];
-            args.P_z = &vtx.z[0];
-            args.N = VSIZEX;
-            geom->displFunc(&args);
+            const Vec3<vfloatx> normal = normalize_safe(patchNormal(patch,u,v));
+            geom->displFunc(geom->userPtr,patch.geom,patch.prim,
+                            &u[0],&v[0],&normal.x[0],&normal.y[0],&normal.z[0],
+                            &vtx.x[0],&vtx.y[0],&vtx.z[0],VSIZEX);
+          
           }
-
           bounds_min[0] = min(bounds_min[0],vtx.x);
           bounds_max[0] = max(bounds_max[0],vtx.x);
           bounds_min[1] = min(bounds_min[1],vtx.y);

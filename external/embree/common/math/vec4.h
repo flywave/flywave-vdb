@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -14,15 +27,10 @@ namespace embree
 
   template<typename T> struct Vec4
   {
-    enum { N = 4 };    
-    union {
-      struct { T x, y, z, w; };
-#if !(defined(__WIN32__) && _MSC_VER == 1800) // workaround for older VS 2013 compiler
-      T components[N];
-#endif
-    };
+    T x, y, z, w;
 
     typedef T Scalar;
+    enum { N = 4 };
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Construction
@@ -39,8 +47,6 @@ namespace embree
     template<typename T1> __forceinline Vec4( const Vec4<T1>& a ) : x(T(a.x)), y(T(a.y)), z(T(a.z)), w(T(a.w)) {}
     template<typename T1> __forceinline Vec4& operator =(const Vec4<T1>& other) { x = other.x; y = other.y; z = other.z; w = other.w; return *this; }
 
-    __forceinline Vec4& operator =(const Vec4& other) { x = other.x; y = other.y; z = other.z; w = other.w; return *this; }
-
     __forceinline operator Vec3<T> () const { return Vec3<T>(x,y,z); }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -52,13 +58,8 @@ namespace embree
     __forceinline Vec4( PosInfTy ) : x(pos_inf), y(pos_inf), z(pos_inf), w(pos_inf) {}
     __forceinline Vec4( NegInfTy ) : x(neg_inf), y(neg_inf), z(neg_inf), w(neg_inf) {}
 
-#if defined(__WIN32__) && (_MSC_VER == 1800) // workaround for older VS 2013 compiler
-	__forceinline const T& operator [](const size_t axis) const { assert(axis < 4); return (&x)[axis]; }
-	__forceinline       T& operator [](const size_t axis)       { assert(axis < 4); return (&x)[axis]; }
-#else
-	__forceinline const T& operator [](const size_t axis ) const { assert(axis < 4); return components[axis]; }
-	__forceinline       T& operator [](const size_t axis)        { assert(axis < 4); return components[axis]; }
-#endif
+    __forceinline const T& operator []( const size_t axis ) const { assert(axis < 4); return (&x)[axis]; }
+    __forceinline       T& operator []( const size_t axis )       { assert(axis < 4); return (&x)[axis]; }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Swizzles
@@ -93,20 +94,6 @@ namespace embree
 
   template<typename T> __forceinline Vec4<T> min(const Vec4<T>& a, const Vec4<T>& b) { return Vec4<T>(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z), min(a.w, b.w)); }
   template<typename T> __forceinline Vec4<T> max(const Vec4<T>& a, const Vec4<T>& b) { return Vec4<T>(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z), max(a.w, b.w)); }
-
-  ////////////////////////////////////////////////////////////////////////////////
-  /// Ternary Operators
-  ////////////////////////////////////////////////////////////////////////////////
-
-  template<typename T> __forceinline Vec4<T> madd  ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( madd(a.x,b.x,c.x), madd(a.y,b.y,c.y), madd(a.z,b.z,c.z), madd(a.w,b.w,c.w)); }
-  template<typename T> __forceinline Vec4<T> msub  ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( msub(a.x,b.x,c.x), msub(a.y,b.y,c.y), msub(a.z,b.z,c.z), msub(a.w,b.w,c.w)); }
-  template<typename T> __forceinline Vec4<T> nmadd ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmadd(a.x,b.x,c.x),nmadd(a.y,b.y,c.y),nmadd(a.z,b.z,c.z),nmadd(a.w,b.w,c.w)); }
-  template<typename T> __forceinline Vec4<T> nmsub ( const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmsub(a.x,b.x,c.x),nmsub(a.y,b.y,c.y),nmsub(a.z,b.z,c.z),nmsub(a.w,b.w,c.w)); }
-
-  template<typename T> __forceinline Vec4<T> madd  ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( madd(a,b.x,c.x), madd(a,b.y,c.y), madd(a,b.z,c.z), madd(a,b.w,c.w)); }
-  template<typename T> __forceinline Vec4<T> msub  ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>( msub(a,b.x,c.x), msub(a,b.y,c.y), msub(a,b.z,c.z), msub(a,b.w,c.w)); }
-  template<typename T> __forceinline Vec4<T> nmadd ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmadd(a,b.x,c.x),nmadd(a,b.y,c.y),nmadd(a,b.z,c.z),nmadd(a,b.w,c.w)); }
-  template<typename T> __forceinline Vec4<T> nmsub ( const T& a, const Vec4<T>& b, const Vec4<T>& c) { return Vec4<T>(nmsub(a,b.x,c.x),nmsub(a,b.y,c.y),nmsub(a,b.z,c.z),nmsub(a,b.w,c.w)); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Assignment Operators
@@ -174,16 +161,11 @@ namespace embree
     return Vec4<T>(select(s,t.x,f.x),select(s,t.y,f.y),select(s,t.z,f.z),select(s,t.w,f.w));
   }
 
-  template<typename T>
-    __forceinline Vec4<T> lerp(const Vec4<T>& v0, const Vec4<T>& v1, const T& t) {
-    return madd(Vec4<T>(T(1.0f)-t),v0,t*v1);
-  }
-
   ////////////////////////////////////////////////////////////////////////////////
   /// Output Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> __forceinline embree_ostream operator<<(embree_ostream cout, const Vec4<T>& a) {
+  template<typename T> inline std::ostream& operator<<(std::ostream& cout, const Vec4<T>& a) {
     return cout << "(" << a.x << ", " << a.y << ", " << a.z << ", " << a.w << ")";
   }
 
@@ -221,17 +203,10 @@ namespace embree
 {
   template<> __forceinline Vec4<float>::Vec4( const Vec3fa& a ) { x = a.x; y = a.y; z = a.z; w = a.w; }
 
-#if defined(__AVX__)
-  template<> __forceinline Vec4<vfloat4>::Vec4( const Vec3fa& a ) {
-    x = a.x; y = a.y; z = a.z; w = a.w;
-  }
-#elif defined(__SSE__)
+#if defined (__SSE__)
   template<> __forceinline Vec4<vfloat4>::Vec4( const Vec3fa& a ) {
     const vfloat4 v = vfloat4(a); x = shuffle<0,0,0,0>(v); y = shuffle<1,1,1,1>(v); z = shuffle<2,2,2,2>(v); w = shuffle<3,3,3,3>(v);
   }
-#endif
-
-#if defined(__SSE__)
   __forceinline Vec4<vfloat4> broadcast4f( const Vec4<vfloat4>& a, const size_t k ) {
     return Vec4<vfloat4>(vfloat4::broadcast(&a.x[k]), vfloat4::broadcast(&a.y[k]), vfloat4::broadcast(&a.z[k]), vfloat4::broadcast(&a.w[k]));
   }

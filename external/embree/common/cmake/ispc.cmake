@@ -1,5 +1,18 @@
-## Copyright 2009-2020 Intel Corporation
-## SPDX-License-Identifier: Apache-2.0
+## ======================================================================== ##
+## Copyright 2009-2016 Intel Corporation                                    ##
+##                                                                          ##
+## Licensed under the Apache License, Version 2.0 (the "License");          ##
+## you may not use this file except in compliance with the License.         ##
+## You may obtain a copy of the License at                                  ##
+##                                                                          ##
+##     http://www.apache.org/licenses/LICENSE-2.0                           ##
+##                                                                          ##
+## Unless required by applicable law or agreed to in writing, software      ##
+## distributed under the License is distributed on an "AS IS" BASIS,        ##
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
+## See the License for the specific language governing permissions and      ##
+## limitations under the License.                                           ##
+## ======================================================================== ##
 
 # ##################################################################
 # add macro INCLUDE_DIRECTORIES_ISPC() that allows to specify search
@@ -45,25 +58,17 @@ IF (NOT EMBREE_ISPC_EXECUTABLE)
 ENDIF()
 
 # check ISPC version
-EXECUTE_PROCESS(COMMAND ${EMBREE_ISPC_EXECUTABLE} --version
-                OUTPUT_VARIABLE ISPC_OUTPUT
-                RESULT_VARIABLE ISPC_RESULT)
-
-IF (NOT ${ISPC_RESULT} STREQUAL "0")
-  MESSAGE(FATAL_ERROR "Error executing ISPC executable '${EMBREE_ISPC_EXECUTABLE}': ${ISPC_RESULT}")
-ENDIF()
-
-STRING(REGEX MATCH "([0-9]+[.][0-9]+[.][0-9]+)" DUMMY "${ISPC_OUTPUT}")
+EXECUTE_PROCESS(COMMAND ${EMBREE_ISPC_EXECUTABLE} --version OUTPUT_VARIABLE ISPC_OUTPUT)
+STRING(REGEX MATCH " ([0-9]+[.][0-9]+[.][0-9]+)(dev|knl)? " DUMMY "${ISPC_OUTPUT}")
 SET(ISPC_VERSION ${CMAKE_MATCH_1})
 
 IF (ISPC_VERSION VERSION_LESS ISPC_VERSION_REQUIRED)
-  MESSAGE(FATAL_ERROR "ISPC ${ISPC_VERSION} is too old. You need at least ISPC ${ISPC_VERSION_REQUIRED}.")
+  MESSAGE(FATAL_ERROR "Need at least version ${ISPC_VERSION_REQUIRED} of Intel SPMD Compiler (ISPC).")
 ENDIF()
 
 GET_FILENAME_COMPONENT(ISPC_DIR ${EMBREE_ISPC_EXECUTABLE} PATH)
 
-SET(EMBREE_ISPC_ADDRESSING 32 CACHE STRING "32vs64 bit addressing in ispc")
-SET_PROPERTY(CACHE EMBREE_ISPC_ADDRESSING PROPERTY STRINGS 32 64)
+SET(EMBREE_ISPC_ADDRESSING 32 CACHE INT "32vs64 bit addressing in ispc")
 MARK_AS_ADVANCED(EMBREE_ISPC_ADDRESSING)
 
 MACRO (ISPC_COMPILE)
@@ -88,7 +93,7 @@ MACRO (ISPC_COMPILE)
   IF (WIN32 OR "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     SET(ISPC_OPT_FLAGS -O3)
   ELSE()
-    SET(ISPC_OPT_FLAGS -O2)
+    SET(ISPC_OPT_FLAGS -O2 -g)
   ENDIF()
 
   IF (WIN32)
@@ -141,7 +146,6 @@ MACRO (ISPC_COMPILE)
       COMMAND ${EMBREE_ISPC_EXECUTABLE}
       -I ${CMAKE_CURRENT_SOURCE_DIR}
       ${ISPC_INCLUDE_DIR_PARMS}
-      ${ISPC_DEFINITIONS}
       --arch=${ISPC_ARCHITECTURE}
       --addressing=${EMBREE_ISPC_ADDRESSING}
       ${ISPC_OPT_FLAGS}

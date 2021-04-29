@@ -1,62 +1,47 @@
-SET(EMBREE_VERSION_MAJOR 3)
-SET(EMBREE_VERSION_MINOR 10)
+## ======================================================================== ##
+## Copyright 2009-2016 Intel Corporation                                    ##
+##                                                                          ##
+## Licensed under the Apache License, Version 2.0 (the "License");          ##
+## you may not use this file except in compliance with the License.         ##
+## You may obtain a copy of the License at                                  ##
+##                                                                          ##
+##     http://www.apache.org/licenses/LICENSE-2.0                           ##
+##                                                                          ##
+## Unless required by applicable law or agreed to in writing, software      ##
+## distributed under the License is distributed on an "AS IS" BASIS,        ##
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
+## See the License for the specific language governing permissions and      ##
+## limitations under the License.                                           ##
+## ======================================================================== ##
+
+SET(EMBREE_VERSION_MAJOR 2)
+SET(EMBREE_VERSION_MINOR 11)
 SET(EMBREE_VERSION_PATCH 0)
 SET(EMBREE_VERSION_NOTE "")
-
 SET(EMBREE_VERSION ${EMBREE_VERSION_MAJOR}.${EMBREE_VERSION_MINOR}.${EMBREE_VERSION_PATCH})
 MATH(EXPR EMBREE_VERSION_NUMBER "10000*${EMBREE_VERSION_MAJOR} + 100*${EMBREE_VERSION_MINOR} + ${EMBREE_VERSION_PATCH}")
 SET(CPACK_RPM_PACKAGE_RELEASE 1)
 
 PROJECT(embree${EMBREE_VERSION_MAJOR})
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1.0)
 
-IF (APPLE AND EMBREE_SIGN_FILE)
-  SET(EMBREE_STRIP ${CMAKE_STRIP})
-  SET(CMAKE_STRIP ${PROJECT_BINARY_DIR}/post_install_target.sh)
-  CONFIGURE_FILE(scripts/post_install_target.sh.in ${PROJECT_BINARY_DIR}/post_install_target.sh @ONLY)
-ENDIF()
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11)
 
-MACRO (SIGN_TARGET target)
-  IF (EMBREE_SIGN_FILE)
-    IF (WIN32)
-      ADD_CUSTOM_COMMAND(TARGET ${target} POST_BUILD
-        COMMAND ${EMBREE_SIGN_FILE} $<TARGET_FILE:${target}>)
-    ELSEIF (APPLE)
-      ADD_CUSTOM_COMMAND(TARGET ${target} POST_BUILD
-        COMMAND ${EMBREE_STRIP} -x $<TARGET_FILE:${target}>
-        COMMAND ${EMBREE_SIGN_FILE} -o runtime -e ${CMAKE_SOURCE_DIR}/common/cmake/embree.entitlements $<TARGET_FILE:${target}>)
-    ELSE()
-    ENDIF()
-  ENDIF()
-ENDMACRO()
+# find git version
+SET(EMBREE_HASH 0)
 
-IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
-  FIND_PACKAGE(Git)
-  IF(GIT_FOUND)
-    EXECUTE_PROCESS(
-      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-      OUTPUT_VARIABLE "EMBREE_HASH"
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  ELSE()
-    SET(EMBREE_HASH 0)
-  ENDIF()
-ENDIF()
+CONFIGURE_FILE(
+  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/version.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/version.h"
+)
+FILE(WRITE "${CMAKE_CURRENT_BINARY_DIR}/hash" "${EMBREE_HASH}")
 
 IF(COMMAND cmake_policy)
   if (POLICY CMP0003)
     cmake_policy(SET CMP0003 NEW)
   endif()
   if (POLICY CMP0042)
-    cmake_policy(SET CMP0042 NEW)
-  endif()
-  if(POLICY CMP0072)
-    cmake_policy(SET CMP0072 OLD)
-  endif()
-  if(POLICY CMP0022)
-    cmake_policy(SET CMP0022 NEW)
+    cmake_policy(SET CMP0042 OLD)
   endif()
 ENDIF(COMMAND cmake_policy)
 
@@ -68,43 +53,63 @@ MARK_AS_ADVANCED(CMAKE_OSX_ARCHITECTURES)
 MARK_AS_ADVANCED(CMAKE_OSX_DEPLOYMENT_TARGET)
 MARK_AS_ADVANCED(CMAKE_OSX_SYSROOT)
 MARK_AS_ADVANCED(CLEAR CMAKE_CXX_COMPILER)
+MARK_AS_ADVANCED(GLUT_cocoa_LIBRARY)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/common/cmake ${CMAKE_MODULE_PATH})
 
-SET(EMBREE_STATIC_LIB ON)
+INCLUDE(test)
+
+##############################################################
+# Embree configuration
+##############################################################
 SET(EMBREE_LIB_TYPE STATIC)
-SET(EMBREE_ISPC_SUPPORT OFF)
-SET(EMBREE_TUTORIALS OFF)
-SET(EMBREE_LIBRARY_NAME "embree")
-SET(EMBREE_ZIP_MODE OFF)
+ADD_DEFINITIONS(-DEMBREE_STATIC_LIB)
+
+OPTION(EMBREE_ISPC_SUPPORT "Build Embree with support for ISPC applications." ON)
+
+##############################################################################
+# Configurations (add configurations also to common/cmake/embree-config-default.cmake)
 
 OPTION(EMBREE_STAT_COUNTERS "Enables statistic counters.")
-OPTION(EMBREE_STACK_PROTECTOR "When enabled Embree compiles with stack protection against return address overrides." OFF)
 
 OPTION(EMBREE_RAY_MASK "Enables ray mask support.")
 OPTION(EMBREE_BACKFACE_CULLING "Enables backface culling.")
-OPTION(EMBREE_FILTER_FUNCTION "Enables filter functions." ON)
+OPTION(EMBREE_INTERSECTION_FILTER "Enables intersection filter callback." ON)
+OPTION(EMBREE_INTERSECTION_FILTER_RESTORE "Restores previous hit when hit is filtered out." ON)
 OPTION(EMBREE_IGNORE_INVALID_RAYS "Ignores invalid rays." OFF) # FIXME: enable by default?
-OPTION(EMBREE_COMPACT_POLYS "Enables double indexed poly layout." OFF)
 
-OPTION(EMBREE_GEOMETRY_TRIANGLE "Enables support for triangle geometries." ON)
-OPTION(EMBREE_GEOMETRY_QUAD "Enables support for quad geometries." ON)
-OPTION(EMBREE_GEOMETRY_CURVE "Enables support for curve geometries." ON)
-OPTION(EMBREE_GEOMETRY_SUBDIVISION "Enables support for subdiv geometries." ON)
+OPTION(EMBREE_GEOMETRY_TRIANGLES "Enables support for triangle geometries." ON)
+OPTION(EMBREE_GEOMETRY_QUADS "Enables support for quad geometries." ON)
+OPTION(EMBREE_GEOMETRY_LINES "Enables support for line geometries." ON)
+OPTION(EMBREE_GEOMETRY_HAIR "Enables support for hair geometries." ON)
+OPTION(EMBREE_GEOMETRY_SUBDIV "Enables support for subdiv geometries." ON)
 OPTION(EMBREE_GEOMETRY_USER "Enables support for user geometries." ON)
-OPTION(EMBREE_GEOMETRY_INSTANCE "Enables support for instances." ON)
-OPTION(EMBREE_GEOMETRY_GRID "Enables support for grid geometries." ON)
-OPTION(EMBREE_GEOMETRY_POINT "Enables support for point geometries." ON)
 OPTION(EMBREE_RAY_PACKETS "Enabled support for ray packets." ON)
 
-SET(EMBREE_MAX_INSTANCE_LEVEL_COUNT 1 CACHE STRING "Maximum number of instance levels.")
-SET(EMBREE_CURVE_SELF_INTERSECTION_AVOIDANCE_FACTOR 2.0 CACHE STRING "Self intersection avoidance factor for flat curves. Specify floating point value in range 0 to inf.")
+SET(EMBREE_TASKING_SYSTEM "TBB" CACHE STRING "Selects tasking system")
+SET_PROPERTY(CACHE EMBREE_TASKING_SYSTEM PROPERTY STRINGS TBB INTERNAL)
+SET(TASKING_TBB      ON )
+SET(TASKING_INTERNAL OFF)
+ADD_DEFINITIONS(-DTASKING_TBB)
 
-SET(TASKING_INTERNAL ON )
-SET(TASKING_TBB      OFF)
-SET(TASKING_PPL      OFF )
-ADD_DEFINITIONS(-DTASKING_INTERNAL)
-LIST(APPEND ISPC_DEFINITIONS -DTASKING_INTERNAL)
+CONFIGURE_FILE(
+  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/config.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+)
+
+INCLUDE_DIRECTORIES(
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../tbb/include"
+)
+
+##############################################################
+# Create Binary Packages (uses above config options)
+##############################################################
+#include(package)
+
+##############################################################
+# Compiler
+##############################################################
 
 SET(CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo")
 
@@ -116,28 +121,22 @@ IF (WIN32)
   SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 
   IF (${CMAKE_GENERATOR_TOOLSET} MATCHES "^LLVM" )
-    MESSAGE("CLANG detected")
     INCLUDE(clang)
-  ELSEIF(${CMAKE_GENERATOR_TOOLSET} MATCHES "^Intel")
-    MESSAGE("Intel Compiler detected")
-    INCLUDE (intel)
+  ELSEIF (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    INCLUDE (gcc)
   ELSE()
-    IF (EMBREE_ISA_AVX512KNL OR EMBREE_ISA_AVX512SKX)
-      MESSAGE(FATAL_ERROR "Microsoft Visual C++ Compiler does not support AVX512. Please use Intel Compiler or Clang.")
-    ENDIF()
     INCLUDE (msvc)
   ENDIF()
 
 ELSE (WIN32)
-  IF(CMAKE_CXX_COMPILER_WRAPPER STREQUAL "CrayPrgEnv")
-    INCLUDE (crayprgenv)
-  ELSE()
-    STRING(TOLOWER "${CMAKE_CXX_COMPILER_ID}" _LOWER_CXX_COMPILER_ID)
-    STRING(REPLACE "appleclang" "clang" _LOWER_CXX_COMPILER_ID ${_LOWER_CXX_COMPILER_ID})
-    INCLUDE(${_LOWER_CXX_COMPILER_ID} OPTIONAL RESULT_VARIABLE COMPILER_FOUND)
-    IF (NOT COMPILER_FOUND)
-      MESSAGE(FATAL_ERROR "Unsupported compiler: " ${CMAKE_CXX_COMPILER_ID})
-    ENDIF ()
+  IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    INCLUDE (gcc)
+  ELSEIF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+    INCLUDE (clang)
+  ELSEIF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+    INCLUDE (icc)
+  ELSE ()
+    MESSAGE(FATAL_ERROR "Unsupported compiler: " ${CMAKE_CXX_COMPILER_ID})
   ENDIF ()
 
   IF(NOT CMAKE_BUILD_TYPE)
@@ -150,232 +149,130 @@ ELSE (WIN32)
 
 ENDIF (WIN32)
 
-SET(EMBREE_MAX_ISA "DEFAULT" CACHE STRING "Selects highest ISA to support.")
+##############################################################
+# ISA configuration
+##############################################################
 
-IF (EMBREE_MAX_ISA STREQUAL "NONE")
-  TRY_COMPILE(COMPILER_SUPPORTS_AVX       ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/common/cmake/check_isa.cpp COMPILE_DEFINITIONS ${FLAGS_AVX})
-  TRY_COMPILE(COMPILER_SUPPORTS_AVX2      ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/common/cmake/check_isa.cpp COMPILE_DEFINITIONS ${FLAGS_AVX2})
-  TRY_COMPILE(COMPILER_SUPPORTS_AVX512KNL ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/common/cmake/check_isa.cpp COMPILE_DEFINITIONS ${FLAGS_AVX512KNL})
-  TRY_COMPILE(COMPILER_SUPPORTS_AVX512SKX ${CMAKE_BINARY_DIR} ${PROJECT_SOURCE_DIR}/common/cmake/check_isa.cpp COMPILE_DEFINITIONS ${FLAGS_AVX512SKX})
-
-  OPTION(EMBREE_ISA_SSE2 "Enables SSE2 ISA." ON)
-  OPTION(EMBREE_ISA_SSE42 "Enables SSE4.2 ISA." ON)
-  OPTION(EMBREE_ISA_AVX "Enables AVX ISA." ${COMPILER_SUPPORTS_AVX})
-  OPTION(EMBREE_ISA_AVX2 "Enables AVX2 ISA." ${COMPILER_SUPPORTS_AVX2})
-  IF (WIN32 OR APPLE)
-    OPTION(EMBREE_ISA_AVX512KNL "Enables AVX512 ISA for Knights Landing." OFF)
-    OPTION(EMBREE_ISA_AVX512SKX "Enables AVX512 ISA for Skylake." OFF)
-  ELSE()
-    OPTION(EMBREE_ISA_AVX512KNL "Enables AVX512 ISA for Knights Landing." OFF) # compilation on GCC 8 broken
-    OPTION(EMBREE_ISA_AVX512SKX "Enables AVX512 ISA for Skylake." ${COMPILER_SUPPORTS_AVX512SKX})
-  ENDIF()
-ELSEIF (EMBREE_MAX_ISA STREQUAL "DEFAULT")
-  UNSET(EMBREE_ISA_SSE2 CACHE)
-  UNSET(EMBREE_ISA_SSE42 CACHE)
-  UNSET(EMBREE_ISA_AVX CACHE)
-  UNSET(EMBREE_ISA_AVX2 CACHE)
-  UNSET(EMBREE_ISA_AVX512KNL CACHE)
-  UNSET(EMBREE_ISA_AVX512SKX CACHE)
-  SET(EMBREE_ISA_SSE2 OFF)
-  SET(EMBREE_ISA_SSE42 OFF)
-  SET(EMBREE_ISA_AVX OFF)
-  SET(EMBREE_ISA_AVX2 OFF)
-  SET(EMBREE_ISA_AVX512KNL OFF)
-  SET(EMBREE_ISA_AVX512SKX OFF)
-  MESSAGE(STATUS "Detecting default ISA...")
-  INCLUDE(check_isa_default)
-  CHECK_ISA_DEFAULT(EMBREE_ISA_DEFAULT)
-  MESSAGE(STATUS "Detected default ISA: ${EMBREE_ISA_DEFAULT}")
-  SET(EMBREE_ISA_${EMBREE_ISA_DEFAULT} ON)
+IF(APPLE)
+  SET(EMBREE_MAX_ISA "AVX2" CACHE STRING "Selects highest ISA to support.")
+ELSEIF(NOT COMPILER STREQUAL "ICC")
+  SET(EMBREE_MAX_ISA "AVX2" CACHE STRING "Selects highest ISA to support.")
 ELSE()
-  UNSET(EMBREE_ISA_SSE2 CACHE)
-  UNSET(EMBREE_ISA_SSE42 CACHE)
-  UNSET(EMBREE_ISA_AVX CACHE)
-  UNSET(EMBREE_ISA_AVX2 CACHE)
-  UNSET(EMBREE_ISA_AVX512KNL CACHE)
-  UNSET(EMBREE_ISA_AVX512SKX CACHE)
+  SET(EMBREE_MAX_ISA "AVX512SKX" CACHE STRING "Selects highest ISA to support.")
+ENDIF ()
 
-  IF(EMBREE_MAX_ISA STREQUAL "SSE2")
-    SET(ISA  1)
-  ELSEIF(EMBREE_MAX_ISA STREQUAL "SSE4.2")
-    SET(ISA  2)
-  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX")
-    SET(ISA  3)
-  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX2")
-    SET(ISA  4)
-  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX512KNL")
-    SET(ISA  5)
-  ELSEIF(EMBREE_MAX_ISA STREQUAL "AVX512SKX")
-    SET(ISA 6)
-  ELSE()
-    MESSAGE(FATAL_ERROR "Unsupported ISA specified: " ${EMBREE_MAX_ISA})
-  ENDIF()
+SET_PROPERTY(CACHE EMBREE_MAX_ISA PROPERTY STRINGS SSE2 SSE3 SSSE3 SSE4.1 SSE4.2 AVX AVX-I AVX2 AVX512KNL AVX512SKX)
 
-  SET(EMBREE_ISA_SSE2 OFF)
-  SET(EMBREE_ISA_SSE42 OFF)
-  SET(EMBREE_ISA_AVX OFF)
-  SET(EMBREE_ISA_AVX2 OFF)
-  SET(EMBREE_ISA_AVX512KNL OFF)
-  SET(EMBREE_ISA_AVX512SKX OFF)
+IF (EMBREE_MAX_ISA STREQUAL "SSE2")
+  SET(ISA  1)
+ENDIF ()
 
-  IF (ISA GREATER 0)
-    SET(EMBREE_ISA_SSE2  ON)
-  ENDIF ()
-  IF (ISA GREATER 1)
-    SET(EMBREE_ISA_SSE42  ON)
-  ENDIF ()
-  IF (ISA GREATER 2)
-    SET(EMBREE_ISA_AVX  ON)
-  ENDIF ()
-  IF (ISA GREATER 3)
-    SET(EMBREE_ISA_AVX2  ON)
-  ENDIF ()
-  IF (ISA GREATER 4)
-    SET(EMBREE_ISA_AVX512KNL  ON)
-  ENDIF ()
-  IF (ISA GREATER 5)
-    SET(EMBREE_ISA_AVX512SKX  ON)
-  ENDIF ()
-ENDIF()
+IF (EMBREE_MAX_ISA STREQUAL "SSE3")
+  SET(ISA  2)
+ENDIF ()
 
-IF(CMAKE_CXX_COMPILER_WRAPPER STREQUAL "CrayPrgEnv")
-  SET(EMBREE_ISA_SSE42 OFF)
-ENDIF()
+IF (EMBREE_MAX_ISA STREQUAL "SSSE3")
+  SET(ISA  3)
+ENDIF ()
 
-IF (APPLE AND EMBREE_STATIC_LIB)
-  SET(NUMISA 0)
-  IF (EMBREE_ISA_SSE2)
-    MATH(EXPR NUMISA "${NUMISA}+1")
-  ENDIF()
-  IF (EMBREE_ISA_SSE42)
-    MATH(EXPR NUMISA "${NUMISA}+1")
-  ENDIF()
-  IF (EMBREE_ISA_AVX)
-    MATH(EXPR NUMISA "${NUMISA}+1")
-  ENDIF()
-  IF (EMBREE_ISA_AVX2)
-    MATH(EXPR NUMISA "${NUMISA}+1")
-  ENDIF()
-  IF (EMBREE_ISA_AVX512KNL)
-    MATH(EXPR NUMISA "${NUMISA}+1")
-  ENDIF()
-  IF (EMBREE_ISA_AVX512SKX)
-    MATH(EXPR NUMISA "${NUMISA}+1")
-  ENDIF()
+IF (EMBREE_MAX_ISA STREQUAL "SSE4.1")
+  SET(ISA  4)
+ENDIF ()
 
-  IF (NUMISA GREATER 1)
-    IF (${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-      IF (${CMAKE_CXX_COMPILER_VERSION} MATCHES "^9\\..*")
-        MESSAGE(FATAL_ERROR "Using Embree as static library is not supported with AppleClang 9.X when multiple ISAs are selected. Please either build a shared library or enable only one ISA.")
-      ENDIF()
-    ENDIF()
-  ENDIF()
-ENDIF()
+IF (EMBREE_MAX_ISA STREQUAL "SSE4.2")
+  SET(ISA  5)
+ENDIF ()
 
-SET(SSE2 0)
-SET(SSE42 1)
-SET(AVX 2)
-SET(AVX2 3)
-SET(AVX512KNL 4)
-SET(AVX512SKX 5)
+IF (EMBREE_MAX_ISA STREQUAL "AVX")
+  SET(ISA  6)
+ENDIF ()
 
-UNSET(FLAGS_LOWEST)
-SET(ISA_LOWEST_AVX 2)
+IF (EMBREE_MAX_ISA STREQUAL "AVX-I")
+  SET(ISA  7)
+ENDIF ()
 
-IF (EMBREE_ISA_SSE2)
-  ADD_DEFINITIONS(-DEMBREE_TARGET_SSE2)
-  LIST(APPEND ISPC_TARGETS "sse2")
-  IF(NOT FLAGS_LOWEST)
-    SET(ISA_LOWEST ${SSE2})
-    SET(FLAGS_LOWEST ${FLAGS_SSE2})
-  ENDIF()
-ENDIF()
+IF (EMBREE_MAX_ISA STREQUAL "AVX2")
+  SET(ISA  8)
+ENDIF ()
 
-IF (EMBREE_ISA_SSE42)
-  ADD_DEFINITIONS(-DEMBREE_TARGET_SSE42)
+IF (EMBREE_MAX_ISA STREQUAL "AVX512KNL")
+  SET(ISA  9)
+ENDIF ()
+
+IF (EMBREE_MAX_ISA STREQUAL "AVX512SKX")
+  SET(ISA 10)
+ENDIF ()
+
+SET(TARGET_SSE2  OFF)
+SET(TARGET_SSE3  OFF)
+SET(TARGET_SSSE3  OFF)
+SET(TARGET_SSE41  OFF)
+SET(TARGET_SSE42  OFF)
+SET(TARGET_AVX  OFF)
+SET(TARGET_AVX2  OFF)
+SET(TARGET_AVX512KNL OFF)
+SET(TARGET_AVX512SKX OFF)
+SET(EMBREE_ISPC_SUPPORT OFF)
+
+IF (ISA GREATER 0)
+  SET(TARGET_SSE2  ON)
+  SET(ISPC_TARGETS "sse2")
+  ADD_DEFINITIONS(-D__TARGET_SSE2__)
+ENDIF ()
+
+IF (ISA GREATER 1)
+  SET(TARGET_SSE3  ON)
+  ADD_DEFINITIONS(-D__TARGET_SSE3__)
+ENDIF ()
+
+IF (ISA GREATER 2)
+  SET(TARGET_SSSE3  ON)
+  ADD_DEFINITIONS(-D__TARGET_SSSE3__)
+ENDIF ()
+
+IF (ISA GREATER 3)
+  SET(TARGET_SSE41  ON)
+  ADD_DEFINITIONS(-D__TARGET_SSE41__)
   LIST(APPEND ISPC_TARGETS "sse4")
-  IF(NOT FLAGS_LOWEST)
-    SET(ISA_LOWEST ${SSE42})
-    SET(FLAGS_LOWEST ${FLAGS_SSE42})
-  ENDIF()
 ENDIF ()
 
-IF (EMBREE_ISA_AVX)
-  ADD_DEFINITIONS(-DEMBREE_TARGET_AVX)
+IF (ISA GREATER 4)
+  SET(TARGET_SSE42  ON)
+  ADD_DEFINITIONS(-D__TARGET_SSE42__)
+ENDIF ()
+
+IF (ISA GREATER 5)
+  SET(TARGET_AVX  ON)
+  ADD_DEFINITIONS(-D__TARGET_AVX__)
   LIST(APPEND ISPC_TARGETS "avx")
-  IF(NOT FLAGS_LOWEST)
-    SET(ISA_LOWEST ${AVX})
-    SET(ISA_LOWEST_AVX ${AVX})
-    SET(FLAGS_LOWEST ${FLAGS_AVX})
-  ENDIF()
 ENDIF ()
 
-IF (EMBREE_ISA_AVX2)
-  ADD_DEFINITIONS(-DEMBREE_TARGET_AVX2)
+IF (ISA GREATER 7)
+  SET(TARGET_AVX2  ON)
+  ADD_DEFINITIONS(-D__TARGET_AVX2__)
   LIST(APPEND ISPC_TARGETS "avx2")
-  IF(NOT FLAGS_LOWEST)
-    SET(ISA_LOWEST ${AVX2})
-    SET(ISA_LOWEST_AVX ${AVX2})
-    SET(FLAGS_LOWEST ${FLAGS_AVX2})
-  ENDIF()
 ENDIF ()
 
-IF (EMBREE_ISA_AVX512KNL)
-  ADD_DEFINITIONS(-DEMBREE_TARGET_AVX512KNL)
+IF (ISA GREATER 8)
+  SET(TARGET_AVX512KNL  ON)
+  ADD_DEFINITIONS(-D__TARGET_AVX512KNL__)
   LIST(APPEND ISPC_TARGETS "avx512knl-i32x16")
-  IF(NOT FLAGS_LOWEST)
-    SET(ISA_LOWEST ${AVX512KNL})
-    SET(ISA_LOWEST_AVX ${AVX512KNL})
-    SET(FLAGS_LOWEST ${FLAGS_AVX512KNL})
-  ENDIF()
 ENDIF ()
 
-IF (EMBREE_ISA_AVX512SKX)
-  ADD_DEFINITIONS(-DEMBREE_TARGET_AVX512SKX)
+IF (ISA GREATER 9)
+  SET(TARGET_AVX512SKX  ON)
+  ADD_DEFINITIONS(-D__TARGET_AVX512SKX__)
   LIST(APPEND ISPC_TARGETS "avx512skx-i32x16")
-  IF(NOT FLAGS_LOWEST)
-    SET(ISA_LOWEST ${AVX512SKX})
-    SET(ISA_LOWEST_AVX ${AVX512SKX})
-    SET(FLAGS_LOWEST ${FLAGS_AVX512SKX})
-  ENDIF()
 ENDIF ()
 
 INCLUDE (ispc)
 
-CONFIGURE_FILE(
-  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/config.h.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/kernels/config.h"
-)
-
-CONFIGURE_FILE(
-  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/rtcore_config.h.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/include/embree3/rtcore_config.h"
-)
-
-CONFIGURE_FILE(
-  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/hash.h.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/kernels/hash.h"
-)
-CONFIGURE_FILE(
-  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/export.linux.map.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/kernels/export.linux.map"
-)
-CONFIGURE_FILE(
-  "${CMAKE_CURRENT_SOURCE_DIR}/kernels/export.macosx.map.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/kernels/export.macosx.map"
-)
-
-include_directories (
-    BEFORE
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_CURRENT_BINARY_DIR}/include"
-    "${CMAKE_CURRENT_BINARY_DIR}/include/embree3/"
-    "${CMAKE_CURRENT_BINARY_DIR}/kernels/"
-)
-
-SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+##############################################################
+# Search paths
+##############################################################
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
+INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}")
+INCLUDE_DIRECTORIES_ISPC("${CMAKE_CURRENT_BINARY_DIR}")
 
 ADD_SUBDIRECTORY(common)
 ADD_SUBDIRECTORY(kernels)

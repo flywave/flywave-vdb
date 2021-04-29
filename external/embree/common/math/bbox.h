@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -8,13 +21,6 @@
 
 namespace embree
 {
-  namespace internal {
-
-    template <typename T> __forceinline T divideByTwo(const T& v) { return v / T(2); }
-    template <> __forceinline float divideByTwo<float>(const float& v) { return v * 0.5f; }
-    template <> __forceinline double divideByTwo<double>(const double& v) { return v * 0.5; }
-
-  } // namespace internal
   template<typename T>
   struct BBox
   {
@@ -45,21 +51,11 @@ namespace embree
     __forceinline T size() const { return upper - lower; }
 
     /*! computes the center of the box */
-    __forceinline T center() const { return internal::divideByTwo<T>(lower+upper); }
+    __forceinline T center() const { return 0.5f*(lower+upper); }
 
     /*! computes twice the center of the box */
     __forceinline T center2() const { return lower+upper; }
 
-    /*! merges two boxes */
-    __forceinline static const BBox merge (const BBox& a, const BBox& b) {
-      return BBox(min(a.lower, b.lower), max(a.upper, b.upper));
-    }
-
-     /*! enlarge box by some scaling factor */
-    __forceinline BBox enlarge_by(const float a) const {
-      return BBox(lower - T(a)*abs(lower), upper + T(a)*abs(upper));
-    }
-    
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
     ////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +93,7 @@ namespace embree
 
   /*! computes the center of the box */
   template<typename T> __forceinline const T center2(const BBox<T>& box) { return box.lower + box.upper; }
-  template<typename T> __forceinline const T center (const BBox<T>& box) { return internal::divideByTwo<T>(center2(box)); }
+  template<typename T> __forceinline const T center (const BBox<T>& box) { return T(0.5f)*center2(box); }
 
   /*! computes the volume of a bounding box */
   __forceinline float volume    ( const BBox<Vec3fa>& b ) { return reduce_mul(b.size()); }
@@ -110,16 +106,12 @@ namespace embree
   template<typename T> __forceinline const T area( const BBox<Vec2<T> >& b ) { const Vec2<T> d = b.size(); return d.x*d.y; }
 
   template<typename T> __forceinline const T halfArea( const BBox<Vec3<T> >& b ) { return halfArea(b.size()); }
-  template<typename T> __forceinline const T     area( const BBox<Vec3<T> >& b ) { return T(2)*halfArea(b); }
+  template<typename T> __forceinline const T     area( const BBox<Vec3<T> >& b ) { return 2.0f*halfArea(b); }
 
   __forceinline float halfArea( const BBox<Vec3fa>& b ) { return halfArea(b.size()); }
   __forceinline float     area( const BBox<Vec3fa>& b ) { return 2.0f*halfArea(b); }
 
   template<typename Vec> __forceinline float safeArea( const BBox<Vec>& b ) { if (b.empty()) return 0.0f; else return area(b); }
-
-  template<typename T> __forceinline float expectedApproxHalfArea(const BBox<T>& box) {
-    return halfArea(box);
-  }
 
   /*! merges bounding boxes and points */
   template<typename T> __forceinline const BBox<T> merge( const BBox<T>& a, const       T& b ) { return BBox<T>(min(a.lower, b    ), max(a.upper, b    )); }
@@ -183,131 +175,14 @@ namespace embree
     return true; 
   }
 
-  template<> __inline bool subset( const BBox<Vec3fa>& a, const BBox<Vec3fa>& b ) {
-    return all(ge_mask(a.lower,b.lower)) & all(le_mask(a.upper,b.upper));
-  }
-  
-  /*! blending */
-  template<typename T>
-    __forceinline BBox<T> lerp(const BBox<T>& b0, const BBox<T>& b1, const float t) {
-    return BBox<T>(lerp(b0.lower,b1.lower,t),lerp(b0.upper,b1.upper,t));
-  }
-
   /*! output operator */
-  template<typename T> __forceinline embree_ostream operator<<(embree_ostream cout, const BBox<T>& box) {
+  template<typename T> __forceinline std::ostream& operator<<(std::ostream& cout, const BBox<T>& box) {
     return cout << "[" << box.lower << "; " << box.upper << "]";
   }
 
   /*! default template instantiations */
   typedef BBox<float> BBox1f;
   typedef BBox<Vec2f> BBox2f;
-  typedef BBox<Vec2fa> BBox2fa;
   typedef BBox<Vec3f> BBox3f;
   typedef BBox<Vec3fa> BBox3fa;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-/// SSE / AVX / MIC specializations
-////////////////////////////////////////////////////////////////////////////////
-
-#if defined __SSE__
-#include "../simd/sse.h"
-#endif
-
-#if defined __AVX__
-#include "../simd/avx.h"
-#endif
-
-#if defined(__AVX512F__)
-#include "../simd/avx512.h"
-#endif
-
-namespace embree
-{
-  template<int N>
-    __forceinline BBox<Vec3<vfloat<N>>> transpose(const BBox3fa* bounds);
-  
-  template<>
-    __forceinline BBox<Vec3<vfloat4>> transpose<4>(const BBox3fa* bounds)
-  {
-    BBox<Vec3<vfloat4>> dest;
-    
-    transpose((vfloat4&)bounds[0].lower,
-              (vfloat4&)bounds[1].lower,
-              (vfloat4&)bounds[2].lower,
-              (vfloat4&)bounds[3].lower,
-              dest.lower.x,
-              dest.lower.y,
-              dest.lower.z);
-    
-    transpose((vfloat4&)bounds[0].upper,
-              (vfloat4&)bounds[1].upper,
-              (vfloat4&)bounds[2].upper,
-              (vfloat4&)bounds[3].upper,
-              dest.upper.x,
-              dest.upper.y,
-              dest.upper.z);
-    
-    return dest;
-  }
-  
-#if defined(__AVX__)
-  template<>
-    __forceinline BBox<Vec3<vfloat8>> transpose<8>(const BBox3fa* bounds)
-  {
-    BBox<Vec3<vfloat8>> dest;
-    
-    transpose((vfloat4&)bounds[0].lower,
-              (vfloat4&)bounds[1].lower,
-              (vfloat4&)bounds[2].lower,
-              (vfloat4&)bounds[3].lower,
-              (vfloat4&)bounds[4].lower,
-              (vfloat4&)bounds[5].lower,
-              (vfloat4&)bounds[6].lower,
-              (vfloat4&)bounds[7].lower,
-              dest.lower.x,
-              dest.lower.y,
-              dest.lower.z);
-    
-    transpose((vfloat4&)bounds[0].upper,
-              (vfloat4&)bounds[1].upper,
-              (vfloat4&)bounds[2].upper,
-              (vfloat4&)bounds[3].upper,
-              (vfloat4&)bounds[4].upper,
-              (vfloat4&)bounds[5].upper,
-              (vfloat4&)bounds[6].upper,
-              (vfloat4&)bounds[7].upper,
-              dest.upper.x,
-              dest.upper.y,
-              dest.upper.z);
-    
-    return dest;
-  }
-#endif
-  
-  template<int N>
-    __forceinline BBox3fa merge(const BBox3fa* bounds);
-  
-  template<>
-    __forceinline BBox3fa merge<4>(const BBox3fa* bounds)
-  {
-    const Vec3fa lower = min(min(bounds[0].lower,bounds[1].lower),
-                             min(bounds[2].lower,bounds[3].lower));
-    const Vec3fa upper = max(max(bounds[0].upper,bounds[1].upper),
-                             max(bounds[2].upper,bounds[3].upper));
-    return BBox3fa(lower,upper);
-  }
-  
-#if defined(__AVX__)
-  template<>
-    __forceinline BBox3fa merge<8>(const BBox3fa* bounds)
-  {
-    const Vec3fa lower = min(min(min(bounds[0].lower,bounds[1].lower),min(bounds[2].lower,bounds[3].lower)),
-                             min(min(bounds[4].lower,bounds[5].lower),min(bounds[6].lower,bounds[7].lower)));
-    const Vec3fa upper = max(max(max(bounds[0].upper,bounds[1].upper),max(bounds[2].upper,bounds[3].upper)),
-                             max(max(bounds[4].upper,bounds[5].upper),max(bounds[6].upper,bounds[7].upper)));
-    return BBox3fa(lower,upper);
-  }
-#endif
-}
-

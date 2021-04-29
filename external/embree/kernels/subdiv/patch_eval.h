@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -24,18 +37,12 @@ namespace embree
                    Vertex* P, Vertex* dPdu, Vertex* dPdv, Vertex* ddPdudu, Vertex* ddPdvdv, Vertex* ddPdudv)
         : P(P), dPdu(dPdu), dPdv(dPdv), ddPdudu(ddPdudu), ddPdvdv(ddPdvdv), ddPdudv(ddPdudv)
         {
-          /* conservative time for the very first allocation */
-          auto time = SharedLazyTessellationCache::sharedLazyTessellationCache.getTime(commitCounter);
-
           Ref patch = SharedLazyTessellationCache::lookup(entry,commitCounter,[&] () {
-              auto alloc = [&](size_t bytes) { return SharedLazyTessellationCache::malloc(bytes); };
+              auto alloc = [](size_t bytes) { return SharedLazyTessellationCache::malloc(bytes); };
               return Patch::create(alloc,edge,vertices,stride);
-            },true);
-
-          auto curTime = SharedLazyTessellationCache::sharedLazyTessellationCache.getTime(commitCounter);
-          const bool allAllocationsValid = SharedLazyTessellationCache::validTime(time,curTime);
-
-          if (patch && allAllocationsValid &&  eval(patch,u,v,1.0f,0)) {
+            });
+          
+          if (patch && eval(patch,u,v,1.0f,0)) {
             SharedLazyTessellationCache::unlock();
             return;
           }
@@ -57,10 +64,10 @@ namespace embree
         
         bool eval_general(const typename Patch::SubdividedGeneralPatch* This, const float U, const float V, const size_t depth)
         {
-          const unsigned l = (unsigned) floor(0.5f*U); const float u = 2.0f*frac(0.5f*U)-0.5f; 
-          const unsigned h = (unsigned) floor(0.5f*V); const float v = 2.0f*frac(0.5f*V)-0.5f; 
+          const unsigned l = (unsigned) floor(4.0f*U); const float u = 2.0f*frac(4.0f*U); 
+          const unsigned h = (unsigned) floor(4.0f*V); const float v = 2.0f*frac(4.0f*V); 
           const unsigned i = 4*h+l; assert(i<This->N);
-          return eval(This->child[i],u,v,1.0f,depth+1);
+          return eval(This->child[i],u,v,8.0f,depth+1);
         }
         
         bool eval(Ref This, const float& u, const float& v, const float dscale, const size_t depth) 

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -16,8 +29,8 @@ namespace embree
     __forceinline PrimRef(const PrimRef& v) { 
       vfloat8::store((float*)this,vfloat8::load((float*)&v));
     }
-    __forceinline PrimRef& operator=(const PrimRef& v) { 
-      vfloat8::store((float*)this,vfloat8::load((float*)&v)); return *this;
+    __forceinline void operator=(const PrimRef& v) { 
+      vfloat8::store((float*)this,vfloat8::load((float*)&v));
     }
 #endif
 
@@ -48,25 +61,6 @@ namespace embree
       return BBox3fa(lower,upper);
     }
 
-    /*! size for bin heuristic is 1 */
-    __forceinline unsigned size() const { 
-      return 1;
-    }
-
-    /*! returns bounds and centroid used for binning */
-    __forceinline void binBoundsAndCenter(BBox3fa& bounds_o, Vec3fa& center_o) const 
-    {
-      bounds_o = bounds();
-      center_o = embree::center2(bounds_o);
-    }
-
-    __forceinline unsigned& geomIDref() {  // FIXME: remove !!!!!!!
-      return lower.u;
-    }
-    __forceinline unsigned& primIDref() {  // FIXME: remove !!!!!!!
-      return upper.u;
-    }
-    
     /*! returns the geometry ID */
     __forceinline unsigned geomID() const { 
       return lower.a;
@@ -97,7 +91,7 @@ namespace embree
     }
 
     /*! Outputs primitive reference to a stream. */
-    friend __forceinline embree_ostream operator<<(embree_ostream cout, const PrimRef& ref) {
+    friend __forceinline std::ostream& operator<<(std::ostream& cout, const PrimRef& ref) {
       return cout << "{ lower = " << ref.lower << ", upper = " << ref.upper << ", geomID = " << ref.geomID() << ", primID = " << ref.primID() << " }";
     }
 
@@ -118,21 +112,4 @@ namespace embree
     std::swap(a,b);
 #endif
   }
-
-  /************************************************************************************/
-  /************************************************************************************/
-  /************************************************************************************/
-  /************************************************************************************/
-  
-  struct SubGridBuildData {
-    unsigned short sx,sy;
-    unsigned int primID;
-    
-    __forceinline SubGridBuildData() {};
-    __forceinline SubGridBuildData(const unsigned int sx, const unsigned int sy, const unsigned int primID) : sx(sx), sy(sy), primID(primID) {};
-    
-    __forceinline size_t x() const { return (size_t)sx & 0x7fff; }
-    __forceinline size_t y() const { return (size_t)sy & 0x7fff; }
-    
-  };
 }

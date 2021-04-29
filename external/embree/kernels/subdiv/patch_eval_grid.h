@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -82,8 +95,8 @@ namespace embree
         foreach2(lx0,lx1,ly0,ly1,[&](const vboolx& valid, const vintx& ix, const vintx& iy) {
             const vfloatx lu = select(ix == swidth -1, vfloatx(1.0f), (vfloatx(ix)-srange.lower.x)*scale_x);
             const vfloatx lv = select(iy == sheight-1, vfloatx(1.0f), (vfloatx(iy)-srange.lower.y)*scale_y);
-            const Vec3vfx p = patch->patch.eval(lu,lv);
-            Vec3vfx n = zero;
+            const Vec3<vfloatx> p = patch->patch.eval(lu,lv);
+            Vec3<vfloatx> n = zero;
             if (unlikely(Nx != nullptr)) n = normalize_safe(patch->patch.normal(lu,lv));
             const vfloatx u = vfloatx(ix)*rcp_swidth;
             const vfloatx v = vfloatx(iy)*rcp_sheight;
@@ -230,11 +243,11 @@ namespace embree
           assert(i<MAX_PATCH_VALENCE);
           static_assert(MAX_PATCH_VALENCE <= 16, "MAX_PATCH_VALENCE > 16");
           const int h = (i >> 2) & 3, l = i & 3;
-          const Vec2f subPatchID((float)l,(float)h);
-          const Vec2f uv[4] = { 2.0f*subPatchID + (0.5f+Vec2f(0.0f,0.0f)),
-                                2.0f*subPatchID + (0.5f+Vec2f(1.0f,0.0f)),
-                                2.0f*subPatchID + (0.5f+Vec2f(1.0f,1.0f)),
-                                2.0f*subPatchID + (0.5f+Vec2f(0.0f,1.0f)) };
+          const Vec2f base((float)l,(float)h);
+          const Vec2f uv[4] = { (1.0f/4.0f) * (base + Vec2f(0.0f,0.0f)),
+                                (1.0f/4.0f) * (base + Vec2f(0.5f,0.0f)),
+                                (1.0f/4.0f) * (base + Vec2f(0.5f,0.5f)),
+                                (1.0f/4.0f) * (base + Vec2f(0.0f,0.5f)) };
           const int neighborSubdiv1[4] = { 0,0,0,0 }; 
           const float levels1[4] = { 0.5f*levels[(i+0)%N], 0.5f*levels[(i+0)%N], 0.5f*levels[(i-1)%N], 0.5f*levels[(i-1)%N] };
           tessellator(uv,neighborSubdiv1,levels1,i);

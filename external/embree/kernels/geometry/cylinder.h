@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -70,17 +83,17 @@ namespace embree
         
         /* calculates u and Ng for near hit */
         {
-          u0_o = madd(t0,dOz,Oz)*rl;
-          const Vec3fa Pr = t0*dir;
-          const Vec3fa Pl = madd(u0_o,p1-p0,p0);
+          u0_o = (Oz+t0*dOz)*rl;
+          const Vec3fa Pr = t_o.lower*dir;
+          const Vec3fa Pl = p0 + u0_o*(p1-p0);
           Ng0_o = Pr-Pl;
         }
 
         /* calculates u and Ng for far hit */
         {
-          u1_o = madd(t1,dOz,Oz)*rl;
-          const Vec3fa Pr = t1*dir;
-          const Vec3fa Pl = madd(u1_o,p1-p0,p0);
+          u1_o = (Oz+t1*dOz)*rl;
+          const Vec3fa Pr = t_o.lower*dir;
+          const Vec3fa Pl = p0 + u1_o*(p1-p0);
           Ng1_o = Pr-Pl;
         }
 
@@ -96,7 +109,7 @@ namespace embree
         return intersect(org_i,dir,t_o,u0_o,Ng0_o,u1_o,Ng1_o);
       }
 
-      static bool verify(const size_t id, const Cylinder& cylinder, const RayHit& ray, bool shouldhit, const float t0, const float t1)
+      static bool verify(const size_t id, const Cylinder& cylinder, const Ray& ray, bool shouldhit, const float t0, const float t1)
       {
         float eps = 0.001f;
         BBox1f t; bool hit;
@@ -106,7 +119,7 @@ namespace embree
         if (shouldhit) failed |= std::isinf(t0) ? t0 != t.lower : abs(t0-t.lower) > eps;
         if (shouldhit) failed |= std::isinf(t1) ? t1 != t.upper : abs(t1-t.upper) > eps;
         if (!failed) return true;
-        embree_cout << "Cylinder test " << id << " failed: cylinder = " << cylinder << ", ray = " << ray << ", hit = " << hit << ", t = " << t << embree_endl; 
+        std::cout << "Cylinder test " << id << " failed: cylinder = " << cylinder << ", ray = " << ray << ", hit = " << hit << ", t = " << t << std::endl; 
         return false;
       }
 
@@ -115,45 +128,47 @@ namespace embree
       {
         bool passed = true;
         const Cylinder cylinder(Vec3fa(0.0f,0.0f,0.0f),Vec3fa(1.0f,0.0f,0.0f),1.0f);
-        passed &= verify(0,cylinder,RayHit(Vec3fa(-2.0f,1.0f,0.0f),Vec3fa( 0.0f,-1.0f,+0.0f),0.0f,float(inf)),true,0.0f,2.0f);
-        passed &= verify(1,cylinder,RayHit(Vec3fa(+2.0f,1.0f,0.0f),Vec3fa( 0.0f,-1.0f,+0.0f),0.0f,float(inf)),true,0.0f,2.0f);
-        passed &= verify(2,cylinder,RayHit(Vec3fa(+2.0f,1.0f,2.0f),Vec3fa( 0.0f,-1.0f,+0.0f),0.0f,float(inf)),false,0.0f,0.0f);
-        passed &= verify(3,cylinder,RayHit(Vec3fa(+0.0f,0.0f,0.0f),Vec3fa( 1.0f, 0.0f,+0.0f),0.0f,float(inf)),true,neg_inf,pos_inf);
-        passed &= verify(4,cylinder,RayHit(Vec3fa(+0.0f,0.0f,0.0f),Vec3fa(-1.0f, 0.0f,+0.0f),0.0f,float(inf)),true,neg_inf,pos_inf);
-        passed &= verify(5,cylinder,RayHit(Vec3fa(+0.0f,2.0f,0.0f),Vec3fa( 1.0f, 0.0f,+0.0f),0.0f,float(inf)),false,pos_inf,neg_inf);
-        passed &= verify(6,cylinder,RayHit(Vec3fa(+0.0f,2.0f,0.0f),Vec3fa(-1.0f, 0.0f,+0.0f),0.0f,float(inf)),false,pos_inf,neg_inf);
+        passed &= verify(0,cylinder,Ray(Vec3fa(-2.0f,1.0f,0.0f),Vec3fa( 0.0f,-1.0f,+0.0f),0.0f,float(inf)),true,0.0f,2.0f);
+        passed &= verify(1,cylinder,Ray(Vec3fa(+2.0f,1.0f,0.0f),Vec3fa( 0.0f,-1.0f,+0.0f),0.0f,float(inf)),true,0.0f,2.0f);
+        passed &= verify(2,cylinder,Ray(Vec3fa(+2.0f,1.0f,2.0f),Vec3fa( 0.0f,-1.0f,+0.0f),0.0f,float(inf)),false,0.0f,0.0f);
+        passed &= verify(3,cylinder,Ray(Vec3fa(+0.0f,0.0f,0.0f),Vec3fa( 1.0f, 0.0f,+0.0f),0.0f,float(inf)),true,neg_inf,pos_inf);
+        passed &= verify(4,cylinder,Ray(Vec3fa(+0.0f,0.0f,0.0f),Vec3fa(-1.0f, 0.0f,+0.0f),0.0f,float(inf)),true,neg_inf,pos_inf);
+        passed &= verify(5,cylinder,Ray(Vec3fa(+0.0f,2.0f,0.0f),Vec3fa( 1.0f, 0.0f,+0.0f),0.0f,float(inf)),false,pos_inf,neg_inf);
+        passed &= verify(6,cylinder,Ray(Vec3fa(+0.0f,2.0f,0.0f),Vec3fa(-1.0f, 0.0f,+0.0f),0.0f,float(inf)),false,pos_inf,neg_inf);
         return passed;
       }
 
       /*! output operator */
-      friend __forceinline embree_ostream operator<<(embree_ostream cout, const Cylinder& c) {
+      friend __forceinline std::ostream& operator<<(std::ostream& cout, const Cylinder& c) {
         return cout << "Cylinder { p0 = " << c.p0 << ", p1 = " << c.p1 << ", r = " << sqrtf(c.rr) << "}";
       }
     };
 
     template<int N>
       struct CylinderN
-    { 
-      const Vec3vf<N> p0;     //!< start location
-      const Vec3vf<N> p1;     //!< end position
+    {
+      typedef Vec3<vfloat<N>> Vec3vfN;
+      
+      const Vec3vfN p0;     //!< start location
+      const Vec3vfN p1;     //!< end position
       const vfloat<N> rr;   //!< squared radius of cylinder
 
-      __forceinline CylinderN(const Vec3vf<N>& p0, const Vec3vf<N>& p1, const vfloat<N>& r)
+      __forceinline CylinderN(const Vec3vfN& p0, const Vec3vfN& p1, const vfloat<N>& r) 
         : p0(p0), p1(p1), rr(sqr(r)) {}
 
-      __forceinline CylinderN(const Vec3vf<N>& p0, const Vec3vf<N>& p1, const vfloat<N>& rr, bool)
+      __forceinline CylinderN(const Vec3vfN& p0, const Vec3vfN& p1, const vfloat<N>& rr, bool) 
         : p0(p0), p1(p1), rr(rr) {}
 
      
       __forceinline vbool<N> intersect(const Vec3fa& org, const Vec3fa& dir, 
                                        BBox<vfloat<N>>& t_o, 
-                                       vfloat<N>& u0_o, Vec3vf<N>& Ng0_o,
-                                       vfloat<N>& u1_o, Vec3vf<N>& Ng1_o) const
+                                       vfloat<N>& u0_o, Vec3vfN& Ng0_o,
+                                       vfloat<N>& u1_o, Vec3vfN& Ng1_o) const
       {
         /* calculate quadratic equation to solve */
         const vfloat<N> rl = rcp_length(p1-p0);
-        const Vec3vf<N> P0 = p0, dP = (p1-p0)*rl;
-        const Vec3vf<N> O = Vec3vf<N>(org)-P0, dO = dir;
+        const Vec3vfN P0 = p0, dP = (p1-p0)*rl;
+        const Vec3vfN O = Vec3vfN(org)-P0, dO = dir;
         
         const vfloat<N> dOdO = dot(dO,dO);
         const vfloat<N> OdO = dot(dO,O);
@@ -181,17 +196,17 @@ namespace embree
         
         /* calculates u and Ng for near hit */
         {
-          u0_o = madd(t0,dOz,Oz)*rl;
-          const Vec3vf<N> Pr = t0*Vec3vf<N>(dir);
-          const Vec3vf<N> Pl = madd(u0_o,p1-p0,p0);
+          u0_o = (Oz+t0*dOz)*rl;
+          const Vec3vfN Pr = t0*Vec3vfN(dir);
+          const Vec3vfN Pl = p0 + u0_o*(p1-p0);
           Ng0_o = Pr-Pl;
         }
         
         /* calculates u and Ng for far hit */
         {
-          u1_o = madd(t1,dOz,Oz)*rl;
-          const Vec3vf<N> Pr = t1*Vec3vf<N>(dir);
-          const Vec3vf<N> Pl = madd(u1_o,p1-p0,p0);
+          u1_o = (Oz+t1*dOz)*rl;
+          const Vec3vfN Pr = t1*Vec3vfN(dir);
+          const Vec3vfN Pl = p0 + u1_o*(p1-p0);
           Ng1_o = Pr-Pl;
         }
 
@@ -206,15 +221,15 @@ namespace embree
           vbool<N> inside = C <= 0.0f;
           t_o.lower = select(validt,select(inside,vfloat<N>(neg_inf),vfloat<N>(pos_inf)),t_o.lower);
           t_o.upper = select(validt,select(inside,vfloat<N>(pos_inf),vfloat<N>(neg_inf)),t_o.upper);
-          valid &= !validt | inside;
+          valid &= inside;
         }
         return valid;
       }
 
       __forceinline vbool<N> intersect(const Vec3fa& org_i, const Vec3fa& dir, BBox<vfloat<N>>& t_o) const
       {
-        vfloat<N> u0_o; Vec3vf<N> Ng0_o;
-        vfloat<N> u1_o; Vec3vf<N> Ng1_o;
+        vfloat<N> u0_o; Vec3vfN Ng0_o;
+        vfloat<N> u1_o; Vec3vfN Ng1_o;
         return intersect(org_i,dir,t_o,u0_o,Ng0_o,u1_o,Ng1_o);
       }
     };

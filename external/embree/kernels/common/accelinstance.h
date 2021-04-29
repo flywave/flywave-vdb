@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -15,12 +28,17 @@ namespace embree
       : Accel(AccelData::TY_ACCEL_INSTANCE,intersectors), accel(accel), builder(builder) {}
 
     void immutable () {
-      builder.reset(nullptr);
+      delete builder; builder = nullptr;
+    }
+
+    ~AccelInstance() {
+      delete builder; builder = nullptr;
+      delete accel;   accel = nullptr;
     }
 
   public:
-    void build () {
-      if (builder) builder->build();
+    void build (size_t threadIndex, size_t threadCount) {
+      if (builder) builder->build(threadIndex,threadCount);
       bounds = accel->bounds;
     }
 
@@ -30,12 +48,12 @@ namespace embree
     }
     
     void clear() {
-      if (accel) accel->clear();
-      if (builder) builder->clear();
+      accel->clear();
+      builder->clear();
     }
 
   private:
-    std::unique_ptr<AccelData> accel;
-    std::unique_ptr<Builder> builder;
+    AccelData* accel;
+    Builder* builder;
   };
 }

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -15,18 +28,10 @@ namespace embree
 
   template<typename T> struct Vec3
   {
-    enum { N  = 3 };
-
-    union {
-      struct {
-	T x, y, z;
-      };
-#if !(defined(__WIN32__) && _MSC_VER == 1800) // workaround for older VS 2013 compiler
-      T components[N];
-#endif
-    };
+    T x, y, z;
 
     typedef T Scalar;
+    enum { N  = 3 };
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Construction
@@ -42,8 +47,6 @@ namespace embree
     template<typename T1> __forceinline Vec3( const Vec3<T1>& a ) : x(T(a.x)), y(T(a.y)), z(T(a.z)) {}
     template<typename T1> __forceinline Vec3& operator =(const Vec3<T1>& other) { x = other.x; y = other.y; z = other.z; return *this; }
 
-    __forceinline Vec3& operator =(const Vec3& other) { x = other.x; y = other.y; z = other.z; return *this; }
-	
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
     ////////////////////////////////////////////////////////////////////////////////
@@ -53,13 +56,8 @@ namespace embree
     __forceinline Vec3( PosInfTy ) : x(pos_inf), y(pos_inf), z(pos_inf) {}
     __forceinline Vec3( NegInfTy ) : x(neg_inf), y(neg_inf), z(neg_inf) {}
 
-#if defined(__WIN32__) && (_MSC_VER == 1800) // workaround for older VS 2013 compiler
     __forceinline const T& operator []( const size_t axis ) const { assert(axis < 3); return (&x)[axis]; }
     __forceinline       T& operator []( const size_t axis )       { assert(axis < 3); return (&x)[axis]; }
-#else
-	__forceinline const T& operator [](const size_t axis) const { assert(axis < 3); return components[axis]; }
-	__forceinline       T& operator [](const size_t axis)       { assert(axis < 3); return components[axis]; }
-#endif
   };
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +77,7 @@ namespace embree
                    select(abs(a.y)<min_rcp_input,T(min_rcp_input),a.y),
                    select(abs(a.z)<min_rcp_input,T(min_rcp_input),a.z));
   }
-  template<typename T> __forceinline Vec3<T> rcp_safe(const Vec3<T>& a) { return rcp(zero_fix(a)); }
+  template<typename T> __forceinline const Vec3<T> rcp_safe(const Vec3<T>& a) { return rcp(zero_fix(a)); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Binary Operators
@@ -104,25 +102,20 @@ namespace embree
   /// Ternary Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> __forceinline Vec3<T> madd  ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>( madd(a.x,b.x,c.x), madd(a.y,b.y,c.y), madd(a.z,b.z,c.z)); }
-  template<typename T> __forceinline Vec3<T> msub  ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>( msub(a.x,b.x,c.x), msub(a.y,b.y,c.y), msub(a.z,b.z,c.z)); }
-  template<typename T> __forceinline Vec3<T> nmadd ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>(nmadd(a.x,b.x,c.x),nmadd(a.y,b.y,c.y),nmadd(a.z,b.z,c.z));}
-  template<typename T> __forceinline Vec3<T> nmsub ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>(nmsub(a.x,b.x,c.x),nmsub(a.y,b.y,c.y),nmsub(a.z,b.z,c.z)); }
-
-  template<typename T> __forceinline Vec3<T> madd  ( const T& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>( madd(a,b.x,c.x), madd(a,b.y,c.y), madd(a,b.z,c.z)); }
-  template<typename T> __forceinline Vec3<T> msub  ( const T& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>( msub(a,b.x,c.x), msub(a,b.y,c.y), msub(a,b.z,c.z)); }
-  template<typename T> __forceinline Vec3<T> nmadd ( const T& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>(nmadd(a,b.x,c.x),nmadd(a,b.y,c.y),nmadd(a,b.z,c.z));}
-  template<typename T> __forceinline Vec3<T> nmsub ( const T& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>(nmsub(a,b.x,c.x),nmsub(a,b.y,c.y),nmsub(a,b.z,c.z)); }
+  template<typename T> __forceinline const Vec3<T> madd  ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>( madd(a.x,b.x,c.x), madd(a.y,b.y,c.y), madd(a.z,b.z,c.z)); }
+  template<typename T> __forceinline const Vec3<T> msub  ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>( msub(a.x,b.x,c.x), msub(a.y,b.y,c.y), msub(a.z,b.z,c.z)); }
+  template<typename T> __forceinline const Vec3<T> nmadd ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>(nmadd(a.x,b.x,c.x),nmadd(a.y,b.y,c.y),nmadd(a.z,b.z,c.z));}
+  template<typename T> __forceinline const Vec3<T> nmsub ( const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& c) { return Vec3<T>(nmsub(a.x,b.x,c.x),nmsub(a.y,b.y,c.y),nmsub(a.z,b.z,c.z)); }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Assignment Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> __forceinline Vec3<T>& operator +=( Vec3<T>& a, const T        b ) { a.x += b;   a.y += b;   a.z += b;   return a; }
-  template<typename T> __forceinline Vec3<T>& operator +=( Vec3<T>& a, const Vec3<T>& b ) { a.x += b.x; a.y += b.y; a.z += b.z; return a; }
-  template<typename T> __forceinline Vec3<T>& operator -=( Vec3<T>& a, const Vec3<T>& b ) { a.x -= b.x; a.y -= b.y; a.z -= b.z; return a; }
-  template<typename T> __forceinline Vec3<T>& operator *=( Vec3<T>& a, const       T& b ) { a.x *= b  ; a.y *= b  ; a.z *= b  ; return a; }
-  template<typename T> __forceinline Vec3<T>& operator /=( Vec3<T>& a, const       T& b ) { a.x /= b  ; a.y /= b  ; a.z /= b  ; return a; }
+  template<typename T> __forceinline const Vec3<T>& operator +=( Vec3<T>& a, const T        b ) { a.x += b;   a.y += b;   a.z += b;   return a; }
+  template<typename T> __forceinline const Vec3<T>& operator +=( Vec3<T>& a, const Vec3<T>& b ) { a.x += b.x; a.y += b.y; a.z += b.z; return a; }
+  template<typename T> __forceinline const Vec3<T>& operator -=( Vec3<T>& a, const Vec3<T>& b ) { a.x -= b.x; a.y -= b.y; a.z -= b.z; return a; }
+  template<typename T> __forceinline const Vec3<T>& operator *=( Vec3<T>& a, const       T& b ) { a.x *= b  ; a.y *= b  ; a.z *= b  ; return a; }
+  template<typename T> __forceinline const Vec3<T>& operator /=( Vec3<T>& a, const       T& b ) { a.x /= b  ; a.y /= b  ; a.z /= b  ; return a; }
 
   ////////////////////////////////////////////////////////////////////////////////
   /// Reduction Operators
@@ -147,14 +140,6 @@ namespace embree
   }
 
   ////////////////////////////////////////////////////////////////////////////////
-  /// Shift Operators
-  ////////////////////////////////////////////////////////////////////////////////
-
-  template<typename T> __forceinline Vec3<T> shift_right_1( const Vec3<T>& a ) {
-    return Vec3<T>(shift_right_1(a.x),shift_right_1(a.y),shift_right_1(a.z));
-  }
-
-  ////////////////////////////////////////////////////////////////////////////////
   /// Select
   ////////////////////////////////////////////////////////////////////////////////
 
@@ -170,18 +155,12 @@ namespace embree
     return Vec3<T>(select(s,t.x,f.x),select(s,t.y,f.y),select(s,t.z,f.z));
   }
 
-  template<typename T>
-    __forceinline Vec3<T> lerp(const Vec3<T>& v0, const Vec3<T>& v1, const T& t) {
-    return madd(Vec3<T>(T(1.0f)-t),v0,t*v1);
-  }
-
   template<typename T> __forceinline int maxDim ( const Vec3<T>& a )
   {
-    const Vec3<T> b = abs(a);
-    if (b.x > b.y) {
-      if (b.x > b.z) return 0; else return 2;
+    if (a.x > a.y) {
+      if (a.x > a.z) return 0; else return 2;
     } else {
-      if (b.y > b.z) return 1; else return 2;
+      if (a.y > a.z) return 1; else return 2;
     }
   }
 
@@ -200,11 +179,10 @@ namespace embree
   /// Euclidian Space Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> __forceinline T       sqr      ( const Vec3<T>& a )                   { return dot(a,a); }
   template<typename T> __forceinline T       dot      ( const Vec3<T>& a, const Vec3<T>& b ) { return madd(a.x,b.x,madd(a.y,b.y,a.z*b.z)); }
-  template<typename T> __forceinline T       length   ( const Vec3<T>& a )                   { return sqrt(sqr(a)); }
-  template<typename T> __forceinline T       rcp_length( const Vec3<T>& a )                  { return rsqrt(sqr(a)); }
-  template<typename T> __forceinline Vec3<T> normalize( const Vec3<T>& a )                   { return a*rsqrt(sqr(a)); }
+  template<typename T> __forceinline T       length   ( const Vec3<T>& a )                   { return sqrt(dot(a,a)); }
+  template<typename T> __forceinline T       rcp_length( const Vec3<T>& a )                  { return rsqrt(dot(a,a)); }
+  template<typename T> __forceinline Vec3<T> normalize( const Vec3<T>& a )                   { return a*rsqrt(dot(a,a)); }
   template<typename T> __forceinline T       distance ( const Vec3<T>& a, const Vec3<T>& b ) { return length(a-b); }
   template<typename T> __forceinline Vec3<T> cross    ( const Vec3<T>& a, const Vec3<T>& b ) { return Vec3<T>(msub(a.y,b.z,a.z*b.y), msub(a.z,b.x,a.x*b.z), msub(a.x,b.y,a.y*b.x)); }
 
@@ -224,7 +202,7 @@ namespace embree
 
   template<typename T> __forceinline T       sum      ( const Vec3<T>& a )                   { return a.x+a.y+a.z; }
 
-  template<typename T> __forceinline      T  halfArea ( const Vec3<T>& d )                  { return madd(d.x,(d.y+d.z),d.y*d.z); }
+  template<typename T> __forceinline      T  halfArea ( const Vec3<T>& d )                  { return d.x*(d.y+d.z)+d.y*d.z; }
   template<typename T> __forceinline      T  area     ( const Vec3<T>& d )                  { return 2.0f*halfArea(d); }
 
   template<typename T> __forceinline Vec3<T> normalize_safe( const Vec3<T>& a ) {
@@ -249,7 +227,7 @@ namespace embree
   /// Output Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> __forceinline embree_ostream operator<<(embree_ostream cout, const Vec3<T>& a) {
+  template<typename T> inline std::ostream& operator<<(std::ostream& cout, const Vec3<T>& a) {
     return cout << "(" << a.x << ", " << a.y << ", " << a.z << ")";
   }
 
@@ -281,70 +259,61 @@ namespace embree
 namespace embree
 {
   template<typename Out, typename In>
-  __forceinline Vec3<Out> broadcast(const Vec3<In>& a, const size_t k) {
-    return Vec3<Out>(Out(a.x[k]), Out(a.y[k]), Out(a.z[k]));
+    __forceinline Vec3<Out> broadcast(const Vec3<In>& a, const size_t k) {
+    return Vec3<Out>(Out(a.x[k]),Out(a.y[k]),Out(a.z[k]));
   }
 
-  template<> __forceinline Vec3<float>::Vec3(const Vec3fa& a) { x = a.x; y = a.y; z = a.z; }
+  template<> __forceinline Vec3<float>::Vec3( const Vec3fa& a ) { x = a.x; y = a.y; z = a.z; }
 
-#if defined(__AVX__)
-  template<> __forceinline Vec3<vfloat4>::Vec3(const Vec3fa& a) {
-    x = a.x; y = a.y; z = a.z;
-  }
-#elif defined(__SSE__)
-  template<>
-  __forceinline Vec3<vfloat4>::Vec3(const Vec3fa& a) {
+#if defined (__SSE__)
+  template<> __forceinline Vec3<vfloat4>::Vec3( const Vec3fa& a ) {
     const vfloat4 v = vfloat4(a); x = shuffle<0,0,0,0>(v); y = shuffle<1,1,1,1>(v); z = shuffle<2,2,2,2>(v);
   }
-#endif
-
-#if defined(__SSE__)
-  __forceinline Vec3<vfloat4> broadcast4f(const Vec3<vfloat4>& a, const size_t k) {
+  __forceinline Vec3<vfloat4> broadcast4f( const Vec3<vfloat4>& a, const size_t k ) {
     return Vec3<vfloat4>(vfloat4::broadcast(&a.x[k]), vfloat4::broadcast(&a.y[k]), vfloat4::broadcast(&a.z[k]));
   }
 
   template<>
-  __forceinline Vec3<vfloat4> broadcast<vfloat4,vfloat4>(const Vec3<vfloat4>& a, const size_t k) {
+    __forceinline Vec3<vfloat4> broadcast<vfloat4,vfloat4>( const Vec3<vfloat4>& a, const size_t k ) {
     return Vec3<vfloat4>(vfloat4::broadcast(&a.x[k]), vfloat4::broadcast(&a.y[k]), vfloat4::broadcast(&a.z[k]));
   }
 
-  template<int i0, int i1, int i2, int i3>
-  __forceinline Vec3<vfloat4> shuffle(const Vec3<vfloat4>& b) {
-    return Vec3<vfloat4>(shuffle<i0,i1,i2,i3>(b.x), shuffle<i0,i1,i2,i3>(b.y), shuffle<i0,i1,i2,i3>(b.z));
+  template<size_t i0, size_t i1, size_t i2, size_t i3> __forceinline const Vec3<vfloat4> shuffle( const Vec3<vfloat4>& b ) {
+    return Vec3<vfloat4>(shuffle<i0,i1,i2,i3>(b.x),shuffle<i0,i1,i2,i3>(b.y),shuffle<i0,i1,i2,i3>(b.z));
   }
+
 #endif
 
 #if defined(__AVX__)
-  template<>
-  __forceinline Vec3<vfloat8>::Vec3(const Vec3fa& a) {
+  template<> __forceinline Vec3<vfloat8>::Vec3( const Vec3fa& a ) {
     x = a.x; y = a.y; z = a.z;
   }
-  __forceinline Vec3<vfloat4> broadcast4f(const Vec3<vfloat8>& a, const size_t k) {
+  __forceinline Vec3<vfloat4> broadcast4f( const Vec3<vfloat8>& a, const size_t k ) {
     return Vec3<vfloat4>(vfloat4::broadcast(&a.x[k]), vfloat4::broadcast(&a.y[k]), vfloat4::broadcast(&a.z[k]));
   }
-  __forceinline Vec3<vfloat8> broadcast8f(const Vec3<vfloat4>& a, const size_t k) {
+  __forceinline Vec3<vfloat8> broadcast8f( const Vec3<vfloat4>& a, const size_t k ) {
     return Vec3<vfloat8>(vfloat8::broadcast(&a.x[k]), vfloat8::broadcast(&a.y[k]), vfloat8::broadcast(&a.z[k]));
   }
-  __forceinline Vec3<vfloat8> broadcast8f(const Vec3<vfloat8>& a, const size_t k) {
+  __forceinline Vec3<vfloat8> broadcast8f( const Vec3<vfloat8>& a, const size_t k ) {
     return Vec3<vfloat8>(vfloat8::broadcast(&a.x[k]), vfloat8::broadcast(&a.y[k]), vfloat8::broadcast(&a.z[k]));
   }
 
   template<>
-  __forceinline Vec3<vfloat8> broadcast<vfloat8,vfloat4>(const Vec3<vfloat4>& a, const size_t k) {
+    __forceinline Vec3<vfloat8> broadcast<vfloat8,vfloat4>( const Vec3<vfloat4>& a, const size_t k ) {
     return Vec3<vfloat8>(vfloat8::broadcast(&a.x[k]), vfloat8::broadcast(&a.y[k]), vfloat8::broadcast(&a.z[k]));
   }
   template<>
-  __forceinline Vec3<vfloat8> broadcast<vfloat8,vfloat8>(const Vec3<vfloat8>& a, const size_t k) {
+    __forceinline Vec3<vfloat8> broadcast<vfloat8,vfloat8>( const Vec3<vfloat8>& a, const size_t k ) {
     return Vec3<vfloat8>(vfloat8::broadcast(&a.x[k]), vfloat8::broadcast(&a.y[k]), vfloat8::broadcast(&a.z[k]));
   }
 
-  template<int i0, int i1, int i2, int i3>
-  __forceinline Vec3<vfloat8> shuffle(const Vec3<vfloat8>& b) {
-    return Vec3<vfloat8>(shuffle<i0,i1,i2,i3>(b.x), shuffle<i0,i1,i2,i3>(b.y), shuffle<i0,i1,i2,i3>(b.z));
+  template<size_t i0, size_t i1, size_t i2, size_t i3> __forceinline const Vec3<vfloat8> shuffle( const Vec3<vfloat8>& b ) {
+    return Vec3<vfloat8>(shuffle<i0,i1,i2,i3>(b.x),shuffle<i0,i1,i2,i3>(b.y),shuffle<i0,i1,i2,i3>(b.z));
   }
+
 #endif
 
 #if defined(__AVX512F__)
-  template<> __forceinline Vec3<vfloat16>::Vec3(const Vec3fa& a) : x(a.x), y(a.y), z(a.z) {}
+  template<> __forceinline Vec3<vfloat16>::Vec3( const Vec3fa& a ) : x(a.x), y(a.y), z(a.z) {}
 #endif
 }

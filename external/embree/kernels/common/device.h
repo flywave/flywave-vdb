@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -11,15 +24,16 @@ namespace embree
 {
   class BVH4Factory;
   class BVH8Factory;
+  class InstanceFactory;
 
   class Device : public State, public MemoryMonitorInterface
   {
-    ALIGNED_CLASS_(16);
+    ALIGNED_CLASS;
 
   public:
 
     /*! Device construction */
-    Device (const char* cfg);
+    Device (const char* cfg, bool singledevice);
 
     /*! Device destruction */
     virtual ~Device ();
@@ -48,16 +62,19 @@ namespace embree
     /*! sets the size of the software cache. */
     void setCacheSize(size_t bytes);
 
-    /*! sets a property */
-    void setProperty(const RTCDeviceProperty prop, ssize_t val);
+    /*! configures some parameter */
+    void setParameter1i(const RTCParameter parm, ssize_t val);
 
-    /*! gets a property */
-    ssize_t getProperty(const RTCDeviceProperty prop);
+    /*! returns some configuration */
+    ssize_t getParameter1i(const RTCParameter parm);
 
   private:
 
     /*! initializes the tasking system */
     void initTaskingSystem(size_t numThreads);
+
+    /*! configures tasking system with maximal number of thread set by any device */
+    void configureTaskingSystem();
 
     /*! shuts down the tasking system */
     void exitTaskingSystem();
@@ -70,13 +87,16 @@ namespace embree
     static ssize_t debug_int3;
 
   public:
-    std::unique_ptr<BVH4Factory> bvh4_factory;
-#if defined(EMBREE_TARGET_SIMD8)
-    std::unique_ptr<BVH8Factory> bvh8_factory;
+    bool singledevice;      //!< true if this is the device created implicitely through rtcInit
+
+    InstanceFactory* instance_factory; // FIXME: use managed pointers here
+    BVH4Factory* bvh4_factory;
+#if defined(__TARGET_AVX__)
+    BVH8Factory* bvh8_factory;
 #endif
     
 #if USE_TASK_ARENA
-    std::unique_ptr<tbb::task_arena> arena;
+    tbb::task_arena* arena;
 #endif
     
     /* ray streams filter */

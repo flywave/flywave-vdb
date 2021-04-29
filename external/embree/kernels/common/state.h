@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -7,14 +20,11 @@
 
 namespace embree
 {
-  /* mutex to make printing to cout thread safe */
-  extern MutexSys g_printMutex;
-
-  struct State : public RefCount
+  struct State
   {
   public:
     /*! state construction */
-    State ();
+    State (bool singledevice);
 
     /*! state destruction */
     ~State();
@@ -44,7 +54,8 @@ namespace embree
     std::string tri_accel;                 //!< acceleration structure to use for triangles
     std::string tri_builder;               //!< builder to use for triangles
     std::string tri_traverser;             //!< traverser to use for triangles
-    
+    float      tri_builder_replication_factor; //!< maximally factor*N many primitives in accel
+
   public:
     std::string tri_accel_mb;              //!< acceleration structure to use for motion blur triangles
     std::string tri_builder_mb;            //!< builder to use for motion blur triangles
@@ -74,88 +85,35 @@ namespace embree
     std::string hair_accel;                //!< hair acceleration structure to use
     std::string hair_builder;              //!< builder to use for hair
     std::string hair_traverser;            //!< traverser to use for hair
+    double      hair_builder_replication_factor; //!< maximally factor*N many primitives in accel
 
   public:
     std::string hair_accel_mb;             //!< acceleration structure to use for motion blur hair
-    std::string hair_builder_mb;           //!< builder to use for motion blur hair
-    std::string hair_traverser_mb;         //!< traverser to use for motion blur hair
 
   public:
-    std::string object_accel;               //!< acceleration structure for user geometries
-    std::string object_builder;             //!< builder for user geometries
-    int object_accel_min_leaf_size;         //!< minimum leaf size for object acceleration structure
-    int object_accel_max_leaf_size;         //!< maximum leaf size for object acceleration structure
+    int object_accel_min_leaf_size;         //!< minimal leaf size for object acceleration structure
+    int object_accel_max_leaf_size;         //!< maximal leaf size for object acceleration structure
 
   public:
-    std::string object_accel_mb;            //!< acceleration structure for user geometries
-    std::string object_builder_mb;          //!< builder for user geometries
-    int object_accel_mb_min_leaf_size;      //!< minimum leaf size for mblur object acceleration structure
-    int object_accel_mb_max_leaf_size;      //!< maximum leaf size for mblur object acceleration structure
+    int object_accel_mb_min_leaf_size;         //!< minimal leaf size for mblur object acceleration structure
+    int object_accel_mb_max_leaf_size;         //!< maximal leaf size for mblur object acceleration structure
 
   public:
+    size_t      tessellation_cache_size;   //!< size of the shared tessellation cache 
     std::string subdiv_accel;              //!< acceleration structure to use for subdivision surfaces
-    std::string subdiv_accel_mb;           //!< acceleration structure to use for subdivision surfaces
 
   public:
-    std::string grid_accel;              //!< acceleration structure to use for grids
-    std::string grid_builder;            //!< builder for grids
-    std::string grid_accel_mb;           //!< acceleration structure to use for motion blur grids
-    std::string grid_builder_mb;         //!< builder for motion blur grids
-
-  public:
-    float max_spatial_split_replications;  //!< maximally replications*N many primitives in accel for spatial splits
-    bool useSpatialPreSplits;              //!< use spatial pre-splits instead of the full spatial split builder
-    size_t tessellation_cache_size;        //!< size of the shared tessellation cache 
-
-  public:
-    size_t instancing_open_min;            //!< instancing opens tree to minimally that number of subtrees
-    size_t instancing_block_size;          //!< instancing opens tree up to average block size of primitives
-    float  instancing_open_factor;         //!< instancing opens tree up to x times the number of instances
-    size_t instancing_open_max_depth;      //!< maximum open depth for geometries
-    size_t instancing_open_max;            //!< instancing opens tree to maximally that number of subtrees
-
-  public:
-    bool ignore_config_files;              //!< if true no more config files get parse
     bool float_exceptions;                 //!< enable floating point exceptions
-    int quality_flags;
-    int scene_flags;
+    int scene_flags;                       //!< scene flags to use
     size_t verbose;                        //!< verbosity of output
     size_t benchmark;                      //!< true
-    
+
   public:
     size_t numThreads;                     //!< number of threads to use in builders
-    size_t numUserThreads;                 //!< number of user provided threads to use in builders
     bool set_affinity;                     //!< sets affinity for worker threads
-    bool start_threads;                    //!< true when threads should be started at device creation time
     int enabled_cpu_features;              //!< CPU ISA features to use
-    int enabled_builder_cpu_features;      //!< CPU ISA features to use for builders only
-    enum FREQUENCY_LEVEL {
-      FREQUENCY_SIMD128,
-      FREQUENCY_SIMD256,
-      FREQUENCY_SIMD512
-    } frequency_level;                     //!< frequency level the app wants to run on (default is SIMD256)
-    bool enable_selockmemoryprivilege;     //!< configures the SeLockMemoryPrivilege under Windows to enable huge pages
-    bool hugepages;                        //!< true if huge pages should get used
-    bool hugepages_success;                //!< status for enabling huge pages
 
   public:
-    size_t alloc_main_block_size;          //!< main allocation block size (shared between threads)
-    int alloc_num_main_slots;              //!< number of such shared blocks to be used to allocate
-    size_t alloc_thread_block_size;        //!< size of thread local allocator block size
-    int alloc_single_thread_alloc;         //!< in single mode nodes and leaves use same thread local allocator
-
-  public:
-
-    /*! checks if we can use AVX */
-    bool canUseAVX() {
-      return hasISA(AVX) && frequency_level != FREQUENCY_SIMD128;
-    }
-
-    /*! checks if we can use AVX2 */
-    bool canUseAVX2() {
-      return hasISA(AVX2) && frequency_level != FREQUENCY_SIMD128;
-    }
-    
     struct ErrorHandler
     {
     public:
@@ -172,23 +130,7 @@ namespace embree
     static ErrorHandler g_errorHandler;
 
   public:
-    void setErrorFunction(RTCErrorFunction fptr, void* uptr) 
-    {
-      error_function = fptr;
-      error_function_userptr = uptr;
-    }
-
-    RTCErrorFunction error_function;
-    void* error_function_userptr;
-
-  public:
-    void setMemoryMonitorFunction(RTCMemoryMonitorFunction fptr, void* uptr) 
-    {
-      memory_monitor_function = fptr;
-      memory_monitor_userptr = uptr;
-    }
-      
-    RTCMemoryMonitorFunction memory_monitor_function;
-    void* memory_monitor_userptr;
+    RTCErrorFunc error_function;
+    RTCMemoryMonitorFunc memory_monitor_function;
   };
 }

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -13,11 +26,8 @@ namespace embree
   /*! virtual interface for all hierarchy builders */
   class Builder : public RefCount {
   public:
-
-    static const size_t DEFAULT_SINGLE_THREAD_THRESHOLD = 1024;
-
     /*! initiates the hierarchy builder */
-    virtual void build() = 0;
+    virtual void build(size_t threadIndex = 0, size_t threadCount = 0) = 0;
 
     /*! notifies the builder about the deletion of some geometry */
     virtual void deleteGeometry(size_t geomID) {};
@@ -28,7 +38,7 @@ namespace embree
 
   /*! virtual interface for progress monitor class */
   struct BuildProgressMonitor {
-    virtual void operator() (size_t dn) const = 0;
+    virtual void operator() (size_t dn) = 0;
   };
 
   /*! build the progress monitor interface from a closure */
@@ -37,9 +47,9 @@ namespace embree
   {
   public:
     ProgressMonitorClosure (const Closure& closure) : closure(closure) {}
-    void operator() (size_t dn) const { closure(dn); }
+    void operator() (size_t dn) { closure(dn); }
   private:
-    const Closure closure;
+    const Closure& closure;
   };
   template<typename Closure> __forceinline const ProgressMonitorClosure<Closure> BuildProgressMonitorFromClosure(const Closure& closure) {
     return ProgressMonitorClosure<Closure>(closure);
@@ -48,13 +58,11 @@ namespace embree
   struct LineSegments;
   struct TriangleMesh;
   struct QuadMesh;
-  struct UserGeometry;
 
   class Scene;
 
-  typedef void (*createLineSegmentsAccelTy)(Scene* scene, LineSegments* mesh, AccelData*& accel, Builder*& builder);
-  typedef void (*createTriangleMeshAccelTy)(Scene* scene, unsigned int geomID, AccelData*& accel, Builder*& builder);
-  typedef void (*createQuadMeshAccelTy)(Scene* scene, unsigned int geomID, AccelData*& accel, Builder*& builder);
-  typedef void (*createUserGeometryAccelTy)(Scene* scene, unsigned int geomID, AccelData*& accel, Builder*& builder);
+  typedef void (*createLineSegmentsAccelTy)(LineSegments* mesh, AccelData*& accel, Builder*& builder);
+  typedef void (*createTriangleMeshAccelTy)(TriangleMesh* mesh, AccelData*& accel, Builder*& builder);
+  typedef void (*createQuadMeshAccelTy)(QuadMesh* mesh, AccelData*& accel, Builder*& builder);
 
 }

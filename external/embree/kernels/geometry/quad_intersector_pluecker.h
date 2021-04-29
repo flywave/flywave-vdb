@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -16,193 +29,105 @@ namespace embree
 {
   namespace isa
   {
-    template<int M>
-    struct QuadHitPlueckerM
-    {
-      __forceinline QuadHitPlueckerM() {}
-
-      __forceinline QuadHitPlueckerM(const vbool<M>& valid,
-                                     const vfloat<M>& U,
-                                     const vfloat<M>& V,
-                                     const vfloat<M>& UVW,
-                                     const vfloat<M>& t,
-                                     const Vec3vf<M>& Ng,
-                                     const vbool<M>& flags)
-        : U(U), V(V), UVW(UVW), tri_Ng(Ng), valid(valid), vt(t), flags(flags) {}
-
-      __forceinline void finalize()
-      {
-        const vbool<M> invalid = abs(UVW) < min_rcp_input;
-        const vfloat<M> rcpUVW = select(invalid,vfloat<M>(0.0f),rcp(UVW));
-        const vfloat<M> u = U * rcpUVW;
-        const vfloat<M> v = V * rcpUVW;
-        const vfloat<M> u1 = vfloat<M>(1.0f) - u;
-        const vfloat<M> v1 = vfloat<M>(1.0f) - v;
-#if !defined(__AVX__) || defined(EMBREE_BACKFACE_CULLING)
-        vu = select(flags,u1,u);
-        vv = select(flags,v1,v);
-        vNg = Vec3vf<M>(tri_Ng.x,tri_Ng.y,tri_Ng.z);
-#else
-        const vfloat<M> flip = select(flags,vfloat<M>(-1.0f),vfloat<M>(1.0f));
-        vv = select(flags,u1,v);
-        vu = select(flags,v1,u);
-        vNg = Vec3vf<M>(flip*tri_Ng.x,flip*tri_Ng.y,flip*tri_Ng.z);
-#endif
-      }
-
-      __forceinline Vec2f uv(const size_t i)
-      {
-        const float u = vu[i];
-        const float v = vv[i];
-        return Vec2f(u,v);
-      }
-
-      __forceinline float   t(const size_t i) { return vt[i]; }
-      __forceinline Vec3fa Ng(const size_t i) { return Vec3fa(vNg.x[i],vNg.y[i],vNg.z[i]); }
-
-    private:
-      vfloat<M> U;
-      vfloat<M> V;
-      vfloat<M> UVW;
-      Vec3vf<M> tri_Ng;
-
-    public:
-      vbool<M> valid;
-      vfloat<M> vu;
-      vfloat<M> vv;
-      vfloat<M> vt;
-      Vec3vf<M> vNg;
-
-    public:
-      const vbool<M> flags;
-    };
-
-    template<int K>
-    struct QuadHitPlueckerK
-    {
-      __forceinline QuadHitPlueckerK(const vfloat<K>& U,
-                                     const vfloat<K>& V,
-                                     const vfloat<K>& UVW,
-                                     const vfloat<K>& t,
-                                     const Vec3vf<K>& Ng,
-                                     const vbool<K>& flags)
-        : U(U), V(V), UVW(UVW), t(t), flags(flags), tri_Ng(Ng) {}
-
-      __forceinline std::tuple<vfloat<K>,vfloat<K>,vfloat<K>,Vec3vf<K>> operator() () const
-      {
-        const vbool<K> invalid = abs(UVW) < min_rcp_input;
-        const vfloat<K> rcpUVW = select(invalid,vfloat<K>(0.0f),rcp(UVW));
-        const vfloat<K> u0 = U * rcpUVW;
-        const vfloat<K> v0 = V * rcpUVW;
-        const vfloat<K> u1 = vfloat<K>(1.0f) - u0;
-        const vfloat<K> v1 = vfloat<K>(1.0f) - v0;
-        const vfloat<K> u = select(flags,u1,u0);
-        const vfloat<K> v = select(flags,v1,v0);
-        const Vec3vf<K> Ng(tri_Ng.x,tri_Ng.y,tri_Ng.z);
-        return std::make_tuple(u,v,t,Ng);
-      }
-
-    private:
-      const vfloat<K> U;
-      const vfloat<K> V;
-      const vfloat<K> UVW;
-      const vfloat<K> t;
-      const vbool<K> flags;
-      const Vec3vf<K> tri_Ng;
-    };
-
     struct PlueckerIntersectorTriangle1
     {
-      template<int M, typename Epilog>
-      static __forceinline bool intersect(Ray& ray,
-                                          const Vec3vf<M>& tri_v0,
-                                          const Vec3vf<M>& tri_v1,
-                                          const Vec3vf<M>& tri_v2,
-                                          const vbool<M>& flags,
-                                          const Epilog& epilog)
-      {
-        /* calculate vertices relative to ray origin */
-        const Vec3vf<M> O = Vec3vf<M>(ray.org);
-        const Vec3vf<M> D = Vec3vf<M>(ray.dir);
-        const Vec3vf<M> v0 = tri_v0-O;
-        const Vec3vf<M> v1 = tri_v1-O;
-        const Vec3vf<M> v2 = tri_v2-O;
-
-        /* calculate triangle edges */
-        const Vec3vf<M> e0 = v2-v0;
-        const Vec3vf<M> e1 = v0-v1;
-        const Vec3vf<M> e2 = v1-v2;
-
-        /* perform edge tests */
-        const vfloat<M> U = dot(cross(e0,v2+v0),D);
-        const vfloat<M> V = dot(cross(e1,v0+v1),D);
-        const vfloat<M> W = dot(cross(e2,v1+v2),D);
-        const vfloat<M> UVW = U+V+W;
-        const vfloat<M> eps = float(ulp)*abs(UVW);
-#if defined(EMBREE_BACKFACE_CULLING)
-        vbool<M> valid = max(U,V,W) <= eps;
-#else
-        vbool<M> valid =  (min(U,V,W) >= -eps) | (max(U,V,W) <= eps);
+        template<int M, typename Epilog>
+        static __forceinline bool intersect(Ray& ray, 
+                                     const Vec3<vfloat<M>>& tri_v0, 
+                                     const Vec3<vfloat<M>>& tri_v1, 
+                                     const Vec3<vfloat<M>>& tri_v2, 
+                                     const vbool<M>& flags,
+                                     const Epilog& epilog)
+        {
+          /* calculate vertices relative to ray origin */
+          typedef Vec3<vfloat<M>> Vec3vfM;
+          const Vec3vfM O = Vec3vfM(ray.org);
+          const Vec3vfM D = Vec3vfM(ray.dir);
+          const Vec3vfM v0 = tri_v0-O;
+          const Vec3vfM v1 = tri_v1-O;
+          const Vec3vfM v2 = tri_v2-O;
+          
+          /* calculate triangle edges */
+          const Vec3vfM e0 = v2-v0;
+          const Vec3vfM e1 = v0-v1;
+          const Vec3vfM e2 = v1-v2;
+          
+          /* perform edge tests */
+          const vfloat<M> U = dot(cross(v2+v0,e0),D);
+          const vfloat<M> V = dot(cross(v0+v1,e1),D);
+          const vfloat<M> W = dot(cross(v1+v2,e2),D);
+          const vfloat<M> minUVW = min(U,V,W);
+          const vfloat<M> maxUVW = max(U,V,W);
+          vbool<M> valid = maxUVW <= 0.0f;
+#if !defined(EMBREE_BACKFACE_CULLING)
+          valid |= minUVW >= 0.0f;
 #endif
-        if (unlikely(none(valid))) return false;
-
-        /* calculate geometry normal and denominator */
-        const Vec3vf<M> Ng = stable_triangle_normal(e0,e1,e2);
-        const vfloat<M> den = twice(dot(Ng,D));
-
-         /* perform depth test */
-        const vfloat<M> T = twice(dot(v0,Ng));
-        const vfloat<M> t = rcp(den)*T;
-        valid &= vfloat<M>(ray.tnear()) <= t & t <= vfloat<M>(ray.tfar);
-        valid &= den != vfloat<M>(zero);
-        if (unlikely(none(valid))) return false;
-
-        /* update hit information */
-        QuadHitPlueckerM<M> hit(valid,U,V,UVW,t,Ng,flags);
-        return epilog(valid,hit);
-      }
-    };
+          if (unlikely(none(valid))) return false;
+          
+          /* calculate geometry normal and denominator */
+          const Vec3vfM Ng1 = cross(e1,e0);
+          //const Vec3vfM Ng1 = stable_triangle_normal(e2,e1,e0); // FIXME: enable
+          const Vec3vfM Ng = Ng1+Ng1;
+          const vfloat<M> den = dot(Ng,D);
+          const vfloat<M> absDen = abs(den);
+          const vfloat<M> sgnDen = signmsk(den);
+          
+          /* perform depth test */
+          const vfloat<M> T = dot(v0,Ng);
+          valid &= ((T^sgnDen) >= absDen*vfloat<M>(ray.tnear));
+          valid &=(absDen*vfloat<M>(ray.tfar) >= (T^sgnDen));
+          if (unlikely(none(valid))) return false;
+          
+          /* avoid division by 0 */
+          valid &= den != vfloat<M>(zero);
+          if (unlikely(none(valid))) return false;
+          
+          /* update hit information */
+          QuadHitM<M> hit(valid,U,V,T,den,Ng,flags);
+          return epilog(valid,hit);
+        }  
+      };
 
     /*! Intersects M quads with 1 ray */
     template<int M, bool filter>
-    struct QuadMIntersector1Pluecker
+      struct QuadMIntersector1Pluecker
     {
       __forceinline QuadMIntersector1Pluecker() {}
 
       __forceinline QuadMIntersector1Pluecker(const Ray& ray, const void* ptr) {}
 
-      __forceinline void intersect(RayHit& ray, IntersectContext* context,
-                                   const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const Vec3vf<M>& v3,
-                                   const vuint<M>& geomID, const vuint<M>& primID) const
+      __forceinline void intersect(Ray& ray, const RTCIntersectContext* context,
+                                   const Vec3<vfloat<M>>& v0, const Vec3<vfloat<M>>& v1, const Vec3<vfloat<M>>& v2, const Vec3<vfloat<M>>& v3, 
+                                   const vint<M>& geomID, const vint<M>& primID, Scene* scene, const unsigned* geomID_to_instID) const
       {
-        Intersect1EpilogM<M,M,filter> epilog(ray,context,geomID,primID);
+        Intersect1EpilogM<M,M,filter> epilog(ray,context,geomID,primID,scene,geomID_to_instID);
         PlueckerIntersectorTriangle1::intersect(ray,v0,v1,v3,vbool<M>(false),epilog);
         PlueckerIntersectorTriangle1::intersect(ray,v2,v3,v1,vbool<M>(true),epilog);
       }
       
-      __forceinline bool occluded(Ray& ray, IntersectContext* context,
-                                  const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const Vec3vf<M>& v3,
-                                  const vuint<M>& geomID, const vuint<M>& primID) const
+      __forceinline bool occluded(Ray& ray, const RTCIntersectContext* context,
+                                  const Vec3<vfloat<M>>& v0, const Vec3<vfloat<M>>& v1, const Vec3<vfloat<M>>& v2, const Vec3<vfloat<M>>& v3, 
+                                  const vint<M>& geomID, const vint<M>& primID, Scene* scene, const unsigned* geomID_to_instID) const
       {
-        Occluded1EpilogM<M,M,filter> epilog(ray,context,geomID,primID);
+        Occluded1EpilogM<M,M,filter> epilog(ray,context,geomID,primID,scene,geomID_to_instID);
         if (PlueckerIntersectorTriangle1::intersect(ray,v0,v1,v3,vbool<M>(false),epilog)) return true;
         if (PlueckerIntersectorTriangle1::intersect(ray,v2,v3,v1,vbool<M>(true ),epilog)) return true;
         return false;
       }
     };
 
-#if defined(__AVX512ER__) // KNL
+#if defined(__AVX512F__)
 
     /*! Intersects 4 quads with 1 ray using AVX512 */
     template<bool filter>
-    struct QuadMIntersector1Pluecker<4,filter>
+      struct QuadMIntersector1Pluecker<4,filter>
     {
       __forceinline QuadMIntersector1Pluecker() {}
 
       __forceinline QuadMIntersector1Pluecker(const Ray& ray, const void* ptr) {}
 
       template<typename Epilog>
-      __forceinline bool intersect(Ray& ray, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
+        __forceinline bool intersect(Ray& ray, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
       {
         const Vec3vf16 vtx0(select(0x0f0f,vfloat16(v0.x),vfloat16(v2.x)),
                             select(0x0f0f,vfloat16(v0.y),vfloat16(v2.y)),
@@ -222,33 +147,33 @@ namespace embree
         return PlueckerIntersectorTriangle1::intersect(ray,vtx0,vtx1,vtx2,flags,epilog);
       }
       
-      __forceinline bool intersect(RayHit& ray, IntersectContext* context,
+      __forceinline bool intersect(Ray& ray, const RTCIntersectContext* context,
                                    const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                   const vuint4& geomID, const vuint4& primID) const
+                                   const vint4& geomID, const vint4& primID, Scene* scene, const unsigned* geomID_to_instID) const
       {
-        return intersect(ray,v0,v1,v2,v3,Intersect1EpilogM<8,16,filter>(ray,context,vuint8(geomID),vuint8(primID)));
+        return intersect(ray,v0,v1,v2,v3,Intersect1EpilogM<8,16,filter>(ray,context,vint8(geomID),vint8(primID),scene,geomID_to_instID));
       }
       
-      __forceinline bool occluded(Ray& ray, IntersectContext* context,
+      __forceinline bool occluded(Ray& ray, const RTCIntersectContext* context,
                                   const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                  const vuint4& geomID, const vuint4& primID) const
+                                  const vint4& geomID, const vint4& primID, Scene* scene, const unsigned* geomID_to_instID) const
       {
-        return intersect(ray,v0,v1,v2,v3,Occluded1EpilogM<8,16,filter>(ray,context,vuint8(geomID),vuint8(primID)));
+        return intersect(ray,v0,v1,v2,v3,Occluded1EpilogM<8,16,filter>(ray,context,vint8(geomID),vint8(primID),scene,geomID_to_instID));
       }
     };
 
-#elif defined(__AVX__)
+#elif defined (__AVX__)
 
     /*! Intersects 4 quads with 1 ray using AVX */
     template<bool filter>
-    struct QuadMIntersector1Pluecker<4,filter>
+      struct QuadMIntersector1Pluecker<4,filter>
     {
       __forceinline QuadMIntersector1Pluecker() {}
 
       __forceinline QuadMIntersector1Pluecker(const Ray& ray, const void* ptr) {}
       
       template<typename Epilog>
-      __forceinline bool intersect(Ray& ray, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
+        __forceinline bool intersect(Ray& ray, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
       {
         const Vec3vf8 vtx0(vfloat8(v0.x,v2.x),vfloat8(v0.y,v2.y),vfloat8(v0.z,v2.z));
 #if !defined(EMBREE_BACKFACE_CULLING)
@@ -262,20 +187,21 @@ namespace embree
         return PlueckerIntersectorTriangle1::intersect(ray,vtx0,vtx1,vtx2,flags,epilog); 
       }
       
-      __forceinline bool intersect(RayHit& ray, IntersectContext* context, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                   const vuint4& geomID, const vuint4& primID) const
+      __forceinline bool intersect(Ray& ray, const RTCIntersectContext* context, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
+                                   const vint4& geomID, const vint4& primID, Scene* scene, const unsigned* geomID_to_instID) const
       {
-        return intersect(ray,v0,v1,v2,v3,Intersect1EpilogM<8,8,filter>(ray,context,vuint8(geomID),vuint8(primID)));
+        return intersect(ray,v0,v1,v2,v3,Intersect1EpilogM<8,8,filter>(ray,context,vint8(geomID),vint8(primID),scene,geomID_to_instID));
       }
       
-      __forceinline bool occluded(Ray& ray, IntersectContext* context, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3,
-                                  const vuint4& geomID, const vuint4& primID) const
+      __forceinline bool occluded(Ray& ray, const RTCIntersectContext* context, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
+                                  const vint4& geomID, const vint4& primID, Scene* scene, const unsigned* geomID_to_instID) const
       {
-        return intersect(ray,v0,v1,v2,v3,Occluded1EpilogM<8,8,filter>(ray,context,vuint8(geomID),vuint8(primID)));
+        return intersect(ray,v0,v1,v2,v3,Occluded1EpilogM<8,8,filter>(ray,context,vint8(geomID),vint8(primID),scene,geomID_to_instID));
       }
     };
 
 #endif
+
 
 
     /* ----------------------------- */
@@ -286,55 +212,60 @@ namespace embree
     {
       /*! Intersect k'th ray from ray packet of size K with M triangles. */
       template<int M, int K, typename Epilog>
-      static  __forceinline bool intersect1(RayK<K>& ray,
-                                            size_t k,
-                                            const Vec3vf<M>& tri_v0,
-                                            const Vec3vf<M>& tri_v1,
-                                            const Vec3vf<M>& tri_v2,
-                                            const vbool<M>& flags,
-                                            const Epilog& epilog)
+       static  __forceinline bool intersect1(RayK<K>& ray, 
+                                     size_t k,
+                                     const Vec3<vfloat<M>>& tri_v0, 
+                                     const Vec3<vfloat<M>>& tri_v1, 
+                                     const Vec3<vfloat<M>>& tri_v2, 
+                                     const vbool<M>& flags,                                     
+                                     const Epilog& epilog)
       {
         /* calculate vertices relative to ray origin */
-          const Vec3vf<M> O = broadcast<vfloat<M>>(ray.org,k);
-          const Vec3vf<M> D = broadcast<vfloat<M>>(ray.dir,k);
-          const Vec3vf<M> v0 = tri_v0-O;
-          const Vec3vf<M> v1 = tri_v1-O;
-          const Vec3vf<M> v2 = tri_v2-O;
+          typedef Vec3<vfloat<M>> Vec3vfM;
+          const Vec3vfM O = broadcast<vfloat<M>>(ray.org,k);
+          const Vec3vfM D = broadcast<vfloat<M>>(ray.dir,k);
+          const Vec3vfM v0 = tri_v0-O;
+          const Vec3vfM v1 = tri_v1-O;
+          const Vec3vfM v2 = tri_v2-O;
           
           /* calculate triangle edges */
-          const Vec3vf<M> e0 = v2-v0;
-          const Vec3vf<M> e1 = v0-v1;
-          const Vec3vf<M> e2 = v1-v2;
+          const Vec3vfM e0 = v2-v0;
+          const Vec3vfM e1 = v0-v1;
+          const Vec3vfM e2 = v1-v2;
           
           /* perform edge tests */
-          const vfloat<M> U = dot(cross(e0,v2+v0),D);
-          const vfloat<M> V = dot(cross(e1,v0+v1),D);
-          const vfloat<M> W = dot(cross(e2,v1+v2),D);
-          const vfloat<M> UVW = U+V+W;
-          const vfloat<M> eps = float(ulp)*abs(UVW);
+          const vfloat<M> U = dot(cross(v2+v0,e0),D);
+          const vfloat<M> V = dot(cross(v0+v1,e1),D);
+          const vfloat<M> W = dot(cross(v1+v2,e2),D);
+          const vfloat<M> minUVW = min(U,V,W);
+          const vfloat<M> maxUVW = max(U,V,W);
 #if defined(EMBREE_BACKFACE_CULLING)
-          vbool<M> valid = max(U,V,W) <= eps;
+          vbool<M> valid = maxUVW <= 0.0f;
 #else
-          vbool<M> valid = (min(U,V,W) >= -eps) | (max(U,V,W) <= eps);
+          vbool<M> valid = (minUVW >= 0.0f) | (maxUVW <= 0.0f);
 #endif
           if (unlikely(none(valid))) return false;
           
           /* calculate geometry normal and denominator */
-          const Vec3vf<M> Ng = stable_triangle_normal(e0,e1,e2);
-          const vfloat<M> den = twice(dot(Ng,D));
+          //const Vec3vfM Ng1 = cross(e1,e0);
+          const Vec3vfM Ng1 = stable_triangle_normal(e2,e1,e0);
+          const Vec3vfM Ng = Ng1+Ng1;
+          const vfloat<M> den = dot(Ng,D);
+          const vfloat<M> absDen = abs(den);
+          const vfloat<M> sgnDen = signmsk(den);
 
           /* perform depth test */
-          const vfloat<M> T = twice(dot(v0,Ng));
-          const vfloat<M> t = rcp(den)*T;
-          valid &= vfloat<M>(ray.tnear()[k]) <= t & t <= vfloat<M>(ray.tfar[k]);
+          const vfloat<M> T = dot(v0,Ng);
+          valid &= ((T^sgnDen) >= absDen*vfloat<M>(ray.tnear[k]));
+          valid &= (absDen*vfloat<M>(ray.tfar[k]) >= (T^sgnDen));
           if (unlikely(none(valid))) return false;
           
           /* avoid division by 0 */
           valid &= den != vfloat<M>(zero);
           if (unlikely(none(valid))) return false;
           
-          /* update hit information */
-          QuadHitPlueckerM<M> hit(valid,U,V,UVW,t,Ng,flags);
+          /* calculate hit information */
+          QuadHitM<M> hit(valid,U,V,T,den,Ng,flags);
           return epilog(valid,hit);
       }
     };
@@ -346,64 +277,72 @@ namespace embree
             
       /*! Intersects K rays with one of M triangles. */
       template<typename Epilog>
-      __forceinline vbool<K> intersectK(const vbool<K>& valid0,
-                                        RayK<K>& ray,
-                                        const Vec3vf<K>& tri_v0,
-                                        const Vec3vf<K>& tri_v1,
-                                        const Vec3vf<K>& tri_v2,
-                                        const vbool<K>& flags,
-                                        const Epilog& epilog) const
+        __forceinline vbool<K> intersectK(const vbool<K>& valid0, 
+                                          RayK<K>& ray, 
+                                          const Vec3<vfloat<K>>& tri_v0, 
+                                          const Vec3<vfloat<K>>& tri_v1, 
+                                          const Vec3<vfloat<K>>& tri_v2, 
+                                          const vbool<K>& flags,
+                                          const Epilog& epilog) const
       {
         /* calculate vertices relative to ray origin */
+          typedef Vec3<vfloat<K>> Vec3vfK;
           vbool<K> valid = valid0;
-          const Vec3vf<K> O = ray.org;
-          const Vec3vf<K> D = ray.dir;
-          const Vec3vf<K> v0 = tri_v0-O;
-          const Vec3vf<K> v1 = tri_v1-O;
-          const Vec3vf<K> v2 = tri_v2-O;
+          const Vec3vfK O = ray.org;
+          const Vec3vfK D = ray.dir;
+          const Vec3vfK v0 = tri_v0-O;
+          const Vec3vfK v1 = tri_v1-O;
+          const Vec3vfK v2 = tri_v2-O;
           
           /* calculate triangle edges */
-          const Vec3vf<K> e0 = v2-v0;
-          const Vec3vf<K> e1 = v0-v1;
-          const Vec3vf<K> e2 = v1-v2;
+          const Vec3vfK e0 = v2-v0;
+          const Vec3vfK e1 = v0-v1;
+          const Vec3vfK e2 = v1-v2;
            
           /* perform edge tests */
-          const vfloat<K> U = dot(Vec3vf<K>(cross(e0,v2+v0)),D);
-          const vfloat<K> V = dot(Vec3vf<K>(cross(e1,v0+v1)),D);
-          const vfloat<K> W = dot(Vec3vf<K>(cross(e2,v1+v2)),D);
-          const vfloat<K> UVW = U+V+W;
-          const vfloat<K> eps = float(ulp)*abs(UVW);
+          const vfloat<K> U = dot(Vec3vfK(cross(v2+v0,e0)),D);
+          const vfloat<K> V = dot(Vec3vfK(cross(v0+v1,e1)),D);
+          const vfloat<K> W = dot(Vec3vfK(cross(v1+v2,e2)),D);
+          const vfloat<K> minUVW = min(U,V,W);
+          const vfloat<K> maxUVW = max(U,V,W);
 #if defined(EMBREE_BACKFACE_CULLING)
-          valid &= max(U,V,W) <= eps;
+          valid &= maxUVW <= 0.0f;
 #else
-          valid &= (min(U,V,W) >= -eps) | (max(U,V,W) <= eps);
+          valid &= (minUVW >= 0.0f) | (maxUVW <= 0.0f);
 #endif
           if (unlikely(none(valid))) return false;
           
            /* calculate geometry normal and denominator */
-          const Vec3vf<K> Ng = stable_triangle_normal(e0,e1,e2);
-          const vfloat<K> den = twice(dot(Vec3vf<K>(Ng),D));
+          //const Vec3vfK Ng1 = cross(e1,e0);
+          const Vec3vfK Ng1 = stable_triangle_normal(e2,e1,e0);
+          const Vec3vfK Ng = Ng1+Ng1;
+          const vfloat<K> den = dot(Vec3vfK(Ng),D);
+          const vfloat<K> absDen = abs(den);
+          const vfloat<K> sgnDen = signmsk(den);
 
           /* perform depth test */
-          const vfloat<K> T = twice(dot(v0,Vec3vf<K>(Ng)));
-          const vfloat<K> t = rcp(den)*T;
-          valid &= ray.tnear() <= t & t <= ray.tfar;
+          const vfloat<K> T = dot(v0,Vec3vfK(Ng));
+          valid &= ((T^sgnDen) >= absDen*ray.tnear);
+          valid &= (absDen*ray.tfar >= (T^sgnDen));
+          if (unlikely(none(valid))) return false;
+          
+          /* avoid division by 0 */
           valid &= den != vfloat<K>(zero);
           if (unlikely(none(valid))) return false;
           
           /* calculate hit information */
-          QuadHitPlueckerK<K> hit(U,V,UVW,t,Ng,flags);
+          QuadHitK<K> hit(U,V,T,den,Ng,flags);
           return epilog(valid,hit);
       }
       
       /*! Intersects K rays with one of M quads. */
       template<typename Epilog>
       __forceinline bool intersectK(const vbool<K>& valid0, 
-                                    RayK<K>& ray,
-                                    const Vec3vf<K>& v0,
-                                    const Vec3vf<K>& v1,
-                                    const Vec3vf<K>& v2,
-                                    const Vec3vf<K>& v3,
+                                    RayK<K>& ray, 
+                                    const Vec3<vfloat<K>>& v0, 
+                                    const Vec3<vfloat<K>>& v1, 
+                                    const Vec3<vfloat<K>>& v2, 
+                                    const Vec3<vfloat<K>>& v3, 
                                     const Epilog& epilog) const
       {
         intersectK(valid0,ray,v0,v1,v3,vbool<K>(false),epilog);
@@ -419,37 +358,37 @@ namespace embree
       __forceinline QuadMIntersectorKPluecker(const vbool<K>& valid, const RayK<K>& ray)
         : QuadMIntersectorKPlueckerBase<M,K,filter>(valid,ray) {}
 
-      __forceinline void intersect1(RayHitK<K>& ray, size_t k, IntersectContext* context,
-                                    const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const Vec3vf<M>& v3,
-                                    const vuint<M>& geomID, const vuint<M>& primID) const
+      __forceinline void intersect1(RayK<K>& ray, size_t k, const RTCIntersectContext* context,
+                                    const Vec3<vfloat<M>>& v0, const Vec3<vfloat<M>>& v1, const Vec3<vfloat<M>>& v2, const Vec3<vfloat<M>>& v3, 
+                                    const vint<M>& geomID, const vint<M>& primID, Scene* scene) const
       {
-        Intersect1KEpilogM<M,M,K,filter> epilog(ray,k,context,geomID,primID);
+        Intersect1KEpilogM<M,M,K,filter> epilog(ray,k,context,geomID,primID,scene);
         PlueckerIntersector1KTriangleM::intersect1(ray,k,v0,v1,v3,vbool<M>(false),epilog);
         PlueckerIntersector1KTriangleM::intersect1(ray,k,v2,v3,v1,vbool<M>(true ),epilog);
       }
       
-      __forceinline bool occluded1(RayK<K>& ray, size_t k, IntersectContext* context,
-                                   const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const Vec3vf<M>& v3,
-                                   const vuint<M>& geomID, const vuint<M>& primID) const
+      __forceinline bool occluded1(RayK<K>& ray, size_t k, const RTCIntersectContext* context,
+                                   const Vec3<vfloat<M>>& v0, const Vec3<vfloat<M>>& v1, const Vec3<vfloat<M>>& v2, const Vec3<vfloat<M>>& v3, 
+                                   const vint<M>& geomID, const vint<M>& primID, Scene* scene) const
       {
-        Occluded1KEpilogM<M,M,K,filter> epilog(ray,k,context,geomID,primID);
+        Occluded1KEpilogM<M,M,K,filter> epilog(ray,k,context,geomID,primID,scene);
         if (PlueckerIntersector1KTriangleM::intersect1(ray,k,v0,v1,v3,vbool<M>(false),epilog)) return true;
         if (PlueckerIntersector1KTriangleM::intersect1(ray,k,v2,v3,v1,vbool<M>(true ),epilog)) return true;
         return false;
       }
     };
 
-#if defined(__AVX512ER__) // KNL
+#if defined(__AVX512F__)
 
     /*! Intersects 4 quads with 1 ray using AVX512 */
     template<int K, bool filter>
-    struct QuadMIntersectorKPluecker<4,K,filter> : public QuadMIntersectorKPlueckerBase<4,K,filter>
+      struct QuadMIntersectorKPluecker<4,K,filter> : public QuadMIntersectorKPlueckerBase<4,K,filter>
     {
       __forceinline QuadMIntersectorKPluecker(const vbool<K>& valid, const RayK<K>& ray)
         : QuadMIntersectorKPlueckerBase<4,K,filter>(valid,ray) {}
 
       template<typename Epilog>
-      __forceinline bool intersect1(RayK<K>& ray, size_t k, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
+        __forceinline bool intersect1(RayK<K>& ray, size_t k, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
       {
         const Vec3vf16 vtx0(select(0x0f0f,vfloat16(v0.x),vfloat16(v2.x)),
                             select(0x0f0f,vfloat16(v0.y),vfloat16(v2.y)),
@@ -470,32 +409,32 @@ namespace embree
         return PlueckerIntersector1KTriangleM::intersect1(ray,k,vtx0,vtx1,vtx2,flags,epilog);
       }
       
-      __forceinline bool intersect1(RayHitK<K>& ray, size_t k, IntersectContext* context, 
+      __forceinline bool intersect1(RayK<K>& ray, size_t k, const RTCIntersectContext* context, 
                                     const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                    const vuint4& geomID, const vuint4& primID) const
+                                    const vint4& geomID, const vint4& primID, Scene* scene) const
       {
-        return intersect1(ray,k,v0,v1,v2,v3,Intersect1KEpilogM<8,16,K,filter>(ray,k,context,vuint8(geomID),vuint8(primID)));
+        return intersect1(ray,k,v0,v1,v2,v3,Intersect1KEpilogM<8,16,K,filter>(ray,k,context,vint8(geomID),vint8(primID),scene));
       }
       
-      __forceinline bool occluded1(RayK<K>& ray, size_t k, IntersectContext* context,
+      __forceinline bool occluded1(RayK<K>& ray, size_t k, const RTCIntersectContext* context,
                                    const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                   const vuint4& geomID, const vuint4& primID) const
+                                   const vint4& geomID, const vint4& primID, Scene* scene) const
       {
-        return intersect1(ray,k,v0,v1,v2,v3,Occluded1KEpilogM<8,16,K,filter>(ray,k,context,vuint8(geomID),vuint8(primID)));
+        return intersect1(ray,k,v0,v1,v2,v3,Occluded1KEpilogM<8,16,K,filter>(ray,k,context,vint8(geomID),vint8(primID),scene));
       }
     };
 
-#elif defined(__AVX__)
+#elif defined (__AVX__)
 
     /*! Intersects 4 quads with 1 ray using AVX */
-    template<int K, bool filter>
-    struct QuadMIntersectorKPluecker<4,K,filter> : public QuadMIntersectorKPlueckerBase<4,K,filter>
+     template<int K, bool filter>
+       struct QuadMIntersectorKPluecker<4,K,filter> : public QuadMIntersectorKPlueckerBase<4,K,filter>
     {
       __forceinline QuadMIntersectorKPluecker(const vbool<K>& valid, const RayK<K>& ray)
         : QuadMIntersectorKPlueckerBase<4,K,filter>(valid,ray) {}
       
       template<typename Epilog>
-      __forceinline bool intersect1(RayK<K>& ray, size_t k, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
+        __forceinline bool intersect1(RayK<K>& ray, size_t k, const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, const Epilog& epilog) const
       {
         const Vec3vf8 vtx0(vfloat8(v0.x,v2.x),vfloat8(v0.y,v2.y),vfloat8(v0.z,v2.z));
         const vbool8 flags(0,0,0,0,1,1,1,1);
@@ -509,18 +448,18 @@ namespace embree
         return PlueckerIntersector1KTriangleM::intersect1(ray,k,vtx0,vtx1,vtx2,flags,epilog); 
       }
       
-      __forceinline bool intersect1(RayHitK<K>& ray, size_t k, IntersectContext* context,
+      __forceinline bool intersect1(RayK<K>& ray, size_t k, const RTCIntersectContext* context,
                                     const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                    const vuint4& geomID, const vuint4& primID) const
+                                    const vint4& geomID, const vint4& primID, Scene* scene) const
       {
-        return intersect1(ray,k,v0,v1,v2,v3,Intersect1KEpilogM<8,8,K,filter>(ray,k,context,vuint8(geomID),vuint8(primID)));
+        return intersect1(ray,k,v0,v1,v2,v3,Intersect1KEpilogM<8,8,K,filter>(ray,k,context,vint8(geomID),vint8(primID),scene));
       }
       
-      __forceinline bool occluded1(RayK<K>& ray, size_t k, IntersectContext* context,
+      __forceinline bool occluded1(RayK<K>& ray, size_t k, const RTCIntersectContext* context,
                                    const Vec3vf4& v0, const Vec3vf4& v1, const Vec3vf4& v2, const Vec3vf4& v3, 
-                                   const vuint4& geomID, const vuint4& primID) const
+                                   const vint4& geomID, const vint4& primID, Scene* scene) const
       {
-        return intersect1(ray,k,v0,v1,v2,v3,Occluded1KEpilogM<8,8,K,filter>(ray,k,context,vuint8(geomID),vuint8(primID)));
+        return intersect1(ray,k,v0,v1,v2,v3,Occluded1KEpilogM<8,8,K,filter>(ray,k,context,vint8(geomID),vint8(primID),scene));
       }
     };
 

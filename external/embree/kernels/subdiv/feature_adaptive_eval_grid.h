@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -150,8 +163,8 @@ namespace embree
         foreach2(lx0,lx1,ly0,ly1,[&](const vboolx& valid, const vintx& ix, const vintx& iy) {
             const vfloatx lu = select(ix == swidth -1, vfloatx(1.0f), (vfloatx(ix)-srange.lower.x)*scale_x);
             const vfloatx lv = select(iy == sheight-1, vfloatx(1.0f), (vfloatx(iy)-srange.lower.y)*scale_y);
-            const Vec3vfx p = patch.eval(lu,lv);
-            Vec3vfx n = zero;
+            const Vec3<vfloatx> p = patch.eval(lu,lv);
+            Vec3<vfloatx> n = zero;
             if (unlikely(Nx != nullptr)) n = normalize_safe(patch.normal(lu,lv));
             const vfloatx u = vfloatx(ix)*rcp_swidth;
             const vfloatx v = vfloatx(iy)*rcp_sheight;
@@ -266,8 +279,8 @@ namespace embree
       
       const unsigned y0s = stitch(y0,fine_y,coarse_y);
       const unsigned y1s = stitch(y1,fine_y,coarse_y);
-      const unsigned M = y1s-y0s+1 + VSIZEX;
-      
+      const unsigned M = y1s-y0s+1;
+
       dynamic_large_stack_array(float,px,M,64*sizeof(float));
       dynamic_large_stack_array(float,py,M,64*sizeof(float));
       dynamic_large_stack_array(float,pz,M,64*sizeof(float));
@@ -276,9 +289,7 @@ namespace embree
       dynamic_large_stack_array(float,nx,M,64*sizeof(float));
       dynamic_large_stack_array(float,ny,M,64*sizeof(float));
       dynamic_large_stack_array(float,nz,M,64*sizeof(float));
-      const bool has_Nxyz = Nx; assert(!Nx || (Ny && Nz));
-      Eval(patch,subPatch, right,right, y0s,y1s, 2,coarse_y+1, px,py,pz,u,v, 
-           has_Nxyz ? (float*)nx : nullptr,has_Nxyz ? (float*)ny : nullptr ,has_Nxyz ? (float*)nz : nullptr, 1,4097);
+      Eval(patch,subPatch, right,right, y0s,y1s, 2,coarse_y+1, px,py,pz,u,v, Nx ? (float*)nx : nullptr,Ny ? (float*)ny : nullptr ,Nz ? (float*)nz : nullptr, 1,4097);
       
       for (unsigned y=y0; y<=y1; y++) 
       {
@@ -288,7 +299,7 @@ namespace embree
         Pz[(y-y0)*dwidth+dx0] = pz[ys];
         U [(y-y0)*dwidth+dx0] = u[ys];
         V [(y-y0)*dwidth+dx0] = v[ys];
-        if (unlikely(has_Nxyz)) {
+        if (unlikely(Nx != nullptr)) {
           Nx[(y-y0)*dwidth+dx0] = nx[ys];
           Ny[(y-y0)*dwidth+dx0] = ny[ys];
           Nz[(y-y0)*dwidth+dx0] = nz[ys];
@@ -308,19 +319,17 @@ namespace embree
       
       const unsigned x0s = stitch(x0,fine_x,coarse_x);
       const unsigned x1s = stitch(x1,fine_x,coarse_x);
-      const unsigned M = x1s-x0s+1 + VSIZEX;
+      const unsigned M = x1s-x0s+1;
 
-      dynamic_large_stack_array(float,px,M,32*sizeof(float));
-      dynamic_large_stack_array(float,py,M,32*sizeof(float));
-      dynamic_large_stack_array(float,pz,M,32*sizeof(float));
-      dynamic_large_stack_array(float,u,M,32*sizeof(float));
-      dynamic_large_stack_array(float,v,M,32*sizeof(float));
-      dynamic_large_stack_array(float,nx,M,32*sizeof(float));
-      dynamic_large_stack_array(float,ny,M,32*sizeof(float));
-      dynamic_large_stack_array(float,nz,M,32*sizeof(float));
-      const bool has_Nxyz = Nx; assert(!Nx || (Ny && Nz));
-      Eval(patch,subPatch, x0s,x1s, bottom,bottom, coarse_x+1,2, px,py,pz,u,v, 
-           has_Nxyz ? (float*)nx :nullptr, has_Nxyz ? (float*)ny : nullptr , has_Nxyz ? (float*)nz : nullptr, 4097,1);
+      dynamic_large_stack_array(float,px,M,64*sizeof(float));
+      dynamic_large_stack_array(float,py,M,64*sizeof(float));
+      dynamic_large_stack_array(float,pz,M,64*sizeof(float));
+      dynamic_large_stack_array(float,u,M,64*sizeof(float));
+      dynamic_large_stack_array(float,v,M,64*sizeof(float));
+      dynamic_large_stack_array(float,nx,M,64*sizeof(float));
+      dynamic_large_stack_array(float,ny,M,64*sizeof(float));
+      dynamic_large_stack_array(float,nz,M,64*sizeof(float));
+      Eval(patch,subPatch, x0s,x1s, bottom,bottom, coarse_x+1,2, px,py,pz,u,v, Nx ? (float*)nx :nullptr,Ny ? (float*)ny : nullptr , Nz ? (float*)nz : nullptr, 4097,1);
       
       for (unsigned x=x0; x<=x1; x++) 
       {
@@ -330,7 +339,7 @@ namespace embree
         Pz[dy0*dwidth+x-x0] = pz[xs];
         U [dy0*dwidth+x-x0] = u[xs];
         V [dy0*dwidth+x-x0] = v[xs];
-        if (unlikely(has_Nxyz)) {
+        if (unlikely(Nx != nullptr)) {
           Nx[dy0*dwidth+x-x0] = nx[xs];
           Ny[dy0*dwidth+x-x0] = ny[xs];
           Nz[dy0*dwidth+x-x0] = nz[xs];

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -18,12 +31,6 @@ namespace embree
     BarrierSys (size_t N = 0);
     ~BarrierSys ();
 
-  private:
-    /*! class in non-copyable */
-    BarrierSys (const BarrierSys& other) DELETED; // do not implement
-    BarrierSys& operator= (const BarrierSys& other) DELETED; // do not implement
-
-  public:
     /*! intializes the barrier with some number of threads */
     void init(size_t count);
 
@@ -49,7 +56,7 @@ namespace embree
     {
       cntr++;
       while (cntr.load() != numThreads) 
-        pause_cpu();
+        __pause_cpu();
     }
 
   private:
@@ -66,13 +73,13 @@ namespace embree
     void wait (size_t threadCount) 
     {
       cntr0.fetch_add(1);
-      while (cntr0 != threadCount) pause_cpu();
+      while (cntr0 != threadCount) __pause_cpu();
       cntr1.fetch_add(1);
-      while (cntr1 != threadCount) pause_cpu();
+      while (cntr1 != threadCount) __pause_cpu();
       cntr0.fetch_add(-1);
-      while (cntr0 != 0) pause_cpu();
+      while (cntr0 != 0) __pause_cpu();
       cntr1.fetch_add(-1);
-      while (cntr1 != 0) pause_cpu();
+      while (cntr1 != 0) __pause_cpu();
     }
 
   private:
@@ -88,12 +95,6 @@ namespace embree
     LinearBarrierActive (size_t threadCount = 0);
     ~LinearBarrierActive();
     
-  private:
-    /*! class in non-copyable */
-    LinearBarrierActive (const LinearBarrierActive& other) DELETED; // do not implement
-    LinearBarrierActive& operator= (const LinearBarrierActive& other) DELETED; // do not implement
-
-  public:
     /*! intializes the barrier with some number of threads */
     void init(size_t threadCount);
     

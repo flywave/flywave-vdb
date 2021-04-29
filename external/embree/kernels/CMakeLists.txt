@@ -1,13 +1,18 @@
-## Copyright 2009-2020 Intel Corporation
-## SPDX-License-Identifier: Apache-2.0
-
-MACRO(DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS)
-  FOREACH(src ${ARGN})
-    IF (src MATCHES ".*intersector.*")
-      DISABLE_STACK_PROTECTOR_FOR_FILE(${src})
-    ENDIF()
-  ENDFOREACH()
-ENDMACRO()
+## ======================================================================== ##
+## Copyright 2009-2016 Intel Corporation                                    ##
+##                                                                          ##
+## Licensed under the Apache License, Version 2.0 (the "License");          ##
+## you may not use this file except in compliance with the License.         ##
+## You may obtain a copy of the License at                                  ##
+##                                                                          ##
+##     http://www.apache.org/licenses/LICENSE-2.0                           ##
+##                                                                          ##
+## Unless required by applicable law or agreed to in writing, software      ##
+## distributed under the License is distributed on an "AS IS" BASIS,        ##
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
+## See the License for the specific language governing permissions and      ##
+## limitations under the License.                                           ##
+## ======================================================================== ##
 
 SOURCE_GROUP("Source Files\\bvh4" "/bvh4/" )
 SOURCE_GROUP("Source Files\\bvh8" "/bvh8/" )
@@ -19,8 +24,15 @@ SOURCE_GROUP("Source Files\\algorithms" "/algorithms/")
 SOURCE_GROUP("" FILES embree.rc)
 
 SET(EMBREE_LIBRARY_FILES
- 
-  embree.rc
+  algorithms/parallel_for.cpp
+  algorithms/parallel_reduce.cpp
+  algorithms/parallel_prefix_sum.cpp
+  algorithms/parallel_for_for.cpp
+  algorithms/parallel_for_for_prefix_sum.cpp
+  algorithms/sort.cpp
+  algorithms/pset.cpp
+  algorithms/pmap.cpp
+  algorithms/prefix.cpp
 
   common/device.cpp
   common/stat.cpp
@@ -28,28 +40,28 @@ SET(EMBREE_LIBRARY_FILES
   common/accelset.cpp
   common/state.cpp
   common/rtcore.cpp
-  common/rtcore_builder.cpp
+  common/buffer.cpp
   common/scene.cpp
   common/alloc.cpp
   common/geometry.cpp
   common/scene_user_geometry.cpp
   common/scene_instance.cpp
+  common/scene_geometry_instance.cpp
   common/scene_triangle_mesh.cpp
   common/scene_quad_mesh.cpp
-  common/scene_curves.cpp
+  common/scene_bezier_curves.cpp
   common/scene_line_segments.cpp
-  common/scene_grid_mesh.cpp
-  common/scene_points.cpp
-  common/motion_derivative.cpp
-
+  common/scene_subdiv_mesh.cpp
+  subdiv/tessellation_cache.cpp
+  subdiv/subdivpatch1base.cpp
+  subdiv/catmullclark_coefficients.cpp
   subdiv/bezier_curve.cpp
-  subdiv/bspline_curve.cpp
-  subdiv/catmullrom_curve.cpp
 
-  geometry/primitive4.cpp
+  geometry/primitive.cpp
+  geometry/instance_intersector1.cpp
   geometry/instance_intersector.cpp
-  geometry/curve_intersector_virtual.cpp
-  geometry/curve_intersector_virtual2.cpp
+  geometry/grid_soa.cpp	
+  subdiv/subdivpatch1base_eval.cpp	
   builders/primrefgen.cpp
 
   bvh/bvh.cpp
@@ -57,248 +69,198 @@ SET(EMBREE_LIBRARY_FILES
   bvh/bvh4_factory.cpp
   bvh/bvh8_factory.cpp
 
-  bvh/bvh_collider.cpp
   bvh/bvh_rotate.cpp
   bvh/bvh_refit.cpp
   bvh/bvh_builder.cpp
   bvh/bvh_builder_hair.cpp
-  bvh/bvh_builder_hair_mb.cpp
   bvh/bvh_builder_morton.cpp
   bvh/bvh_builder_sah.cpp
-  bvh/bvh_builder_sah_spatial.cpp
-  bvh/bvh_builder_sah_mb.cpp
   bvh/bvh_builder_twolevel.cpp
+  bvh/bvh_builder_instancing.cpp
+  bvh/bvh_builder_subdiv.cpp
 
-  bvh/bvh_intersector1_bvh4.cpp
+  bvh/bvh_intersector1.cpp
   )
 
-IF (EMBREE_GEOMETRY_SUBDIVISION)
-  SET(EMBREE_LIBRARY_FILES ${EMBREE_LIBRARY_FILES}
-  common/scene_subdiv_mesh.cpp
-  subdiv/tessellation_cache.cpp
-  subdiv/subdivpatch1base.cpp
-  subdiv/catmullclark_coefficients.cpp
-  geometry/grid_soa.cpp	
-  subdiv/subdivpatch1base_eval.cpp
-  bvh/bvh_builder_subdiv.cpp)
+IF (WIN32 AND NOT MINGW)
+  SET(EMBREE_LIBRARY_FILES 
+    embree.rc
+    ${EMBREE_LIBRARY_FILES})
+ENDIF()
+  
+IF (TASKING_INTERNAL)
+  SET(EMBREE_LIBRARY_FILES 
+    ../common/tasking/taskschedulerinternal.cpp
+    ../common/tasking/tasksys.cpp
+    ${EMBREE_LIBRARY_FILES})
+ENDIF()
+
+IF (TASKING_TBB)
+  SET(EMBREE_LIBRARY_FILES 
+    ../common/tasking/taskschedulertbb.cpp
+    ../common/tasking/tasksys.cpp
+    ${EMBREE_LIBRARY_FILES})
+  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} ${TBB_LIBRARIES})
 ENDIF()
 
 IF (EMBREE_RAY_PACKETS)
   SET(EMBREE_LIBRARY_FILES ${EMBREE_LIBRARY_FILES}
 
-  bvh/bvh_intersector_hybrid4_bvh4.cpp
-  bvh/bvh_intersector_stream_bvh4.cpp
+  common/rtcore_ispc.cpp
+  common/rtcore_ispc.ispc
+
+  bvh/bvh_intersector_single.cpp
+  bvh/bvh_intersector_hybrid.cpp
   bvh/bvh_intersector_stream_filters.cpp)
 ENDIF()
 
-MACRO(embree_files TARGET ISA)
-      
-  SET(${TARGET}
-    geometry/instance_intersector.cpp
-    geometry/curve_intersector_virtual.cpp
-    geometry/curve_intersector_virtual2.cpp
-    bvh/bvh_intersector1_bvh4.cpp)
+SET(EMBREE_LIBRARY_FILES_SSE42
+    geometry/grid_soa.cpp
+    subdiv/subdivpatch1base_eval.cpp
+    bvh/bvh_intersector1.cpp)
 
-  IF (${ISA} EQUAL ${ISA_LOWEST_AVX})
-    LIST(APPEND ${TARGET} geometry/primitive8.cpp)
-  ENDIF() 
-
-  IF (${ISA} EQUAL ${SSE2} OR ${ISA} EQUAL ${AVX} OR ${ISA} EQUAL ${AVX2} OR ${ISA} EQUAL ${AVX512KNL} OR ${ISA} EQUAL ${AVX512SKX} OR ${ISA_LOWEST} EQUAL ${ISA})
-    
-    LIST(APPEND ${TARGET}
-      common/scene_user_geometry.cpp
-      common/scene_instance.cpp
-      common/scene_triangle_mesh.cpp
-      common/scene_quad_mesh.cpp 
-      common/scene_curves.cpp
-      common/scene_line_segments.cpp
-      common/scene_grid_mesh.cpp
-      common/scene_points.cpp
-
-      bvh/bvh_collider.cpp
-      bvh/bvh_refit.cpp
-      bvh/bvh_builder.cpp
-      bvh/bvh_builder_hair.cpp
-      bvh/bvh_builder_hair_mb.cpp
-      bvh/bvh_builder_sah.cpp
-      bvh/bvh_builder_sah_spatial.cpp
-      bvh/bvh_builder_sah_mb.cpp
-      bvh/bvh_builder_twolevel.cpp)
-
-    IF (EMBREE_GEOMETRY_SUBDIVISION)
-      LIST(APPEND ${TARGET} bvh/bvh_builder_subdiv.cpp)
-    ENDIF()
-  ENDIF()
-
-  IF (${ISA} EQUAL ${SSE2} OR ${ISA} EQUAL ${AVX} OR ${ISA} EQUAL ${AVX2} OR ${ISA} EQUAL ${AVX512KNL} OR ${ISA_LOWEST} EQUAL ${ISA})
-    LIST(APPEND ${TARGET}
-      bvh/bvh_builder_morton.cpp
-      bvh/bvh_rotate.cpp
-      builders/primrefgen.cpp)
-  ENDIF()
-    
-  IF (${ISA} GREATER ${SSE42})
-    LIST(APPEND ${TARGET} bvh/bvh_intersector1_bvh8.cpp)
-  ENDIF()
-
-  IF (${ISA} EQUAL ${AVX})
-    LIST(APPEND ${TARGET}
-      bvh/bvh.cpp
-      bvh/bvh_statistics.cpp)
-  ENDIF()
-
-  IF (EMBREE_GEOMETRY_SUBDIVISION)
-    LIST(APPEND ${TARGET}
-        common/scene_subdiv_mesh.cpp
-        geometry/grid_soa.cpp
-        subdiv/subdivpatch1base_eval.cpp)
-  ENDIF()
-    
-  IF (EMBREE_RAY_PACKETS)
-    LIST(APPEND ${TARGET}
-      bvh/bvh_intersector_hybrid4_bvh4.cpp
-      bvh/bvh_intersector_stream_bvh4.cpp
-      bvh/bvh_intersector_stream_filters.cpp)
-
-    IF (${ISA} GREATER ${SSE42})
-      LIST(APPEND ${TARGET}
-        bvh/bvh_intersector_hybrid8_bvh4.cpp
-        bvh/bvh_intersector_hybrid4_bvh8.cpp
-        bvh/bvh_intersector_hybrid8_bvh8.cpp
-        bvh/bvh_intersector_stream_bvh8.cpp)
-    ENDIF()
-
-    IF (${ISA} GREATER ${AVX2})
-      LIST(APPEND ${TARGET}
-        bvh/bvh_intersector_hybrid16_bvh8.cpp
-        bvh/bvh_intersector_hybrid16_bvh4.cpp)
-    ENDIF()
-  ENDIF()
-  
-ENDMACRO()
-
-#embree_files(EMBREE_LIBRARY_FILES_SSE2 ${SSE2})
-embree_files(EMBREE_LIBRARY_FILES_SSE42 ${SSE42})
-embree_files(EMBREE_LIBRARY_FILES_AVX ${AVX})
-embree_files(EMBREE_LIBRARY_FILES_AVX2 ${AVX2})
-embree_files(EMBREE_LIBRARY_FILES_AVX512KNL ${AVX512KNL})
-embree_files(EMBREE_LIBRARY_FILES_AVX512SKX ${AVX512SKX})
-
-#message("SSE2: ${EMBREE_LIBRARY_FILES_SSE2}")
-#message("SSE42: ${EMBREE_LIBRARY_FILES_SSE42}")
-#message("AVX: ${EMBREE_LIBRARY_FILES_AVX}")
-#message("AVX2: ${EMBREE_LIBRARY_FILES_AVX2}")
-#message("AVX512KNL: ${EMBREE_LIBRARY_FILES_AVX512KNL}")
-#message("AVX512SKX: ${EMBREE_LIBRARY_FILES_AVX512SKX}")
-
-# replaces all .cpp files with a dummy file that includes that .cpp file
-# this is to work around an ICC name mangling issue related to lambda functions under windows
-MACRO (CreateISADummyFiles list isa)
-  SET(${list})
-  FOREACH(src ${ARGN})
-    SET(src_file ${CMAKE_CURRENT_SOURCE_DIR}/${src})
-    SET(dst_file ${CMAKE_BINARY_DIR}/${src}.${isa}.cpp)
-    SET(${list} ${${list}} ${dst_file})
-    ADD_CUSTOM_COMMAND(OUTPUT ${dst_file}
-      COMMAND ${CMAKE_COMMAND} 
-       -D src=${src_file}
-       -D dst=${dst_file}
-       -P ${PROJECT_SOURCE_DIR}/common/cmake/create_isa_dummy_file.cmake
-      DEPENDS ${src_file})
-  ENDFOREACH()
-ENDMACRO()
-#CreateISADummyFiles(EMBREE_LIBRARY_FILES_SSE2      sse2      ${EMBREE_LIBRARY_FILES_SSE2})
-CreateISADummyFiles(EMBREE_LIBRARY_FILES_SSE42     sse42     ${EMBREE_LIBRARY_FILES_SSE42})
-CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX       avx       ${EMBREE_LIBRARY_FILES_AVX})
-CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX2      avx2      ${EMBREE_LIBRARY_FILES_AVX2})
-CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX512KNL avx512knl ${EMBREE_LIBRARY_FILES_AVX512KNL})
-CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX512SKX avx512skx ${EMBREE_LIBRARY_FILES_AVX512SKX})
-
-MACRO (CheckGlobals library)
-  IF (NOT WIN32 AND NOT APPLE)
-    ADD_CUSTOM_TARGET(${library}_check_globals ALL COMMAND ${CMAKE_COMMAND} -D file=$<TARGET_FILE:${library}> -P ${PROJECT_SOURCE_DIR}/common/cmake/check_globals.cmake DEPENDS ${library})
-  ENDIF()
-ENDMACRO()
-
-DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES})
-ADD_LIBRARY(embree ${EMBREE_LIB_TYPE} ${EMBREE_LIBRARY_FILES} $<TARGET_OBJECTS:algorithms>)
-SET_TARGET_PROPERTIES(embree PROPERTIES COMPILE_FLAGS "${FLAGS_LOWEST}")
-SET_TARGET_PROPERTIES(embree PROPERTIES COMPILE_DEFINITIONS "EMBREE_LOWEST_ISA")
-SET_PROPERTY(TARGET embree PROPERTY FOLDER external/embree/kernels)
-IF (NOT WIN32 AND NOT  APPLE)
-  ADD_CUSTOM_TARGET(embree_check_stack_frame_size COMMAND ${CMAKE_COMMAND} -D file=$<TARGET_FILE:embree> -P ${PROJECT_SOURCE_DIR}/common/cmake/check_stack_frame_size.cmake DEPENDS embree)
+IF (EMBREE_RAY_PACKETS)
+    SET(EMBREE_LIBRARY_FILES_SSE42 ${EMBREE_LIBRARY_FILES_SSE42}
+    bvh/bvh_intersector_single.cpp
+    bvh/bvh_intersector_hybrid.cpp
+    bvh/bvh_intersector_stream.cpp
+    bvh/bvh_intersector_stream_filters.cpp)
 ENDIF()
 
-#IF (EMBREE_ISA_SSE2 AND EMBREE_LIBRARY_FILES_SSE2)
-#  ADD_LIBRARY(embree_sse2 STATIC ${EMBREE_LIBRARY_FILES_SSE2})
-#  SET_TARGET_PROPERTIES(embree_sse2 PROPERTIES COMPILE_FLAGS "${FLAGS_SSE2}")
-#  SET_PROPERTY(TARGET embree_sse2 PROPERTY FOLDER kernels)
-#  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_sse2)
-#  CheckGlobals(embree_sse2)
-#IF (EMBREE_STATIC_LIB)
-#    INSTALL(TARGETS embree_sse2 ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
-#  ENDIF()
-#ENDIF ()
+SET(EMBREE_LIBRARY_FILES_AVX
+    
+    common/scene_subdiv_mesh_avx.cpp
+  
+    geometry/instance_intersector1.cpp
+    
+    geometry/grid_soa.cpp
+    subdiv/subdivpatch1base_eval.cpp
+    builders/primrefgen.avx.cpp
 
-IF (EMBREE_ISA_SSE42 AND EMBREE_LIBRARY_FILES_SSE42)
-  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_SSE42})
+    bvh/bvh_rotate.cpp
+    bvh/bvh_refit.avx.cpp
+    bvh/bvh_builder.avx.cpp
+    bvh/bvh_builder_hair.avx.cpp
+    bvh/bvh_builder_morton.avx.cpp
+    bvh/bvh_builder_sah.avx.cpp
+    bvh/bvh_builder_twolevel.avx.cpp
+    bvh/bvh_builder_instancing.avx.cpp
+    bvh/bvh_builder_subdiv.avx.cpp
+    bvh/bvh_intersector1.cpp
+    
+    bvh/bvh.cpp
+    bvh/bvh_statistics.cpp)
+
+IF (EMBREE_RAY_PACKETS)
+  SET(EMBREE_LIBRARY_FILES_AVX ${EMBREE_LIBRARY_FILES_AVX}
+
+    geometry/instance_intersector.cpp
+
+    bvh/bvh_intersector_single.cpp
+    bvh/bvh_intersector_hybrid.cpp
+    bvh/bvh_intersector_stream.cpp
+    bvh/bvh_intersector_stream_filters.cpp)
+ENDIF()
+
+SET(EMBREE_LIBRARY_FILES_AVX2
+
+    geometry/instance_intersector1.cpp
+    geometry/grid_soa.cpp
+    subdiv/subdivpatch1base_eval.cpp
+
+    bvh/bvh_intersector1.cpp)
+
+IF (EMBREE_RAY_PACKETS)
+  SET(EMBREE_LIBRARY_FILES_AVX2 ${EMBREE_LIBRARY_FILES_AVX2}
+    geometry/instance_intersector.cpp
+
+    bvh/bvh_intersector_single.cpp
+    bvh/bvh_intersector_hybrid.cpp
+    bvh/bvh_intersector_stream.cpp
+    bvh/bvh_intersector_stream_filters.cpp)
+ENDIF()
+
+SET(EMBREE_LIBRARY_FILES_AVX512
+
+    geometry/instance_intersector1.cpp
+    geometry/grid_soa.cpp    
+    subdiv/subdivpatch1base_eval.cpp
+
+    bvh/bvh_refit.cpp
+    bvh/bvh_rotate.cpp
+    bvh/bvh_builder_subdiv.avx512knl.cpp
+    bvh/bvh_intersector1.cpp)
+
+IF (EMBREE_RAY_PACKETS)
+  SET(EMBREE_LIBRARY_FILES_AVX512 ${EMBREE_LIBRARY_FILES_AVX512}
+
+    geometry/instance_intersector.cpp
+
+    bvh/bvh_intersector_single.cpp
+    bvh/bvh_intersector_hybrid.cpp
+    bvh/bvh_intersector_stream.cpp
+    bvh/bvh_intersector_stream_filters.cpp)
+ENDIF()
+
+SET(EMBREE_LIBRARY_FILES_AVX512KNL ${EMBREE_LIBRARY_FILES_AVX512}
+
+    builders/primrefgen.avx512knl.cpp
+    bvh/bvh_builder.avx512knl.cpp
+    bvh/bvh_builder_sah.avx512knl.cpp
+    bvh/bvh_builder_twolevel.avx512knl.cpp
+    bvh/bvh_builder_instancing.avx512knl.cpp
+    bvh/bvh_builder_morton.avx512knl.cpp
+    bvh/bvh_builder_subdiv.avx512knl.cpp)
+
+SET(EMBREE_LIBRARY_FILES_AVX512SKX ${EMBREE_LIBRARY_FILES_AVX512}
+
+    builders/primrefgen.avx512skx.cpp
+    bvh/bvh_builder.avx512skx.cpp
+    bvh/bvh_builder_sah.avx512skx.cpp
+    bvh/bvh_builder_twolevel.avx512skx.cpp
+    bvh/bvh_builder_instancing.avx512skx.cpp
+    bvh/bvh_builder_morton.avx512skx.cpp
+    bvh/bvh_builder_subdiv.avx512skx.cpp)
+
+ADD_ISPC_LIBRARY(embree STATIC ${EMBREE_LIBRARY_FILES})
+SET_PROPERTY(TARGET embree PROPERTY FOLDER kernels)
+
+IF (TARGET_SSE42 AND EMBREE_LIBRARY_FILES_SSE42)
   ADD_LIBRARY(embree_sse42 STATIC ${EMBREE_LIBRARY_FILES_SSE42})
   SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES COMPILE_FLAGS "${FLAGS_SSE42}")
-  SET_PROPERTY(TARGET embree_sse42 PROPERTY FOLDER external/embree/kernels)
+  SET_PROPERTY(TARGET embree_sse42 PROPERTY FOLDER kernels)
   SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_sse42)
-  CheckGlobals(embree_sse42)
 ENDIF ()
 
-IF (EMBREE_ISA_AVX  AND EMBREE_LIBRARY_FILES_AVX)
-  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX})
+IF (TARGET_AVX  AND EMBREE_LIBRARY_FILES_AVX)
   ADD_LIBRARY(embree_avx STATIC ${EMBREE_LIBRARY_FILES_AVX})
   SET_TARGET_PROPERTIES(embree_avx PROPERTIES COMPILE_FLAGS "${FLAGS_AVX}")
-  SET_PROPERTY(TARGET embree_avx PROPERTY FOLDER external/embree/kernels)
+  SET_PROPERTY(TARGET embree_avx PROPERTY FOLDER kernels)
   SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx)
-  CheckGlobals(embree_avx)
-ENDIF()
+ ENDIF()
 
-IF (EMBREE_ISA_AVX2 AND EMBREE_LIBRARY_FILES_AVX2)
-  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX2})
+IF (TARGET_AVX2 AND EMBREE_LIBRARY_FILES_AVX2)
   ADD_LIBRARY(embree_avx2 STATIC ${EMBREE_LIBRARY_FILES_AVX2})
   SET_TARGET_PROPERTIES(embree_avx2 PROPERTIES COMPILE_FLAGS "${FLAGS_AVX2}")
-  SET_PROPERTY(TARGET embree_avx2 PROPERTY FOLDER external/embree/kernels)
+  SET_PROPERTY(TARGET embree_avx2 PROPERTY FOLDER kernels)
   SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx2)
-  CheckGlobals(embree_avx2)
 ENDIF()
 
-IF (EMBREE_ISA_AVX512KNL AND EMBREE_LIBRARY_FILES_AVX512KNL)
-  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX512KNL})
+IF (TARGET_AVX512KNL AND EMBREE_LIBRARY_FILES_AVX512KNL)
   ADD_LIBRARY(embree_avx512knl STATIC ${EMBREE_LIBRARY_FILES_AVX512KNL})
   SET_TARGET_PROPERTIES(embree_avx512knl PROPERTIES COMPILE_FLAGS "${FLAGS_AVX512KNL}")
-  SET_PROPERTY(TARGET embree_avx512knl PROPERTY FOLDER external/embree/kernels)
+  SET_PROPERTY(TARGET embree_avx512knl PROPERTY FOLDER kernels)
   SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx512knl)
-  CheckGlobals(embree_avx512knl)
 ENDIF()
 
-IF (EMBREE_ISA_AVX512SKX AND EMBREE_LIBRARY_FILES_AVX512SKX)
-  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX512SKX})
+IF (TARGET_AVX512SKX AND EMBREE_LIBRARY_FILES_AVX512SKX)
   ADD_LIBRARY(embree_avx512skx STATIC ${EMBREE_LIBRARY_FILES_AVX512SKX})
   SET_TARGET_PROPERTIES(embree_avx512skx PROPERTIES COMPILE_FLAGS "${FLAGS_AVX512SKX}")
-  SET_PROPERTY(TARGET embree_avx512skx PROPERTY FOLDER external/embree/kernels)
+  SET_PROPERTY(TARGET embree_avx512skx PROPERTY FOLDER kernels)
   SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx512skx)
-  CheckGlobals(embree_avx512skx)
 ENDIF()
 
-TARGET_LINK_LIBRARIES(embree PRIVATE ${EMBREE_LIBRARIES} sys math simd lexers tasking)
-SET_TARGET_PROPERTIES(embree PROPERTIES OUTPUT_NAME ${EMBREE_LIBRARY_NAME})
-target_include_directories(embree PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
-  $<INSTALL_INTERFACE:include>)
-
-
-# libtbb is located in same install folder as libembree
-IF(WIN32)
-ELSEIF(APPLE)
-  SET_TARGET_PROPERTIES(embree PROPERTIES INSTALL_RPATH "@rpath") # On MacOSX the app is supposed to already have an rpath set to that folder
-ELSE()
-  SET_TARGET_PROPERTIES(embree PROPERTIES INSTALL_RPATH "$ORIGIN")  # Linux we tell ld to find libtbb in the folder libembree is placed.
-ENDIF()
+TARGET_LINK_LIBRARIES(embree ${EMBREE_LIBRARIES} sys simd lexers)
 
 IF (WIN32)
 ELSEIF (APPLE)
@@ -315,4 +277,6 @@ ELSE()
   SET_TARGET_PROPERTIES(embree PROPERTIES VERSION ${EMBREE_VERSION} SOVERSION ${EMBREE_VERSION_MAJOR})
 ENDIF()
 
-SIGN_TARGET(embree)
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(embree  PROPERTIES FOLDER external)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

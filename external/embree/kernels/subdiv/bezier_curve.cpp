@@ -1,30 +1,44 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "bezier_curve.h"
 
 namespace embree
 {
-  PrecomputedBezierBasis::PrecomputedBezierBasis(int dj)
+  BezierCoefficients::BezierCoefficients(int dj)
   {
-    for (size_t i=1; i<=N; i++) 
+    for (size_t i=0; i<=N; i++) 
     {
       for (size_t j=0; j<=N; j++) 
       {
-        const float u = float(j+dj)/float(i);
-        const Vec4f f = BezierBasis::eval(u);
-        c0[i][j] = f.x;
-        c1[i][j] = f.y;
-        c2[i][j] = f.z;
-        c3[i][j] = f.w;
-        const Vec4f d = BezierBasis::derivative(u);
-        d0[i][j] = d.x;
-        d1[i][j] = d.y;
-        d2[i][j] = d.z;
-        d3[i][j] = d.w;
+        const float t1 = float(j+dj)/float(i);
+        const float t0 = 1.0f-t1;
+
+        c0[i][j] = t0 * t0 * t0;
+        c1[i][j] = 3.0f * t1 * t0 * t0;
+        c2[i][j] = 3.0f * t1 * t1 * t0;
+        c3[i][j] = t1 * t1 * t1;
+
+        d0[i][j] = -3.0f*(t0*t0);
+        d1[i][j] = -6.0f*(t0*t1) + 3.0f*(t0*t0);
+        d2[i][j] = +6.0f*(t0*t1) - 3.0f*(t1*t1);
+        d3[i][j] = +3.0f*(t1*t1);
       }
     }
   }
-  PrecomputedBezierBasis bezier_basis0(0);
-  PrecomputedBezierBasis bezier_basis1(1);
+  BezierCoefficients bezier_coeff0(0);
+  BezierCoefficients bezier_coeff1(1);
 }

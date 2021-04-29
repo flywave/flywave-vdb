@@ -1,245 +1,223 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "scene_quad_mesh.h"
 #include "scene.h"
 
 namespace embree
 {
-#if defined(EMBREE_LOWEST_ISA)
 
-  QuadMesh::QuadMesh (Device* device)
-    : Geometry(device,GTY_QUAD_MESH,0,1)
+  QuadMesh::QuadMesh (Scene* parent, RTCGeometryFlags flags, size_t numQuads, size_t numVertices, size_t numTimeSteps)
+    : Geometry(parent,QUAD_MESH,numQuads,numTimeSteps,flags)
   {
-    vertices.resize(numTimeSteps);
+    quads.init(parent->device,numQuads,sizeof(Quad));
+    for (size_t i=0; i<numTimeSteps; i++) {
+      vertices[i].init(parent->device,numVertices,sizeof(Vec3fa));
+    }
+    enabling();
+  }
+  
+  void QuadMesh::enabling() 
+  { 
+    if (numTimeSteps == 1) parent->world1.numQuads += quads.size();
+    else                   parent->world2.numQuads += quads.size();
+  }
+  
+  void QuadMesh::disabling() 
+  { 
+    if (numTimeSteps == 1) parent->world1.numQuads -= quads.size();
+    else                   parent->world2.numQuads -= quads.size();
   }
 
   void QuadMesh::setMask (unsigned mask) 
   {
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
     this->mask = mask; 
     Geometry::update();
   }
 
-  void QuadMesh::setNumTimeSteps (unsigned int numTimeSteps)
-  {
-    vertices.resize(numTimeSteps);
-    Geometry::setNumTimeSteps(numTimeSteps);
-  }
-
-  void QuadMesh::setVertexAttributeCount (unsigned int N)
-  {
-    vertexAttribs.resize(N);
-    Geometry::update();
-  }
-  
-  void QuadMesh::setBuffer(RTCBufferType type, unsigned int slot, RTCFormat format, const Ref<Buffer>& buffer, size_t offset, size_t stride, unsigned int num)
+  void QuadMesh::setBuffer(RTCBufferType type, void* ptr, size_t offset, size_t stride) 
   { 
+    if (parent->isStatic() && parent->isBuild()) 
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
     /* verify that all accesses are 4 bytes aligned */
-    if (((size_t(buffer->getPtr()) + offset) & 0x3) || (stride & 0x3)) 
-      throw_RTCError(RTC_ERROR_INVALID_OPERATION, "data must be 4 bytes aligned");
+    if (((size_t(ptr) + offset) & 0x3) || (stride & 0x3)) 
+      throw_RTCError(RTC_INVALID_OPERATION,"data must be 4 bytes aligned");
 
-    if (type == RTC_BUFFER_TYPE_VERTEX) 
-    {
-      if (format != RTC_FORMAT_FLOAT3)
-        throw_RTCError(RTC_ERROR_INVALID_OPERATION, "invalid vertex buffer format");
+    switch (type) {
+    case RTC_INDEX_BUFFER  : 
+      quads.set(ptr,offset,stride); 
+      break;
+    case RTC_VERTEX_BUFFER0: 
+      vertices[0].set(ptr,offset,stride); 
+      vertices[0].checkPadding16();
+      break;
+    case RTC_VERTEX_BUFFER1: 
+      vertices[1].set(ptr,offset,stride); 
+      vertices[1].checkPadding16();
+      break;
+    case RTC_USER_VERTEX_BUFFER0: 
+      if (userbuffers[0] == nullptr) userbuffers[0].reset(new Buffer(parent->device,numVertices(),stride)); 
+      userbuffers[0]->set(ptr,offset,stride);  
+      userbuffers[0]->checkPadding16();
+      break;
+    case RTC_USER_VERTEX_BUFFER1: 
+      if (userbuffers[1] == nullptr) userbuffers[1].reset(new Buffer(parent->device,numVertices(),stride)); 
+      userbuffers[1]->set(ptr,offset,stride);  
+      userbuffers[1]->checkPadding16();
+      break;
 
-      /* if buffer is larger than 16GB the premultiplied index optimization does not work */
-      if (stride*num > 16ll*1024ll*1024ll*1024ll)
-       throw_RTCError(RTC_ERROR_INVALID_OPERATION, "vertex buffer can be at most 16GB large");
-
-      if (slot >= vertices.size())
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid vertex buffer slot");
-
-      vertices[slot].set(buffer, offset, stride, num, format);
-      vertices[slot].checkPadding16();
-      vertices0 = vertices[0];
-    } 
-    else if (type >= RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE)
-    {
-      if (format < RTC_FORMAT_FLOAT || format > RTC_FORMAT_FLOAT16)
-        throw_RTCError(RTC_ERROR_INVALID_OPERATION, "invalid vertex attribute buffer format");
-
-      if (slot >= vertexAttribs.size())
-        throw_RTCError(RTC_ERROR_INVALID_OPERATION, "invalid vertex attribute buffer slot");
-      
-      vertexAttribs[slot].set(buffer, offset, stride, num, format);
-      vertexAttribs[slot].checkPadding16();
+    default: 
+      throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type");
     }
-    else if (type == RTC_BUFFER_TYPE_INDEX)
-    {
-      if (slot != 0)
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      if (format != RTC_FORMAT_UINT4)
-        throw_RTCError(RTC_ERROR_INVALID_OPERATION, "invalid index buffer format");
-
-      quads.set(buffer, offset, stride, num, format);
-      setNumPrimitives(num);
-    }
-    else
-      throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "unknown buffer type");
   }
 
-  void* QuadMesh::getBuffer(RTCBufferType type, unsigned int slot)
+  void* QuadMesh::map(RTCBufferType type) 
   {
-    if (type == RTC_BUFFER_TYPE_INDEX)
-    {
-      if (slot != 0)
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      return quads.getPtr();
-    }
-    else if (type == RTC_BUFFER_TYPE_VERTEX)
-    {
-      if (slot >= vertices.size())
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      return vertices[slot].getPtr();
-    }
-    else if (type == RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE)
-    {
-      if (slot >= vertexAttribs.size())
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      return vertexAttribs[slot].getPtr();
-    }
-    else
-    {
-      throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "unknown buffer type");
-      return nullptr;
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
+
+    switch (type) {
+    case RTC_INDEX_BUFFER  : return quads.map(parent->numMappedBuffers);
+    case RTC_VERTEX_BUFFER0: return vertices[0].map(parent->numMappedBuffers);
+    case RTC_VERTEX_BUFFER1: return vertices[1].map(parent->numMappedBuffers);
+    default                : throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type"); return nullptr;
     }
   }
 
-  void QuadMesh::updateBuffer(RTCBufferType type, unsigned int slot)
+  void QuadMesh::unmap(RTCBufferType type) 
   {
-    if (type == RTC_BUFFER_TYPE_INDEX)
-    {
-      if (slot != 0)
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      quads.setModified();
-    }
-    else if (type == RTC_BUFFER_TYPE_VERTEX)
-    {
-      if (slot >= vertices.size())
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      vertices[slot].setModified();
-    }
-    else if (type == RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE)
-    {
-      if (slot >= vertexAttribs.size())
-        throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "invalid buffer slot");
-      vertexAttribs[slot].setModified();
-    }
-    else
-    {
-      throw_RTCError(RTC_ERROR_INVALID_ARGUMENT, "unknown buffer type");
-    }
+    if (parent->isStatic() && parent->isBuild())
+      throw_RTCError(RTC_INVALID_OPERATION,"static scenes cannot get modified");
 
-    Geometry::update();
+    switch (type) {
+    case RTC_INDEX_BUFFER  : quads  .unmap(parent->numMappedBuffers); break;
+    case RTC_VERTEX_BUFFER0: vertices[0].unmap(parent->numMappedBuffers); break;
+    case RTC_VERTEX_BUFFER1: vertices[1].unmap(parent->numMappedBuffers); break;
+    default                : throw_RTCError(RTC_INVALID_ARGUMENT,"unknown buffer type"); break;
+    }
   }
 
-  void QuadMesh::commit() 
+  void QuadMesh::immutable () 
   {
-    /* verify that stride of all time steps are identical */
-    for (unsigned int t=0; t<numTimeSteps; t++)
-      if (vertices[t].getStride() != vertices[0].getStride())
-        throw_RTCError(RTC_ERROR_INVALID_OPERATION,"stride of vertex buffers have to be identical for each time step");
-
-    Geometry::commit();
+    const bool freeQuads = !parent->needQuadIndices;
+    const bool freeVertices  = !parent->needQuadVertices;
+    if (freeQuads) quads.free(); 
+    if (freeVertices ) vertices[0].free();
+    if (freeVertices ) vertices[1].free();
   }
 
-  void QuadMesh::addElementsToCount (GeometryCounts & counts) const
-  {
-    if (numTimeSteps == 1) counts.numQuads += numPrimitives;
-    else                   counts.numMBQuads += numPrimitives;
-  }
-
-  bool QuadMesh::verify() 
+  bool QuadMesh::verify () 
   {
     /*! verify consistent size of vertex arrays */
-    if (vertices.size() == 0) return false;
-    for (const auto& buffer : vertices)
-      if (buffer.size() != numVertices())
+    if (numTimeSteps == 2 && vertices[0].size() != vertices[1].size())
         return false;
 
-    /*! verify quad indices */
-    for (size_t i=0; i<size(); i++) {     
+    /*! verify proper quad indices */
+    for (size_t i=0; i<quads.size(); i++) {     
       if (quads[i].v[0] >= numVertices()) return false; 
       if (quads[i].v[1] >= numVertices()) return false; 
       if (quads[i].v[2] >= numVertices()) return false; 
       if (quads[i].v[3] >= numVertices()) return false; 
     }
 
-    /*! verify vertices */
-    for (const auto& buffer : vertices)
-      for (size_t i=0; i<buffer.size(); i++)
-	if (!isvalid(buffer[i])) 
+    /*! verify proper quad vertices */
+    for (size_t j=0; j<numTimeSteps; j++) 
+    {
+      BufferT<Vec3fa>& verts = vertices[j];
+      for (size_t i=0; i<verts.size(); i++) {
+	if (!isvalid(verts[i])) 
 	  return false;
-
+      }
+    }
     return true;
   }
 
-  void QuadMesh::interpolate(const RTCInterpolateArguments* const args)
+  void QuadMesh::interpolate(unsigned primID, float u, float v, RTCBufferType buffer, float* P, float* dPdu, float* dPdv, float* ddPdudu, float* ddPdvdv, float* ddPdudv, size_t numFloats)
   {
-    unsigned int primID = args->primID;
-    float u = args->u;
-    float v = args->v;
-    RTCBufferType bufferType = args->bufferType;
-    unsigned int bufferSlot = args->bufferSlot;
-    float* P = args->P;
-    float* dPdu = args->dPdu;
-    float* dPdv = args->dPdv;
-    float* ddPdudu = args->ddPdudu;
-    float* ddPdvdv = args->ddPdvdv;
-    float* ddPdudv = args->ddPdudv;
-    unsigned int valueCount = args->valueCount;
+    /* test if interpolation is enabled */
+#if defined(DEBUG)
+    if ((parent->aflags & RTC_INTERPOLATE) == 0) 
+      throw_RTCError(RTC_INVALID_OPERATION,"rtcInterpolate can only get called when RTC_INTERPOLATE is enabled for the scene");
+#endif
 
     /* calculate base pointer and stride */
-    assert((bufferType == RTC_BUFFER_TYPE_VERTEX && bufferSlot < numTimeSteps) ||
-           (bufferType == RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE && bufferSlot <= vertexAttribs.size()));
+    assert((buffer >= RTC_VERTEX_BUFFER0 && buffer <= RTC_VERTEX_BUFFER1) ||
+           (buffer >= RTC_USER_VERTEX_BUFFER0 && buffer <= RTC_USER_VERTEX_BUFFER1));
     const char* src = nullptr; 
     size_t stride = 0;
-    if (bufferType == RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE) {
-      src    = vertexAttribs[bufferSlot].getPtr();
-      stride = vertexAttribs[bufferSlot].getStride();
+    if (buffer >= RTC_USER_VERTEX_BUFFER0) {
+      src    = userbuffers[buffer&0xFFFF]->getPtr();
+      stride = userbuffers[buffer&0xFFFF]->getStride();
     } else {
-      src    = vertices[bufferSlot].getPtr();
-      stride = vertices[bufferSlot].getStride();
+      src    = vertices[buffer&0xFFFF].getPtr();
+      stride = vertices[buffer&0xFFFF].getStride();
     }
 
-    for (unsigned int i=0; i<valueCount; i+=4)
+    for (size_t i=0; i<numFloats; i+=VSIZEX)
     {
-      const vbool4 valid = vint4((int)i)+vint4(step) < vint4(int(valueCount));
+      const vboolx valid = vintx(i)+vintx(step) < vintx(numFloats);
       const size_t ofs = i*sizeof(float);
       const Quad& tri = quad(primID);
-      const vfloat4 p0 = vfloat4::loadu(valid,(float*)&src[tri.v[0]*stride+ofs]);
-      const vfloat4 p1 = vfloat4::loadu(valid,(float*)&src[tri.v[1]*stride+ofs]);
-      const vfloat4 p2 = vfloat4::loadu(valid,(float*)&src[tri.v[2]*stride+ofs]);
-      const vfloat4 p3 = vfloat4::loadu(valid,(float*)&src[tri.v[3]*stride+ofs]);      
-      const vbool4 left = u+v <= 1.0f;
-      const vfloat4 Q0 = select(left,p0,p2);
-      const vfloat4 Q1 = select(left,p1,p3);
-      const vfloat4 Q2 = select(left,p3,p1);
-      const vfloat4 U  = select(left,u,vfloat4(1.0f)-u);
-      const vfloat4 V  = select(left,v,vfloat4(1.0f)-v);
-      const vfloat4 W  = 1.0f-U-V;
+      const vfloatx p0 = vfloatx::loadu(valid,(float*)&src[tri.v[0]*stride+ofs]);
+      const vfloatx p1 = vfloatx::loadu(valid,(float*)&src[tri.v[1]*stride+ofs]);
+      const vfloatx p2 = vfloatx::loadu(valid,(float*)&src[tri.v[2]*stride+ofs]);
+      const vfloatx p3 = vfloatx::loadu(valid,(float*)&src[tri.v[3]*stride+ofs]);      
+      const vboolx left = u+v <= 1.0f;
+      const vfloatx Q0 = select(left,p0,p2);
+      const vfloatx Q1 = select(left,p1,p3);
+      const vfloatx Q2 = select(left,p3,p1);
+      const vfloatx U  = select(left,u,vfloatx(1.0f)-u);
+      const vfloatx V  = select(left,v,vfloatx(1.0f)-v);
+      const vfloatx W  = 1.0f-U-V;
       if (P) {
-        vfloat4::storeu(valid,P+i,madd(W,Q0,madd(U,Q1,V*Q2)));
+        vfloatx::storeu(valid,P+i,W*Q0 + U*Q1 + V*Q2);
       }
       if (dPdu) { 
-        assert(dPdu); vfloat4::storeu(valid,dPdu+i,select(left,Q1-Q0,Q0-Q1));
-        assert(dPdv); vfloat4::storeu(valid,dPdv+i,select(left,Q2-Q0,Q0-Q2));
+        assert(dPdu); vfloatx::storeu(valid,dPdu+i,select(left,Q1-Q0,Q0-Q1));
+        assert(dPdv); vfloatx::storeu(valid,dPdv+i,select(left,Q2-Q0,Q0-Q2));
       }
       if (ddPdudu) { 
-        assert(ddPdudu); vfloat4::storeu(valid,ddPdudu+i,vfloat4(zero));
-        assert(ddPdvdv); vfloat4::storeu(valid,ddPdvdv+i,vfloat4(zero));
-        assert(ddPdudv); vfloat4::storeu(valid,ddPdudv+i,vfloat4(zero));
+        assert(ddPdudu); vfloatx::storeu(valid,ddPdudu+i,vfloatx(zero));
+        assert(ddPdvdv); vfloatx::storeu(valid,ddPdvdv+i,vfloatx(zero));
+        assert(ddPdudv); vfloatx::storeu(valid,ddPdudv+i,vfloatx(zero));
       }
     }
   }
-  
-#endif
 
-  namespace isa
+  void QuadMesh::write(std::ofstream& file)
   {
-    QuadMesh* createQuadMesh(Device* device) {
-      return new QuadMeshISA(device);
+    int type = QUAD_MESH;
+    file.write((char*)&type,sizeof(int));
+    file.write((char*)&numTimeSteps,sizeof(int));
+    size_t numVerts = numVertices();
+    file.write((char*)&numVerts,sizeof(int));
+    size_t numQuads = quads.size();
+    file.write((char*)&numQuads,sizeof(int));
+
+    for (size_t j=0; j<numTimeSteps; j++) {
+      while ((file.tellp() % 16) != 0) { char c = 0; file.write(&c,1); }
+      for (size_t i=0; i<numVerts; i++) file.write((char*)vertexPtr(i,j),sizeof(Vec3fa));  
     }
+
+    while ((file.tellp() % 16) != 0) { char c = 0; file.write(&c,1); }
+    for (size_t i=0; i<numQuads; i++) file.write((char*)&quad(i),sizeof(Quad));  
+
   }
 }

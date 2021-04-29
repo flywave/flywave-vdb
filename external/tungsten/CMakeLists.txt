@@ -55,25 +55,13 @@ foreach(flag ${Vc_ARCHITECTURE_FLAGS})
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flag}")
 endforeach()
 
-set(EMBREE_STATIC_LIB ON CACHE BOOL "Build Embree as a static library." FORCE)
-set(EMBREE_ISPC_SUPPORT OFF CACHE BOOL "Build Embree with support for ISPC applications." FORCE)
-set(EMBREE_TUTORIALS OFF CACHE BOOL "Enable to build Embree tutorials" FORCE)
-set(EMBREE_STAT_COUNTERS OFF CACHE BOOL "Enables statistic counters." FORCE)
-set(EMBREE_RAY_MASK OFF CACHE BOOL "Enables ray mask support." FORCE)
-set(EMBREE_BACKFACE_CULLING OFF CACHE BOOL "Enables backface culling." FORCE)
-set(EMBREE_INTERSECTION_FILTER ON CACHE BOOL "Enables intersection filter callback." FORCE)
-set(EMBREE_INTERSECTION_FILTER_RESTORE ON CACHE BOOL "Restores previous hit when hit is filtered out." FORCE)
-set(EMBREE_TASKING_SYSTEM "INTERNAL" CACHE STRING "Selects tasking system" FORCE)
-set(EMBREE_STATIC_RUNTIME OFF CACHE BOOL "Use the static version of the C/C++ runtime library." FORCE)
-add_subdirectory(src/thirdparty/embree)
 add_definitions(-DEMBREE_STATIC_LIB=1)
 
 add_definitions(-DRAPIDJSON_HAS_STDSTRING=1)
 add_definitions(-DSTBI_NO_STDIO=1)
 add_definitions(-DLODEPNG_NO_COMPILE_DISK=1)
 add_definitions(-DUSE_IPV6=1)
-add_library(thirdparty STATIC
-		src/thirdparty/civetweb/civetweb.c
+add_library(tungsten_thirdparty STATIC
 		src/thirdparty/lodepng/lodepng.cpp
 		src/thirdparty/sobol/sobol.cpp
 		src/thirdparty/stbi/stb_image.c
@@ -85,143 +73,41 @@ if (CMAKE_COMPILER_IS_GNUCXX)
     set(CXX_WARNINGS "-Wall -Wextra -Wpointer-arith -Wcast-align -fstrict-aliasing -Wno-unused-local-typedefs -Wno-misleading-indentation -Wno-maybe-uninitialized -Wno-int-in-bool-context -Wno-implicit-fallthrough -Wno-class-memaccess")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_WARNINGS} -fvisibility-inlines-hidden")
 endif()
-set(core_libs core thirdparty embree)
 
-include_directories(src/core src/thirdparty src/thirdparty/embree/include src)
+include_directories(src/core src/thirdparty src)
 
-find_package(Eigen3)
-if (EIGEN3_FOUND)
-    include_directories(${EIGEN3_INCLUDE_DIR})
-    message(STATUS "Eigen3 detected. denoiser will be built")
-else()
-    message(STATUS "No Eigen3 detected. denoiser will not be built")
-endif()
+INCLUDE_DIRECTORIES(
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openvdb/openvdb"
+    "${CMAKE_CURRENT_BINARY_DIR}/../openvdb/openvdb"
+    "${CMAKE_CURRENT_BINARY_DIR}/../openvdb/openvdb/openvdb"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../tbb/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/"
+    "${CMAKE_CURRENT_BINARY_DIR}/../openexr/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/Half"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/Iex"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/IlmImf"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/IlmThread"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/Imath"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../c-blosc/blosc/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../libboost/boost_1_67_0/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../eigen"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../eigen/unsupported"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../libjpeg/"
+    "${CMAKE_CURRENT_BINARY_DIR}/../libjpeg/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../embree/include/"
+    "${CMAKE_CURRENT_BINARY_DIR}/../embree/include/"
+    "${CMAKE_CURRENT_BINARY_DIR}/../embree/include/embree3/"
+)
 
-find_package(OpenEXR)
-if (OPENEXR_FOUND)
-    message(STATUS "OpenEXR detected. Building with .exr support")
-    add_definitions(-DOPENEXR_AVAILABLE)
-    include_directories(${OPENEXR_INCLUDE_DIR})
-    set(core_libs ${core_libs} ${OPENEXR_LIBRARIES})
-else()
-    message(STATUS "No OpenEXR detected. Building without .exr support")
-endif()
-
-find_package(JPEG)
-if (JPEG_FOUND)
-    message(STATUS "JPEG library detected.")
-    add_definitions(-DJPEG_AVAILABLE)
-    include_directories(${JPEG_INCLUDE_DIR})
-    set(core_libs ${core_libs} ${JPEG_LIBRARIES})
-else()
-    message(STATUS "No JPEG library detected. Falling back to stb_image JPG decoder")
-endif()
-
-find_package(OpenVDB)
-find_package(TBB)
-if (OPENEXR_FOUND AND OPENVDB_FOUND AND TBB_FOUND)
-    message(STATUS "OpenVDB detected. Building with .vdb support")
-    add_definitions(-DOPENVDB_AVAILABLE)
-    add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)
-    include_directories(${OPENVDB_INCLUDE_DIR})
-    set(core_libs ${core_libs} ${OPENVDB_LIBRARIES} ${TBB_LIBRARIES})
-else()
-    if (NOT OPENVDB_FOUND)
-        message(STATUS "No OpenVDB detected. Building without .vdb support")
-    elseif(NOT OPENEXR_FOUND)
-        message(STATUS "No OpenEXR libraries detected. Building without .vdb support")
-    else()
-        message(STATUS "No TBB detected. Building without .vdb support")
-    endif()
-endif()
+add_definitions(-DOPENEXR_AVAILABLE)
+add_definitions(-DJPEG_AVAILABLE)
+add_definitions(-DOPENVDB_AVAILABLE)
+add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)
 
 file(GLOB_RECURSE Core_SOURCES "src/core/*.cpp")
-add_library(core STATIC ${Core_SOURCES})
+add_library(tungsten STATIC ${Core_SOURCES})
 
-add_executable(obj2json src/obj2json/obj2json.cpp)
-target_link_libraries(obj2json ${core_libs})
-
-add_executable(json2xml src/json2xml/json2xml.cpp)
-target_link_libraries(json2xml ${core_libs})
-
-add_executable(scenemanip src/scenemanip/scenemanip.cpp)
-target_link_libraries(scenemanip ${core_libs})
-
-add_executable(hdrmanip src/hdrmanip/hdrmanip.cpp)
-target_link_libraries(hdrmanip ${core_libs})
-
-if (EIGEN3_FOUND)
-    file(GLOB_RECURSE denoiser_SOURCES "src/denoiser/*.cpp")
-    add_executable(denoiser ${denoiser_SOURCES})
-    target_link_libraries(denoiser ${core_libs})
-endif()
-
-add_executable(tungsten src/tungsten/tungsten.cpp)
-target_link_libraries(tungsten ${core_libs})
-
-if (WIN32)
-    set(socket_libs wsock32 Ws2_32)
-else()
-    set(socket_libs "")
-endif()
-
-add_executable(tungsten_server src/tungsten-server/tungsten-server.cpp)
-target_link_libraries(tungsten_server ${core_libs} ${socket_libs})
-
-set(executables obj2json json2xml scenemanip hdrmanip tungsten tungsten_server)
-if (EIGEN3_FOUND)
-    set(executables ${executables} denoiser)
-endif()
-set(data_dirs example-scenes materialtest mc-loader)
-
-find_package(OpenGL)
-find_package(Qt5Widgets)
-find_package(Qt5OpenGL)
-if (OPENGL_FOUND AND Qt5Widgets_FOUND)
-    include_directories(${OPENGL_INCLUDE_DIR})
-    set(opengl_libs ${OPENGL_LIBRARIES})
-    
-    file(GLOB_RECURSE Editor_SOURCES "src/editor/*.cpp")
-    if (APPLE)
-        list(APPEND Editor_SOURCES "src/editor/CoreProfileAttributes.mm")
-    endif()
-    add_executable(editor ${Editor_SOURCES} src/editor/resources/Tungsten.rc)
-    set_target_properties(editor PROPERTIES AUTOMOC TRUE)
-    qt5_use_modules(editor Widgets OpenGL)
-    target_link_libraries(editor ${core_libs} ${opengl_libs} Qt5::Widgets Qt5::OpenGL)
-    if (APPLE)
-        find_library(APPKIT NAMES AppKit) 
-        target_link_libraries(editor ${APPKIT})
-    endif()
-    message(STATUS "Building editor")
-    
-    set(data_dirs ${data_dirs} editor shaders)
-    set(executables ${executables} editor)
-else()
-    if (NOT Qt5Widgets_FOUND)
-        message(STATUS "Qt5 not found. Editor will not be built")
-    endif()
-    if (NOT OPENGL_FOUND)
-        message(STATUS "OpenGL not found. Editor will not be built")
-    endif()
-endif()
-
-if (WIN32)
-    set(data_prefix "data")
-else()
-    set(data_prefix "share/tungsten")
-endif()
-
-foreach (data_dir ${data_dirs})
-    install(DIRECTORY data/${data_dir} DESTINATION ${data_prefix})
-    file(GLOB_RECURSE data_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/data "data/${data_dir}/*")
-    foreach (data ${data_files})
-        configure_file(data/${data} ${CMAKE_CURRENT_BINARY_DIR}/${data_prefix}/${data} COPYONLY)
-    endforeach(data)
-endforeach()
-
-if (WIN32)
-    install(TARGETS ${executables} DESTINATION .)
-else()
-    install(TARGETS ${executables} DESTINATION bin)
-endif()
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(tungsten  PROPERTIES FOLDER external/tungsten)
+  SET_TARGET_PROPERTIES(tungsten_thirdparty  PROPERTIES FOLDER external/tungsten)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

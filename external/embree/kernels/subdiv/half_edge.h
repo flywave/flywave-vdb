@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -13,10 +26,9 @@ namespace embree
     public:
 
     enum PatchType : char { 
-      BILINEAR_PATCH        = 0, //!< a bilinear patch
-      REGULAR_QUAD_PATCH    = 1, //!< a regular quad patch can be represented as a B-Spline
-      IRREGULAR_QUAD_PATCH  = 2, //!< an irregular quad patch can be represented as a Gregory patch
-      COMPLEX_PATCH         = 3  //!< these patches need subdivision and cannot be processed by the above fast code paths
+      REGULAR_QUAD_PATCH       = 0, //!< a regular quad patch can be represented as a B-Spline
+      IRREGULAR_QUAD_PATCH     = 1, //!< an irregular quad patch can be represented as a Gregory patch
+      COMPLEX_PATCH            = 2  //!< these patches need subdivision and cannot be processed by the above fast code paths
     };
     
     enum VertexType : char { 
@@ -28,31 +40,13 @@ namespace embree
       return (PatchType) max((int)ty0,(int)ty1);
     }
     
-    struct Edge 
-    {
-      /*! edge constructor */
-      __forceinline Edge(const uint32_t v0, const uint32_t v1)
-	: v0(v0), v1(v1) {}
-
-      /*! create an 64 bit identifier that is unique for the not oriented edge */
-      __forceinline operator uint64_t() const       
-      {
-	uint32_t p0 = v0, p1 = v1;
-	if (p0<p1) std::swap(p0,p1);
-	return (((uint64_t)p0) << 32) | (uint64_t)p1;
-      }
-
-    public:
-      uint32_t v0,v1;    //!< start and end vertex of the edge
-    };
-
     HalfEdge () 
       : vtx_index(-1), next_half_edge_ofs(0), prev_half_edge_ofs(0), opposite_half_edge_ofs(0), edge_crease_weight(0), 
       vertex_crease_weight(0), edge_level(0), patch_type(COMPLEX_PATCH), vertex_type(REGULAR_VERTEX)
     {
       static_assert(sizeof(HalfEdge) == 32, "invalid half edge size");
     }
- 
+    
     __forceinline bool hasOpposite() const { return opposite_half_edge_ofs != 0; }
     __forceinline void setOpposite(HalfEdge* opposite) { opposite_half_edge_ofs = int(opposite-this); }
     
@@ -70,8 +64,6 @@ namespace embree
     
     __forceinline unsigned int getStartVertexIndex() const { return vtx_index; }
     __forceinline unsigned int getEndVertexIndex  () const { return next()->vtx_index; }
-    __forceinline Edge         getEdge            () const { return Edge(getStartVertexIndex(),getEndVertexIndex()); }
-   
     
     /*! tests if the start vertex of the edge is regular */
     __forceinline PatchType vertexType() const
@@ -122,36 +114,25 @@ namespace embree
       else if (face_valence == 4 && !hasBorder)      return REGULAR_QUAD_PATCH;
       else                                           return IRREGULAR_QUAD_PATCH;
     }
-
-    /*! tests if this edge is part of a bilinear patch */
-    __forceinline bool bilinearVertex() const {
-      return vertex_crease_weight == float(inf) && edge_crease_weight == float(inf);
-    }
     
     /*! calculates the type of the patch */
     __forceinline PatchType patchType() const 
     {
       const HalfEdge* p = this;
       PatchType ret = REGULAR_QUAD_PATCH;
-      bool bilinear = true;
       
       ret = max(ret,p->vertexType());
-      bilinear &= p->bilinearVertex();
       if ((p = p->next()) == this) return COMPLEX_PATCH;
       
       ret = max(ret,p->vertexType());
-      bilinear &= p->bilinearVertex();
       if ((p = p->next()) == this) return COMPLEX_PATCH;
       
       ret = max(ret,p->vertexType());
-      bilinear &= p->bilinearVertex();
       if ((p = p->next()) == this) return COMPLEX_PATCH;
       
       ret = max(ret,p->vertexType());
-      bilinear &= p->bilinearVertex();
       if ((p = p->next()) != this) return COMPLEX_PATCH;
       
-      if (bilinear) return BILINEAR_PATCH;
       return ret;
     }
     
@@ -169,7 +150,7 @@ namespace embree
     __forceinline bool isCorner() const {
       return !hasOpposite() && !prev()->hasOpposite();
     }
-
+    
     /*! tests if the vertex is attached to any border */
     __forceinline bool vertexHasBorder() const 
     {
@@ -193,7 +174,7 @@ namespace embree
     }
     
     /*! calculates conservative bounds of a catmull clark subdivision face */
-    __forceinline BBox3fa bounds(const BufferView<Vec3fa>& vertices) const
+    __forceinline BBox3fa bounds(const BufferT<Vec3fa>& vertices) const
     {
       BBox3fa bounds = this->get1RingBounds(vertices);
       for (const HalfEdge* p=this->next(); p!=this; p=p->next())
@@ -202,7 +183,7 @@ namespace embree
     }
     
     /*! tests if this is a valid patch */
-    __forceinline bool valid(const BufferView<Vec3fa>& vertices) const
+    __forceinline bool valid(const BufferT<Vec3fa>& vertices) const
     {
       size_t N = 1;
       if (!this->validRing(vertices)) return false;
@@ -219,40 +200,7 @@ namespace embree
       for (const HalfEdge* p=this->next(); p!=this; p=p->next(), N++);
       return N;
     }
-
-    /*! calculates face and edge valence */
-    __forceinline void calculateFaceValenceAndEdgeValence(size_t& faceValence, size_t& edgeValence) const 
-    {
-      faceValence = 0;
-      edgeValence = 0;
-      
-      const HalfEdge* p = this;
-      do 
-      {
-         /* calculate bounds of current face */
-        unsigned int numEdges = p->numEdges();
-        assert(numEdges >= 3);
-        edgeValence += numEdges-2;
-        
-        faceValence++;
-        p = p->prev();
-        
-        /* continue with next face */
-        if (likely(p->hasOpposite())) 
-          p = p->opposite();
-        
-        /* if there is no opposite go the long way to the other side of the border */
-        else {
-          faceValence++;
-          edgeValence++;
-          p = this;
-          while (p->hasOpposite()) 
-            p = p->opposite()->next();
-        }
-        
-      } while (p != this); 
-    }
-
+    
     /*! stream output */
     friend __forceinline std::ostream &operator<<(std::ostream &o, const HalfEdge &h)
     {
@@ -261,8 +209,8 @@ namespace embree
         "prev = " << h.prev_half_edge_ofs << ", " << 
         "next = " << h.next_half_edge_ofs << ", " << 
         "opposite = " << h.opposite_half_edge_ofs << ", " << 
-        "edge_crease = " << h.edge_crease_weight << ", " << 
-        "vertex_crease = " << h.vertex_crease_weight << ", " << 
+        //"edge_crease = " << h.edge_crease_weight << ", " << 
+        //"vertex_crease = " << h.vertex_crease_weight << ", " << 
         //"edge_level = " << h.edge_level << 
         " }";
     } 
@@ -270,7 +218,7 @@ namespace embree
   private:
     
     /*! calculates the bounds of the face associated with the half-edge */
-    __forceinline BBox3fa getFaceBounds(const BufferView<Vec3fa>& vertices) const 
+    __forceinline BBox3fa getFaceBounds(const BufferT<Vec3fa>& vertices) const 
     {
       BBox3fa b = vertices[getStartVertexIndex()];
       for (const HalfEdge* p = next(); p!=this; p=p->next()) {
@@ -280,7 +228,7 @@ namespace embree
     }
     
     /*! calculates the bounds of the 1-ring associated with the vertex of the half-edge */
-    __forceinline BBox3fa get1RingBounds(const BufferView<Vec3fa>& vertices) const 
+    __forceinline BBox3fa get1RingBounds(const BufferT<Vec3fa>& vertices) const 
     {
       BBox3fa bounds = empty;
       const HalfEdge* p = this;
@@ -307,7 +255,7 @@ namespace embree
     }
     
     /*! tests if this is a valid face */
-    __forceinline bool validFace(const BufferView<Vec3fa>& vertices, size_t& N) const 
+    __forceinline bool validFace(const BufferT<Vec3fa>& vertices, size_t& N) const 
     {
       const Vec3fa v = vertices[getStartVertexIndex()];
       if (!isvalid(v)) return false;
@@ -321,7 +269,7 @@ namespace embree
     }
     
     /*! tests if this is a valid ring */
-    __forceinline bool validRing(const BufferView<Vec3fa>& vertices) const 
+    __forceinline bool validRing(const BufferT<Vec3fa>& vertices) const 
     {
       size_t faceValence = 0;
       size_t edgeValence = 0;

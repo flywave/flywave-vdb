@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -11,19 +24,14 @@ namespace embree
   {
     struct Type : public PrimitiveType 
     {
-      const char* name() const;
-      size_t sizeActive(const char* This) const;
-      size_t sizeTotal(const char* This) const;
-      size_t getBytes(const char* This) const;
+      Type ();
+      size_t size(const char* This) const;
     };
     static Type type;
 
   public:
 
-    /* primitive supports multiple time segments */
-    static const bool singleTimeSegment = false;
-
-    /* Returns maximum number of stored primitives */
+    /* Returns maximal number of stored primitives */
     static __forceinline size_t max_size() { return 1; }
 
     /* Returns required number of primitive blocks for N primitives */
@@ -33,52 +41,28 @@ namespace embree
 
     /*! constructs a virtual object */
     Object (unsigned geomID, unsigned primID) 
-    : _geomID(geomID), _primID(primID) {}
-
-    __forceinline unsigned geomID() const {
-      return _geomID;
-    }
-
-    __forceinline unsigned primID() const {
-      return _primID;
-    }
+    : geomID(geomID), primID(primID) {}
 
     /*! fill triangle from triangle list */
-    __forceinline void fill(const PrimRef* prims, size_t& i, size_t end, Scene* scene)
+    __forceinline void fill(const PrimRef* prims, size_t& i, size_t end, Scene* scene, const bool list)
     {
       const PrimRef& prim = prims[i]; i++;
       new (this) Object(prim.geomID(), prim.primID());
     }
 
     /*! fill triangle from triangle list */
-    __forceinline LBBox3fa fillMB(const PrimRef* prims, size_t& i, size_t end, Scene* scene, size_t itime)
+    __forceinline std::pair<BBox3fa,BBox3fa> fill_mblur(const PrimRef* prims, size_t& i, size_t end, Scene* scene, const bool list)
     {
       const PrimRef& prim = prims[i]; i++;
       const unsigned geomID = prim.geomID();
       const unsigned primID = prim.primID();
       new (this) Object(geomID, primID);
       AccelSet* accel = (AccelSet*) scene->get(geomID);
-      return accel->linearBounds(primID,itime);
+      return accel->bounds_mblur(primID);
     }
 
-    /*! fill triangle from triangle list */
-    __forceinline LBBox3fa fillMB(const PrimRefMB* prims, size_t& i, size_t end, Scene* scene, const BBox1f time_range)
-    {
-      const PrimRefMB& prim = prims[i]; i++;
-      const unsigned geomID = prim.geomID();
-      const unsigned primID = prim.primID();
-      new (this) Object(geomID, primID);
-      AccelSet* accel = (AccelSet*) scene->get(geomID);
-      return accel->linearBounds(primID,time_range);
-    }
-
-    /* Updates the primitive */
-    __forceinline BBox3fa update(AccelSet* mesh) {
-      return mesh->bounds(primID());
-    }
-
-  private:
-    unsigned int _geomID;  //!< geometry ID
-    unsigned int _primID;  //!< primitive ID
+  public:
+    unsigned geomID;  //!< geometry ID
+    unsigned primID;  //!< primitive ID
   };
 }

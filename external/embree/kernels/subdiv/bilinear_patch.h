@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -21,23 +34,11 @@ namespace embree
       
       __forceinline BilinearPatchT () {}
 
-      __forceinline BilinearPatchT (const HalfEdge* edge, const BufferView<Vertex>& vertices) {
-        init(edge,vertices.getPtr(),vertices.getStride());
-      }
-      
-      __forceinline BilinearPatchT (const HalfEdge* edge, const char* vertices, size_t stride) {
-        init(edge,vertices,stride);
-      }
-
-      __forceinline void init (const HalfEdge* edge, const char* vertices, size_t stride)
-      {
-        v[0] = Vertex::loadu(vertices+edge->getStartVertexIndex()*stride); edge = edge->next();
-        v[1] = Vertex::loadu(vertices+edge->getStartVertexIndex()*stride); edge = edge->next();
-        v[2] = Vertex::loadu(vertices+edge->getStartVertexIndex()*stride); edge = edge->next();
-        v[3] = Vertex::loadu(vertices+edge->getStartVertexIndex()*stride); edge = edge->next();
-      }
-
-      __forceinline BilinearPatchT (const CatmullClarkPatch& patch)
+      __forceinline BilinearPatchT (const CatmullClarkPatch& patch,
+                                    const BezierCurveT<Vertex>* border0 = nullptr,
+                                    const BezierCurveT<Vertex>* border1 = nullptr,
+                                    const BezierCurveT<Vertex>* border2 = nullptr,
+                                    const BezierCurveT<Vertex>* border3 = nullptr) 
       {
         v[0] = patch.ring[0].getLimitVertex();
         v[1] = patch.ring[1].getLimitVertex();
@@ -55,16 +56,23 @@ namespace embree
         return bounds;
       }
       
-      __forceinline Vertex eval(const float uu, const float vv) const {
-        return lerp(lerp(v[0],v[1],uu),lerp(v[3],v[2],uu),vv);
+      __forceinline Vertex eval(const float uu, const float vv) const
+      {
+        const float sx1 = uu, sx0 = 1.0f-sx1;
+        const float sy1 = vv, sy0 = 1.0f-sy1;
+        return sy0*(sx0*v[0]+sx1*v[1]) + sy1*(sx0*v[3]+sx1*v[2]);
       }
 
-      __forceinline Vertex eval_du(const float uu, const float vv) const {
-        return lerp(v[1]-v[0],v[2]-v[3],vv);
+      __forceinline Vertex eval_du(const float uu, const float vv) const
+      {
+        const float sy1 = vv, sy0 = 1.0f-sy1;
+        return sy0*(v[1]-v[0]) + sy1*(v[2]-v[3]); 
       }
 
-      __forceinline Vertex eval_dv(const float uu, const float vv) const {
-        return lerp(v[3]-v[0],v[2]-v[1],uu);
+      __forceinline Vertex eval_dv(const float uu, const float vv) const
+      {
+        const float sx1 = uu, sx0 = 1.0f-sx1;
+        return sx0*(v[3]-v[0]) + sx1*(v[2]-v[1]);
       }
 
       __forceinline Vertex eval_dudu(const float uu, const float vv) const {
@@ -80,7 +88,7 @@ namespace embree
       }
 
       __forceinline Vertex normal(const float uu, const float vv) const {
-        return cross(eval_du(uu,vv),eval_dv(uu,vv));
+        return cross(eval_dv(uu,vv),eval_du(uu,vv));
       }
       
       __forceinline void eval(const float u, const float v, 
@@ -104,50 +112,61 @@ namespace embree
       template<class vfloat>
       __forceinline Vec3<vfloat> eval(const vfloat& uu, const vfloat& vv) const
       {
-        const vfloat x = lerp(lerp(v[0].x,v[1].x,uu),lerp(v[3].x,v[2].x,uu),vv);
-        const vfloat y = lerp(lerp(v[0].y,v[1].y,uu),lerp(v[3].y,v[2].y,uu),vv);
-        const vfloat z = lerp(lerp(v[0].z,v[1].z,uu),lerp(v[3].z,v[2].z,uu),vv);
+        const vfloat sx1 = uu, sx0 = 1.0f-sx1;
+        const vfloat sy1 = vv, sy0 = 1.0f-sy1;
+        const vfloat x = sy0*(sx0*v[0].x+sx1*v[1].x) + sy1*(sx0*v[3].x+sx1*v[2].x);
+        const vfloat y = sy0*(sx0*v[0].y+sx1*v[1].y) + sy1*(sx0*v[3].y+sx1*v[2].y);
+        const vfloat z = sy0*(sx0*v[0].z+sx1*v[1].z) + sy1*(sx0*v[3].z+sx1*v[2].z);
         return Vec3<vfloat>(x,y,z);
       }
 
       template<class vfloat>
       __forceinline Vec3<vfloat> eval_du(const vfloat& uu, const vfloat& vv) const
       {
-        const vfloat x = lerp(v[1].x-v[0].x,v[2].x-v[3].x,vv);
-        const vfloat y = lerp(v[1].y-v[0].y,v[2].y-v[3].y,vv);
-        const vfloat z = lerp(v[1].z-v[0].z,v[2].z-v[3].z,vv);
+        const vfloat sy1 = vv, sy0 = 1.0f-sy1;
+        const vfloat x = sy0*(v[1].x-v[0].x) + sy1*(v[2].x-v[3].x); 
+        const vfloat y = sy0*(v[1].y-v[0].y) + sy1*(v[2].y-v[3].y); 
+        const vfloat z = sy0*(v[1].z-v[0].z) + sy1*(v[2].z-v[3].z); 
         return Vec3<vfloat>(x,y,z);
       }
 
       template<class vfloat>
       __forceinline Vec3<vfloat> eval_dv(const vfloat& uu, const vfloat& vv) const
       {
-        const vfloat x = lerp(v[3].x-v[0].x,v[2].x-v[1].x,uu);
-        const vfloat y = lerp(v[3].y-v[0].y,v[2].y-v[1].y,uu);
-        const vfloat z = lerp(v[3].z-v[0].z,v[2].z-v[1].z,uu);
+        const vfloat sx1 = uu, sx0 = 1.0f-sx1;
+        const vfloat x = sx0*(v[3].x-v[0].x) + sx1*(v[2].x-v[1].x);
+        const vfloat y = sx0*(v[3].y-v[0].y) + sx1*(v[2].y-v[1].y);
+        const vfloat z = sx0*(v[3].z-v[0].z) + sx1*(v[2].z-v[1].z);
         return Vec3<vfloat>(x,y,z);
       }
 
       template<typename vfloat>
       __forceinline Vec3<vfloat> normal(const vfloat& uu, const vfloat& vv) const {
-        return cross(eval_du(uu,vv),eval_dv(uu,vv));
+        return cross(eval_dv(uu,vv),eval_du(uu,vv));
       }
 
        template<class vfloat>
-      __forceinline vfloat eval(const size_t i, const vfloat& uu, const vfloat& vv) const {
-        return lerp(lerp(v[0][i],v[1][i],uu),lerp(v[3][i],v[2][i],uu),vv);
+      __forceinline vfloat eval(const size_t i, const vfloat& uu, const vfloat& vv) const
+      {
+        const vfloat sx1 = uu, sx0 = 1.0f-sx1;
+        const vfloat sy1 = vv, sy0 = 1.0f-sy1;
+        return sy0*(sx0*v[0][i]+sx1*v[1][i]) + sy1*(sx0*v[3][i]+sx1*v[2][i]);
       }
 
       template<class vfloat>
-      __forceinline vfloat eval_du(const size_t i, const vfloat& uu, const vfloat& vv) const {
-        return lerp(v[1][i]-v[0][i],v[2][i]-v[3][i],vv);
+      __forceinline vfloat eval_du(const size_t i, const vfloat& uu, const vfloat& vv) const
+      {
+        const vfloat sy1 = vv, sy0 = 1.0f-sy1;
+        return sy0*(v[1][i]-v[0][i]) + sy1*(v[2][i]-v[3][i]); 
       }
 
       template<class vfloat>
-      __forceinline vfloat eval_dv(const size_t i, const vfloat& uu, const vfloat& vv) const {
-        return lerp(v[3][i]-v[0][i],v[2][i]-v[1][i],uu);
+      __forceinline vfloat eval_dv(const size_t i, const vfloat& uu, const vfloat& vv) const
+      {
+        const vfloat sx1 = uu, sx0 = 1.0f-sx1;
+        return sx0*(v[3][i]-v[0][i]) + sx1*(v[2][i]-v[1][i]);
       }
-      
+
       template<class vfloat>
       __forceinline vfloat eval_dudu(const size_t i, const vfloat& uu, const vfloat& vv) const {
         return vfloat(zero);

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "thread.h"
 #include "sysinfo.h"
@@ -8,7 +21,7 @@
 #include <iostream>
 #include <xmmintrin.h>
 
-#if defined(PTHREADS_WIN32)
+#if defined(PTHREADS_WIN32) && !defined(__MINGW32__)
 #pragma comment (lib, "pthreadVC.lib")
 #endif
 
@@ -26,6 +39,7 @@ namespace embree
   /*! set the affinity of a given thread */
   void setAffinity(HANDLE thread, ssize_t affinity)
   {
+#if _WIN32_WINNT >= _WIN32_WINNT_WIN7
     typedef WORD (WINAPI *GetActiveProcessorGroupCountFunc)();
     typedef DWORD (WINAPI *GetActiveProcessorCountFunc)(WORD);
     typedef BOOL (WINAPI *SetThreadGroupAffinityFunc)(HANDLE, const GROUP_AFFINITY *, PGROUP_AFFINITY);
@@ -66,6 +80,7 @@ namespace embree
         WARNING("SetThreadIdealProcessorEx failed"); // on purpose only a warning
     } 
     else 
+#endif
     {
       if (!SetThreadAffinityMask(thread, DWORD_PTR(uint64_t(1) << affinity)))
         WARNING("SetThreadAffinityMask failed"); // on purpose only a warning
@@ -79,6 +94,8 @@ namespace embree
     setAffinity(GetCurrentThread(), affinity);
   }
 
+#if !defined(PTHREADS_WIN32)
+
   struct ThreadStartupData 
   {
   public:
@@ -89,21 +106,18 @@ namespace embree
     void* arg;
   };
 
-  DWORD WINAPI threadStartup(LPVOID ptr)
+  static void* threadStartup(ThreadStartupData* parg)
   {
-    ThreadStartupData* parg = (ThreadStartupData*) ptr;
     _mm_setcsr(_mm_getcsr() | /*FTZ:*/ (1<<15) | /*DAZ:*/ (1<<6));
     parg->f(parg->arg);
     delete parg;
-    return 0;
+    return nullptr;
   }
-
-#if !defined(PTHREADS_WIN32)
 
   /*! creates a hardware thread running on specific core */
   thread_t createThread(thread_func f, void* arg, size_t stack_size, ssize_t threadID)
   {
-    HANDLE thread = CreateThread(nullptr, stack_size, threadStartup, new ThreadStartupData(f,arg), 0, nullptr);
+    HANDLE thread = CreateThread(nullptr, stack_size, (LPTHREAD_START_ROUTINE)threadStartup, new ThreadStartupData(f,arg), 0, nullptr);
     if (thread == nullptr) FATAL("CreateThread failed");
     if (threadID >= 0) setAffinity(thread, threadID);
     return thread_t(thread);
@@ -162,14 +176,13 @@ namespace embree
 
 namespace embree
 {
-  static MutexSys mutex;
-  static std::vector<size_t> threadIDs;
-  
   /* changes thread ID mapping such that we first fill up all thread on one core */
   size_t mapThreadID(size_t threadID)
   {
+    static MutexSys mutex;
     Lock<MutexSys> lock(mutex);
-    
+    static std::vector<size_t> threadIDs;
+
     if (threadIDs.size() == 0)
     {
       /* parse thread/CPU topology */
@@ -211,22 +224,6 @@ namespace embree
     if (threadID < threadIDs.size())
       ID = threadIDs[threadID];
 
-    /* find correct thread to affinitize to */
-    cpu_set_t set;
-    if (pthread_getaffinity_np(pthread_self(), sizeof(set), &set) == 0)
-    {
-      for (int i=0, j=0; i<CPU_SETSIZE; i++)
-      {
-        if (!CPU_ISSET(i,&set)) continue;
-
-        if (j == ID) {
-          ID = i;
-          break;
-        }
-        j++;
-      }
-    }
-
     return ID;
   }
 
@@ -235,11 +232,10 @@ namespace embree
   {
     cpu_set_t cset;
     CPU_ZERO(&cset);
-    size_t threadID = mapThreadID(affinity);
-    CPU_SET(threadID, &cset);
+    CPU_SET(mapThreadID(affinity), &cset);
 
     if (pthread_setaffinity_np(pthread_self(), sizeof(cset), &cset) != 0)
-      WARNING("pthread_setaffinity_np failed to set affinity to thread "+std::to_string(threadID)); // on purpose only a warning
+      WARNING("pthread_setaffinity_np failed"); // on purpose only a warning
   }
 }
 #endif
@@ -341,22 +337,17 @@ namespace embree
 
     /* create thread */
     pthread_t* tid = new pthread_t;
-    if (pthread_create(tid,&attr,(void*(*)(void*))threadStartup,new ThreadStartupData(f,arg,threadID)) != 0) {
-      pthread_attr_destroy(&attr);
-      delete tid; 
+    if (pthread_create(tid,&attr,(void*(*)(void*))threadStartup,new ThreadStartupData(f,arg,threadID)) != 0)
       FATAL("pthread_create failed");
-    }
-    pthread_attr_destroy(&attr);
 
     /* set affinity */
 #if defined(__LINUX__)
     if (threadID >= 0) {
       cpu_set_t cset;
       CPU_ZERO(&cset);
-      threadID = mapThreadID(threadID);
-      CPU_SET(threadID, &cset);
+      CPU_SET(mapThreadID(threadID), &cset);
       if (pthread_setaffinity_np(*tid, sizeof(cset), &cset))
-        WARNING("pthread_setaffinity_np failed to set affinity to thread "+std::to_string(threadID)); // on purpose only a warning
+        WARNING("pthread_setaffinity_np failed"); // on purpose only a warning
     }
 #elif defined(__FreeBSD__)
     if (threadID >= 0) {
@@ -393,10 +384,8 @@ namespace embree
   tls_t createTls() 
   {
     pthread_key_t* key = new pthread_key_t;
-    if (pthread_key_create(key,nullptr) != 0) {
-      delete key;
+    if (pthread_key_create(key,nullptr) != 0)
       FATAL("pthread_key_create failed");
-    }
 
     return tls_t(key);
   }

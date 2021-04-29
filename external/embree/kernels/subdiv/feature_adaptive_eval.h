@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -32,7 +45,6 @@ namespace embree
         : P(P), dPdu(dPdu), dPdv(dPdv), ddPdudu(ddPdudu), ddPdvdv(ddPdvdv), ddPdudv(ddPdudv)
         {
           switch (edge->patch_type) {
-          case HalfEdge::BILINEAR_PATCH: BilinearPatch(edge,vertices,stride).eval(u,v,P,dPdu,dPdv,ddPdudu,ddPdvdv,ddPdudv,1.0f); break;
           case HalfEdge::REGULAR_QUAD_PATCH: RegularPatchT(edge,vertices,stride).eval(u,v,P,dPdu,dPdv,ddPdudu,ddPdvdv,ddPdudv,1.0f); break;
 #if PATCH_USE_GREGORY == 2
           case HalfEdge::IRREGULAR_QUAD_PATCH: GregoryPatch(edge,vertices,stride).eval(u,v,P,dPdu,dPdv,ddPdudu,ddPdvdv,ddPdudv,1.0f); break;
@@ -119,11 +131,11 @@ namespace embree
         __forceinline bool final(const CatmullClarkPatch& patch, const typename CatmullClarkRing::Type type, size_t depth) 
         {
           const int max_eval_depth = (type & CatmullClarkRing::TYPE_CREASES) ? PATCH_MAX_EVAL_DEPTH_CREASE : PATCH_MAX_EVAL_DEPTH_IRREGULAR;
-//#if PATCH_MIN_RESOLUTION
-//          return patch.isFinalResolution(PATCH_MIN_RESOLUTION) || depth>=(size_t)max_eval_depth;
-//#else
-          return depth>=(size_t)max_eval_depth;
-//#endif
+#if PATCH_MIN_RESOLUTION
+          return patch.isFinalResolution(PATCH_MIN_RESOLUTION) || depth>=(size_t)max_eval_depth;
+#else
+          return depth>=max_eval_depth;
+#endif
         }
         
         void eval(CatmullClarkPatch& patch, Vec2f uv, float dscale, size_t depth, 
@@ -178,7 +190,7 @@ namespace embree
         }
         
         void eval(const GeneralCatmullClarkPatch& patch, const Vec2f& uv, const size_t depth) 
-        {  
+        {
           /* convert into standard quad patch if possible */
           if (likely(patch.isQuadPatch())) 
           {
@@ -198,18 +210,17 @@ namespace embree
           /* parametrization for arbitrary polygons */
           else 
           {
-            const unsigned l = (unsigned) floor(0.5f*uv.x); const float u = 2.0f*frac(0.5f*uv.x)-0.5f; 
-            const unsigned h = (unsigned) floor(0.5f*uv.y); const float v = 2.0f*frac(0.5f*uv.y)-0.5f; 
+            const unsigned l = (unsigned) floor(4.0f*uv.x); const float u = 2.0f*frac(4.0f*uv.x); 
+            const unsigned h = (unsigned) floor(4.0f*uv.y); const float v = 2.0f*frac(4.0f*uv.y); 
             const unsigned i = 4*h+l; assert(i<N);
-            if (i >= N) return;
 
 #if PATCH_USE_GREGORY == 2
             BezierCurve borders[2]; patch.getLimitBorder(borders,i);
             BezierCurve border0l,border0r; borders[0].subdivide(border0l,border0r);
             BezierCurve border2l,border2r; borders[1].subdivide(border2l,border2r);
-            eval(patches[i],Vec2f(u,v),1.0f,depth+1, &border0l, nullptr, nullptr, &border2r);
+            eval(patches[i],Vec2f(u,v),8.0f,depth+1, &border0l, nullptr, nullptr, &border2r);
 #else
-            eval(patches[i],Vec2f(u,v),1.0f,depth+1);
+            eval(patches[i],Vec2f(u,v),8.0f,depth+1);
 #endif
           }
         }

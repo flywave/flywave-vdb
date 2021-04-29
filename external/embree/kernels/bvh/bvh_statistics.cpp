@@ -1,165 +1,257 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "bvh_statistics.h"
-#include "../../common/algorithms/parallel_reduce.h"
+#include <sstream>
 
 namespace embree
 {
+  static const int travCostAligned = 1;
+  static const int travCostUnaligned = 1;
+  static const int travCostTransform = 1;
+  static const int intCost = 1;
+
   template<int N>
   BVHNStatistics<N>::BVHNStatistics (BVH* bvh) : bvh(bvh)
   {
-    double A = max(0.0f,bvh->getLinearBounds().expectedHalfArea());
-    stat = statistics(bvh->root,A,BBox1f(0.0f,1.0f));
+    numAlignedNodes = numUnalignedNodes = 0;
+    numAlignedNodesMB = numUnalignedNodesMB = 0;
+    numTransformNodes = numQuantizedNodes = 0;
+    numLeaves = numPrims = numPrimBlocks = depth = 0;
+    childrenAlignedNodes = childrenUnalignedNodes = 0;
+    childrenAlignedNodesMB = childrenUnalignedNodesMB = 0;
+    childrenQuantizedNodes = 0;
+    bvhSAH = 0.0f; leafSAH = 0.0f;
+    float A = max(0.0f,halfArea(bvh->bounds));
+    statistics(bvh->root,A,depth);
+    bvhSAH /= halfArea(bvh->bounds);
+    leafSAH /= halfArea(bvh->bounds);
+    assert(depth <= BVH::maxDepth);
+  }
+  
+  template<int N>
+  size_t BVHNStatistics<N>::bytesUsed() const
+  {
+    size_t bytesAlignedNodes = numAlignedNodes*sizeof(AlignedNode);
+    size_t bytesUnalignedNodes = numUnalignedNodes*sizeof(UnalignedNode);
+    size_t bytesAlignedNodesMB = numAlignedNodesMB*sizeof(AlignedNodeMB);
+    size_t bytesUnalignedNodesMB = numUnalignedNodesMB*sizeof(UnalignedNodeMB);
+    size_t bytesTransformNodes = numTransformNodes*sizeof(TransformNode);
+    size_t bytesQuantizedNodes = numQuantizedNodes*sizeof(QuantizedNode);
+    size_t bytesPrims  = numPrimBlocks*bvh->primTy.bytes;
+    size_t numVertices = bvh->numVertices;
+    size_t bytesVertices = numVertices*sizeof(Vec3fa); 
+    return bytesAlignedNodes+bytesUnalignedNodes+bytesAlignedNodesMB+bytesUnalignedNodesMB+bytesTransformNodes+bytesQuantizedNodes+bytesPrims+bytesVertices;
   }
   
   template<int N>
   std::string BVHNStatistics<N>::str()
   {
     std::ostringstream stream;
+    size_t bytesAlignedNodes = numAlignedNodes*sizeof(AlignedNode);
+    size_t bytesUnalignedNodes = numUnalignedNodes*sizeof(UnalignedNode);
+    size_t bytesAlignedNodesMB = numAlignedNodesMB*sizeof(AlignedNodeMB);
+    size_t bytesUnalignedNodesMB = numUnalignedNodesMB*sizeof(UnalignedNodeMB);
+    size_t bytesTransformNodes = numTransformNodes*sizeof(TransformNode);
+    size_t bytesQuantizedNodes = numQuantizedNodes*sizeof(QuantizedNode);
+    size_t bytesPrims  = numPrimBlocks*bvh->primTy.bytes;
+    size_t numVertices = bvh->numVertices;
+    size_t bytesVertices = numVertices*sizeof(Vec3fa); 
+    size_t bytesTotal = bytesAlignedNodes+bytesUnalignedNodes+bytesAlignedNodesMB+bytesUnalignedNodesMB+bytesTransformNodes+bytesQuantizedNodes+bytesPrims+bytesVertices;
+    //size_t bytesTotalAllocated = bvh->alloc.bytes();
     stream.setf(std::ios::fixed, std::ios::floatfield);
-    stream << "  primitives = " << bvh->numPrimitives << ", vertices = " << bvh->numVertices << ", depth = " << stat.depth << std::endl;
-    size_t totalBytes = stat.bytes(bvh);
-    double totalSAH = stat.sah(bvh);
-    stream << "  total            : sah = "  << std::setw(7) << std::setprecision(3) << totalSAH << " (100.00%), ";
-    stream << "#bytes = " << std::setw(7) << std::setprecision(2) << totalBytes/1E6 << " MB (100.00%), ";
-    stream << "#nodes = " << std::setw(7) << stat.size() << " (" << std::setw(6) << std::setprecision(2) << 100.0*stat.fillRate(bvh) << "% filled), ";
-    stream << "#bytes/prim = " << std::setw(6) << std::setprecision(2) << double(totalBytes)/double(bvh->numPrimitives) << std::endl;
-    if (stat.statAABBNodes.numNodes    ) stream << "  getAABBNodes     : "  << stat.statAABBNodes.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (stat.statOBBNodes.numNodes  ) stream << "  ungetAABBNodes   : "  << stat.statOBBNodes.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (stat.statAABBNodesMB.numNodes  ) stream << "  getAABBNodesMB   : "  << stat.statAABBNodesMB.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (stat.statAABBNodesMB4D.numNodes) stream << "  getAABBNodesMB4D : "  << stat.statAABBNodesMB4D.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (stat.statOBBNodesMB.numNodes) stream << "  ungetAABBNodesMB : "  << stat.statOBBNodesMB.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (stat.statQuantizedNodes.numNodes  ) stream << "  quantizedNodes   : "  << stat.statQuantizedNodes.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (true)                               stream << "  leaves           : "  << stat.statLeaf.toString(bvh,totalSAH,totalBytes) << std::endl;
-    if (true)                               stream << "    histogram      : "  << stat.statLeaf.histToString() << std::endl;
+    stream << "  primitives = " << bvh->numPrimitives << ", vertices = " << bvh->numVertices << std::endl;
+    stream.precision(4);
+    stream << "  sah = " << bvhSAH+leafSAH << " (" << bvhSAH << " + " << leafSAH << ")";
+    stream.setf(std::ios::fixed, std::ios::floatfield);
+    stream.precision(1);
+    stream << ", depth = " << depth << std::endl;
+    stream << "  used = " << bytesTotal/1E6 << " MB, perPrimitive = " << double(bytesTotal)/double(bvh->numPrimitives) << " B" << std::endl;
+    stream.precision(1);
+    if (numAlignedNodes) {
+      stream << "  alignedNodes = "  << numAlignedNodes << " "
+             << "(" << 100.0*double(childrenAlignedNodes)/double(N*numAlignedNodes) << "% filled) "
+	     << "(" << bytesAlignedNodes/1E6  << " MB) " 
+	     << "(" << 100.0*double(bytesAlignedNodes)/double(bytesTotal) << "% of total)"
+	     << std::endl;
+    }
+    if (numUnalignedNodes) {
+      stream << "  unalignedNodes = "  << numUnalignedNodes << " "
+             << "(" << 100.0*double(childrenUnalignedNodes)/double(N*numUnalignedNodes) << "% filled) "
+	     << "(" << bytesUnalignedNodes/1E6  << " MB) " 
+	     << "(" << 100.0*double(bytesUnalignedNodes)/double(bytesTotal) << "% of total)"
+	     << std::endl;
+    }
+    if (numAlignedNodesMB) {
+      stream << "  alignedNodesMB = "  << numAlignedNodesMB << " "
+             << "(" << 100.0*double(childrenAlignedNodesMB)/double(N*numAlignedNodesMB) << "% filled) "
+	     << "(" << bytesAlignedNodesMB/1E6  << " MB) " 
+	     << "(" << 100.0*double(bytesAlignedNodesMB)/double(bytesTotal) << "% of total)"
+	     << std::endl;
+    }
+    if (numUnalignedNodesMB) {
+      stream << "  unalignedNodesMB = "  << numUnalignedNodesMB << " "
+             << "(" << 100.0*double(childrenUnalignedNodesMB)/double(N*numUnalignedNodesMB) << "% filled) "
+	     << "(" << bytesUnalignedNodesMB/1E6  << " MB) " 
+	     << "(" << 100.0*double(bytesUnalignedNodesMB)/double(bytesTotal) << "% of total)"
+	     << std::endl;
+    }
+    if (numTransformNodes) {
+      stream << "  transformNodes = "  << numTransformNodes << " "
+	     << "(" << bytesTransformNodes/1E6  << " MB) " 
+	     << "(" << 100.0*double(bytesTransformNodes)/double(bytesTotal) << "% of total)"
+	     << std::endl;
+    }
+    if (numQuantizedNodes) {
+      stream << "  quantizedNodes = "  << numQuantizedNodes << " "
+             << "(" << 100.0*double(childrenQuantizedNodes)/double(N*numQuantizedNodes) << "% filled) "
+	     << "(" << bytesQuantizedNodes/1E6  << " MB) " 
+	     << "(" << 100.0*double(bytesQuantizedNodes)/double(bytesTotal) << "% of total)"
+	     << std::endl;
+    }
+
+    stream << "  leaves = " << numLeaves << " "
+           << "(" << bytesPrims/1E6  << " MB) "
+           << "(" << 100.0*double(bytesPrims)/double(bytesTotal) << "% of total)"
+           << "(" << 100.0*double(numPrims)/double(bvh->primTy.blockSize*numPrimBlocks) << "% used)" 
+           << std::endl;
+    stream << "  vertices = " << numVertices << " "
+           << "(" << bytesVertices/1E6 << " MB) " 
+           << "(" << 100.0*double(bytesVertices)/double(bytesTotal) << "% of total) "
+           << "(" << 100.0*12.0f/float(sizeof(Vec3fa)) << "% used)" 
+           << std::endl;
     return stream.str();
   }
   
   template<int N>
-  typename BVHNStatistics<N>::Statistics BVHNStatistics<N>::statistics(NodeRef node, const double A, const BBox1f t0t1)
+  void BVHNStatistics<N>::statistics(NodeRef node, const float A, size_t& depth)
   {
-    Statistics s;
-    assert(t0t1.size() > 0.0f);
-    double dt = max(0.0f,t0t1.size());
-    if (node.isAABBNode())
+    if (node.isNode())
     {
-      AABBNode* n = node.getAABBNode();
-      s = s + parallel_reduce(0,N,Statistics(),[&] ( const int i ) {
-          if (n->child(i) == BVH::emptyNode) return Statistics();
-          const double Ai = max(0.0f,halfArea(n->extend(i)));
-          Statistics s = statistics(n->child(i),Ai,t0t1); 
-          s.statAABBNodes.numChildren++;
-          return s;
-        }, Statistics::add);
-      s.statAABBNodes.numNodes++;
-      s.statAABBNodes.nodeSAH += dt*A;
-      s.depth++;
+      numAlignedNodes++;
+      AlignedNode* n = node.node();
+      bvhSAH += A*travCostAligned;
+      depth = 0;
+      for (size_t i=0; i<N; i++) {
+        if (n->child(i) == BVH::emptyNode) continue;
+        childrenAlignedNodes++;
+        const float Ai = max(0.0f,halfArea(n->extend(i)));
+        size_t cdepth; statistics(n->child(i),Ai,cdepth); 
+        depth=max(depth,cdepth);
+      }
+      depth++;
     }
-    else if (node.isOBBNode())
+    else if (node.isUnalignedNode())
     {
-      OBBNode* n = node.ungetAABBNode();
-      s = s + parallel_reduce(0,N,Statistics(),[&] ( const int i ) {
-          if (n->child(i) == BVH::emptyNode) return Statistics();
-          const double Ai = max(0.0f,halfArea(n->extent(i)));
-          Statistics s = statistics(n->child(i),Ai,t0t1); 
-          s.statOBBNodes.numChildren++;
-          return s;
-        }, Statistics::add);
-      s.statOBBNodes.numNodes++;
-      s.statOBBNodes.nodeSAH += dt*A;
-      s.depth++;
+      numUnalignedNodes++;
+      UnalignedNode* n = node.unalignedNode();
+      bvhSAH += A*travCostUnaligned;
+      
+      depth = 0;
+      for (size_t i=0; i<N; i++) {
+        if (n->child(i) == BVH::emptyNode) continue;
+        childrenUnalignedNodes++;
+        const float Ai = max(0.0f,halfArea(n->extend(i)));
+        size_t cdepth; statistics(n->child(i),Ai,cdepth); 
+        depth=max(depth,cdepth);
+      }
+      depth++;
     }
-    else if (node.isAABBNodeMB())
+    else if (node.isNodeMB())
     {
-      AABBNodeMB* n = node.getAABBNodeMB();
-      s = s + parallel_reduce(0,N,Statistics(),[&] ( const int i ) {
-          if (n->child(i) == BVH::emptyNode) return Statistics();
-          const double Ai = max(0.0f,n->expectedHalfArea(i,t0t1));
-          Statistics s = statistics(n->child(i),Ai,t0t1);
-          s.statAABBNodesMB.numChildren++;
-          return s;
-        }, Statistics::add);
-      s.statAABBNodesMB.numNodes++;
-      s.statAABBNodesMB.nodeSAH += dt*A;
-      s.depth++;
+      numAlignedNodesMB++;
+      AlignedNodeMB* n = node.nodeMB();
+      bvhSAH += A*travCostAligned;
+      
+      depth = 0;
+      for (size_t i=0; i<N; i++) {
+        if (n->child(i) == BVH::emptyNode) continue;
+        childrenAlignedNodesMB++;
+        const float Ai = max(0.0f,halfArea(n->extend0(i)));
+        size_t cdepth; statistics(n->child(i),Ai,cdepth); 
+        depth=max(depth,cdepth);
+      }
+      depth++;
     }
-    else if (node.isAABBNodeMB4D())
+    else if (node.isUnalignedNodeMB())
     {
-      AABBNodeMB4D* n = node.getAABBNodeMB4D();
-      s = s + parallel_reduce(0,N,Statistics(),[&] ( const int i ) {
-          if (n->child(i) == BVH::emptyNode) return Statistics();
-          const BBox1f t0t1i = intersect(t0t1,n->timeRange(i));
-          assert(!t0t1i.empty());
-          const double Ai = n->AABBNodeMB::expectedHalfArea(i,t0t1i);
-          Statistics s =  statistics(n->child(i),Ai,t0t1i);
-          s.statAABBNodesMB4D.numChildren++;
-          return s;
-        }, Statistics::add);
-      s.statAABBNodesMB4D.numNodes++;
-      s.statAABBNodesMB4D.nodeSAH += dt*A;
-      s.depth++;
+      numUnalignedNodesMB++;
+      UnalignedNodeMB* n = node.unalignedNodeMB();
+      bvhSAH += A*travCostUnaligned;
+      
+      depth = 0;
+      for (size_t i=0; i<N; i++) {
+        if (n->child(i) == BVH::emptyNode) continue;
+        childrenUnalignedNodesMB++;
+        const float Ai = max(0.0f,halfArea(n->extend0(i)));
+        size_t cdepth; statistics(n->child(i),Ai,cdepth); 
+        depth=max(depth,cdepth);
+      }
+      depth++;
     }
-    else if (node.isOBBNodeMB())
+    else if (node.isTransformNode())
     {
-      OBBNodeMB* n = node.ungetAABBNodeMB();
-      s = s + parallel_reduce(0,N,Statistics(),[&] ( const int i ) {
-          if (n->child(i) == BVH::emptyNode) return Statistics();
-          const double Ai = max(0.0f,halfArea(n->extent0(i)));
-          Statistics s = statistics(n->child(i),Ai,t0t1); 
-          s.statOBBNodesMB.numChildren++;
-          return s;
-        }, Statistics::add);
-      s.statOBBNodesMB.numNodes++;
-      s.statOBBNodesMB.nodeSAH += dt*A;
-      s.depth++;
+      numTransformNodes++;
+      //TransformNode* n = node.transformNode();
+      bvhSAH += A*travCostTransform;
+
+      depth = 0;
+      //const BBox3fa worldBounds = xfmBounds(n->local2world,n->localBounds);
+      //const float Ai = max(0.0f,halfArea(worldBounds));
+      //size_t cdepth; statistics(n->child,Ai,cdepth); 
+      //depth=max(depth,cdepth)+1;
     }
     else if (node.isQuantizedNode())
     {
-      QuantizedNode* n = node.quantizedNode();
-      s = s + parallel_reduce(0,N,Statistics(),[&] ( const int i ) {
-          if (n->child(i) == BVH::emptyNode) return Statistics();
-          const double Ai = max(0.0f,halfArea(n->extent(i)));
-          Statistics s = statistics(n->child(i),Ai,t0t1); 
-          s.statQuantizedNodes.numChildren++;
-          return s;
-        }, Statistics::add);
-      s.statQuantizedNodes.numNodes++;
-      s.statQuantizedNodes.nodeSAH += dt*A;
-      s.depth++;
-    }
-    else if (node.isLeaf())
-    {
-      size_t num; const char* tri = node.leaf(num);
-      if (num)
-      {
-        for (size_t i=0; i<num; i++)
-        {
-          const size_t bytes = bvh->primTy->getBytes(tri);
-          s.statLeaf.numPrimsActive += bvh->primTy->sizeActive(tri);
-          s.statLeaf.numPrimsTotal += bvh->primTy->sizeTotal(tri);
-          s.statLeaf.numBytes += bytes;
-          tri+=bytes;
-        }
-        s.statLeaf.numLeaves++;
-        s.statLeaf.numPrimBlocks += num;
-        s.statLeaf.leafSAH += dt*A*num;
-        if (num-1 < Statistics::LeafStat::NHIST) {
-          s.statLeaf.numPrimBlocksHistogram[num-1]++;
-        }
+      numQuantizedNodes++;
+      QuantizedNode* n = (QuantizedNode*)node.quantizedNode();
+      bvhSAH += A*travCostAligned;
+      depth = 0;
+      for (size_t i=0; i<N; i++) {
+#if ENABLE_32BIT_OFFSETS_FOR_QUANTIZED_NODES == 1 
+        if (n->childOffset(i) == BVH::emptyNode) continue; 
+#else
+        if (n->child(i) == BVH::emptyNode) continue; 
+#endif
+        childrenQuantizedNodes++;
+        const float Ai = max(0.0f,halfArea(n->extend(i)));
+        size_t cdepth; statistics(n->child(i),Ai,cdepth); 
+        depth=max(depth,cdepth);
       }
+      depth++;
     }
-    else {
-      throw std::runtime_error("not supported node type in bvh_statistics");
+    else
+    {
+      depth = 0;
+      size_t num; const char* tri = node.leaf(num);
+      if (!num) return;
+      
+      numLeaves++;
+      numPrimBlocks += num;
+      for (size_t i=0; i<num; i++)
+        numPrims += bvh->primTy.size(tri+i*bvh->primTy.bytes);
+      
+      float sah = A * intCost * num;
+      leafSAH += sah;
     }
-    return s;
   } 
 
 #if defined(__AVX__)
   template class BVHNStatistics<8>;
-#endif
-
-#if !defined(__AVX__) || !defined(EMBREE_TARGET_SSE2) && !defined(EMBREE_TARGET_SSE42)
+#else
   template class BVHNStatistics<4>;
 #endif
 }

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -53,13 +66,13 @@ namespace embree
     __forceinline const LinearSpace3 transposed() const { return LinearSpace3(vx.x,vx.y,vx.z,vy.x,vy.y,vy.z,vz.x,vz.y,vz.z); }
 
     /*! returns first row of matrix */
-    __forceinline Vector row0() const { return Vector(vx.x,vy.x,vz.x); }
+    __forceinline const Vector row0() const { return Vector(vx.x,vy.x,vz.x); }
 
     /*! returns second row of matrix */
-    __forceinline Vector row1() const { return Vector(vx.y,vy.y,vz.y); }
+    __forceinline const Vector row1() const { return Vector(vx.y,vy.y,vz.y); }
 
     /*! returns third row of matrix */
-    __forceinline Vector row2() const { return Vector(vx.z,vy.z,vz.z); }
+    __forceinline const Vector row2() const { return Vector(vx.z,vy.z,vz.z); }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -143,7 +156,7 @@ namespace embree
   template<typename T> __forceinline LinearSpace3<T> operator -( const LinearSpace3<T>& a, const LinearSpace3<T>& b ) { return LinearSpace3<T>(a.vx-b.vx,a.vy-b.vy,a.vz-b.vz); }
 
   template<typename T> __forceinline LinearSpace3<T> operator*(const typename T::Scalar & a, const LinearSpace3<T>& b) { return LinearSpace3<T>(a*b.vx, a*b.vy, a*b.vz); }
-  template<typename T> __forceinline T               operator*(const LinearSpace3<T>& a, const T              & b) { return madd(T(b.x),a.vx,madd(T(b.y),a.vy,T(b.z)*a.vz)); }
+  template<typename T> __forceinline T               operator*(const LinearSpace3<T>& a, const T              & b) { return b.x*a.vx + b.y*a.vy + b.z*a.vz; }
   template<typename T> __forceinline LinearSpace3<T> operator*(const LinearSpace3<T>& a, const LinearSpace3<T>& b) { return LinearSpace3<T>(a*b.vx, a*b.vy, a*b.vz); }
 
   template<typename T> __forceinline LinearSpace3<T> operator/(const LinearSpace3<T>& a, const typename T::Scalar & b) { return LinearSpace3<T>(a.vx/b, a.vy/b, a.vz/b); }
@@ -164,48 +177,14 @@ namespace embree
   template<typename T> __forceinline bool operator !=( const LinearSpace3<T>& a, const LinearSpace3<T>& b ) { return a.vx != b.vx || a.vy != b.vy || a.vz != b.vz; }
 
   ////////////////////////////////////////////////////////////////////////////////
-  /// Select
-  ////////////////////////////////////////////////////////////////////////////////
-
-  template<typename T> __forceinline LinearSpace3<T> select ( const typename T::Scalar::Bool& s, const LinearSpace3<T>& t, const LinearSpace3<T>& f ) {
-    return LinearSpace3<T>(select(s,t.vx,f.vx),select(s,t.vy,f.vy),select(s,t.vz,f.vz));
-  }
-
-  /*! blending */
-  template<typename T>
-    __forceinline LinearSpace3<T> lerp(const LinearSpace3<T>& l0, const LinearSpace3<T>& l1, const float t) 
-  {
-    return LinearSpace3<T>(lerp(l0.vx,l1.vx,t),
-                           lerp(l0.vy,l1.vy,t),
-                           lerp(l0.vz,l1.vz,t));
-  }
-
-  ////////////////////////////////////////////////////////////////////////////////
   /// Output Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> static embree_ostream operator<<(embree_ostream cout, const LinearSpace3<T>& m) {
+  template<typename T> static std::ostream& operator<<(std::ostream& cout, const LinearSpace3<T>& m) {
     return cout << "{ vx = " << m.vx << ", vy = " << m.vy << ", vz = " << m.vz << "}";
   }
 
   /*! Shortcuts for common linear spaces. */
   typedef LinearSpace3<Vec3f> LinearSpace3f;
   typedef LinearSpace3<Vec3fa> LinearSpace3fa;
-
-  template<int N> using LinearSpace3vf = LinearSpace3<Vec3<vfloat<N>>>;
-  typedef LinearSpace3<Vec3<vfloat<4>>>  LinearSpace3vf4;
-  typedef LinearSpace3<Vec3<vfloat<8>>>  LinearSpace3vf8;
-  typedef LinearSpace3<Vec3<vfloat<16>>> LinearSpace3vf16;
-
-  /*! blending */
-  template<typename T, typename S>
-    __forceinline LinearSpace3<T> lerp(const LinearSpace3<T>& l0,
-                                       const LinearSpace3<T>& l1,
-                                       const S& t)
-  {
-    return LinearSpace3<T>(lerp(l0.vx,l1.vx,t),
-                           lerp(l0.vy,l1.vy,t),
-                           lerp(l0.vz,l1.vz,t));
-  }
-
 }

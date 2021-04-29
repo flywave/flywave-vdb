@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -23,9 +36,9 @@
 #endif
 
 #define PATCH_MAX_CACHE_DEPTH 2
-//#define PATCH_MIN_RESOLUTION 1     // FIXME: not yet completely implemented
-#define PATCH_MAX_EVAL_DEPTH_IRREGULAR 10     // maximum evaluation depth at irregular vertices (has to be larger or equal than PATCH_MAX_CACHE_DEPTH)
-#define PATCH_MAX_EVAL_DEPTH_CREASE 10       // maximum evaluation depth at crease features (has to be larger or equal than PATCH_MAX_CACHE_DEPTH)
+#define PATCH_MIN_RESOLUTION 1     // FIXME: not yet completely implemented
+#define PATCH_MAX_EVAL_DEPTH_IRREGULAR 2     // maximal evaluation depth at irregular vertices (has to be larger or equal than PATCH_MAX_CACHE_DEPTH)
+#define PATCH_MAX_EVAL_DEPTH_CREASE 10       // maximal evaluation depth at crease features (has to be larger or equal than PATCH_MAX_CACHE_DEPTH)
 #define PATCH_USE_GREGORY 1        // 0 = no gregory, 1 = fill, 2 = as early as possible
 
 #if PATCH_USE_GREGORY==2
@@ -110,20 +123,11 @@ namespace embree
       template<typename Allocator>
       __noinline static Ref create(const Allocator& alloc, const CatmullClarkPatch& patch,
                                    const BezierCurve* border0, const BezierCurve* border1, const BezierCurve* border2, const BezierCurve* border3) {
-        return Ref(BILINEAR_PATCH, new (alloc(sizeof(BilinearPatch))) BilinearPatch(patch));
-      }
-
-      __forceinline BilinearPatch (const CatmullClarkPatch& patch) 
-        : patch(patch) {}
-
-      /* creates BilinearPatch from 4 vertices */
-      template<typename Allocator>
-      __noinline static Ref create(const Allocator& alloc, const HalfEdge* edge, const char* vertices, size_t stride) {
-        return Ref(BILINEAR_PATCH, new (alloc(sizeof(BilinearPatch))) BilinearPatch(edge,vertices,stride));
+        return Ref(BILINEAR_PATCH, new (alloc(sizeof(BilinearPatch))) BilinearPatch(patch,border0,border1,border2,border3));
       }
       
-      __forceinline BilinearPatch (const HalfEdge* edge, const char* vertices, size_t stride) 
-        : patch(edge,vertices,stride) {}
+      __forceinline BilinearPatch (const CatmullClarkPatch& patch, const BezierCurve* border0, const BezierCurve* border1, const BezierCurve* border2, const BezierCurve* border3) 
+        : patch(patch,border0,border1,border2,border3) {}
       
     public:
       BilinearPatchT<Vertex,Vertex_t> patch;
@@ -245,7 +249,6 @@ namespace embree
 
       Ref child(0);
       switch (edge->patch_type) {
-      case HalfEdge::BILINEAR_PATCH:       child = BilinearPatch::create(alloc,edge,vertices,stride); break; 
       case HalfEdge::REGULAR_QUAD_PATCH:   child = RegularPatch::create(alloc,edge,vertices,stride); break;
 #if PATCH_USE_GREGORY == 2
       case HalfEdge::IRREGULAR_QUAD_PATCH: child = GregoryPatch::create(alloc,edge,vertices,stride); break;
@@ -260,18 +263,17 @@ namespace embree
 
     template<typename Allocator>
     __noinline static Ref create(const Allocator& alloc, GeneralCatmullClarkPatch& patch, const HalfEdge* edge, const char* vertices, size_t stride, size_t depth)
-    {  
+    {
       /* convert into standard quad patch if possible */
       if (likely(patch.isQuadPatch())) 
       {
         CatmullClarkPatch qpatch; patch.init(qpatch);
         return PatchT::create(alloc,qpatch,edge,vertices,stride,depth);
       }
-   
-      /* do only cache up to some depth */
+      
       if (depth >= PATCH_MAX_CACHE_DEPTH)
         return nullptr;
-         
+      
       /* subdivide patch */
       unsigned N;
       array_t<CatmullClarkPatch,GeneralCatmullClarkPatch::SIZE> patches; 

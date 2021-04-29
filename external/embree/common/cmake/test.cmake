@@ -1,115 +1,133 @@
-## Copyright 2009-2020 Intel Corporation
-## SPDX-License-Identifier: Apache-2.0
+## ======================================================================== ##
+## Copyright 2009-2016 Intel Corporation                                    ##
+##                                                                          ##
+## Licensed under the Apache License, Version 2.0 (the "License");          ##
+## you may not use this file except in compliance with the License.         ##
+## You may obtain a copy of the License at                                  ##
+##                                                                          ##
+##     http://www.apache.org/licenses/LICENSE-2.0                           ##
+##                                                                          ##
+## Unless required by applicable law or agreed to in writing, software      ##
+## distributed under the License is distributed on an "AS IS" BASIS,        ##
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
+## See the License for the specific language governing permissions and      ##
+## limitations under the License.                                           ##
+## ======================================================================== ##
+
+IF(NOT BUILD_TESTING)
+  SET(BUILD_TESTING OFF CACHE BOOL "Build the testing tree.")
+ENDIF()
 
 INCLUDE(CTest)
 
-IF (WIN32)
-    SET(MY_PROJECT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}")
-ELSE()
-    SET(MY_PROJECT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-ENDIF()
+IF (BUILD_TESTING)
 
-FIND_PATH(EMBREE_TESTING_MODEL_DIR
-  NAMES test-models-intensity2.txt
-  PATHS "${PROJECT_SOURCE_DIR}/models"
-  DOC "Path to the folder containing the Embree models for regression testing."
-  NO_DEFAULT_PATHS)
+  CMAKE_HOST_SYSTEM_INFORMATION(RESULT memory QUERY TOTAL_PHYSICAL_MEMORY)
+  
+  SET(EMBREE_TESTING_MODEL_DIR "${PROJECT_SOURCE_DIR}/models" CACHE FILEPATH "Path to the folder containing the Embree models for regression testing.")
+  SET(EMBREE_TESTING_INTENSIVE OFF CACHE BOOL "Turns intensive testing on.")
+  SET(EMBREE_TESTING_MEMCHECK OFF CACHE BOOL "Turns on memory checking for some tests.")
+  SET(EMBREE_TESTING_BENCHMARK OFF CACHE BOOL "Turns benchmarking on.")
+  SET(EMBREE_TESTING_BENCHMARK_DATABASE "${PROJECT_BINARY_DIR}" CACHE PATH "Path to database for benchmarking.")
 
-SET(EMBREE_TESTING_INTENSITY 1 CACHE STRING "Intensity of testing (0 = no testing, 1 = verify and tutorials, 2 = light testing, 3 = intensive testing.")
-SET_PROPERTY(CACHE EMBREE_TESTING_INTENSITY PROPERTY STRINGS 0 1 2 3)
-SET(EMBREE_TESTING_MEMCHECK OFF CACHE BOOL "Turns on memory checking for some tests.")
-SET(EMBREE_TESTING_BENCHMARK OFF CACHE BOOL "Turns benchmarking on.")
-SET(EMBREE_TESTING_BENCHMARK_DATABASE "${PROJECT_BINARY_DIR}" CACHE PATH "Path to database for benchmarking.")
-SET(EMBREE_TESTING_PACKAGE OFF CACHE BOOL "Packages release as test.")
-SET(EMBREE_TESTING_KLOCWORK OFF CACHE BOOL "Runs Kocwork as test.")
-SET(EMBREE_TESTING_SDE OFF CACHE STRING "Uses SDE to run tests for specified CPU.")
-SET_PROPERTY(CACHE EMBREE_TESTING_SDE PROPERTY STRINGS OFF pnr nhm wsm snb ivb hsw bdw knl skl skx cnl)
-
-SET(EMBREE_MODEL_DIR "none")
-IF (EMBREE_TESTING_MODEL_DIR)
-  SET(EMBREE_MODEL_DIR ${EMBREE_TESTING_MODEL_DIR})
-ENDIF()
-
-MACRO (ADD_EMBREE_NORMAL_CPP_TEST name reference executable args)  
-  IF (BUILD_TESTING)  
-    ADD_TEST(NAME ${name}
-             WORKING_DIRECTORY ${MY_PROJECT_BINARY_DIR}
-             COMMAND ${executable} --compare ${EMBREE_MODEL_DIR}/reference/${reference}.tga ${args})
-  ENDIF()
-ENDMACRO()
-
-MACRO (ADD_EMBREE_NORMAL_ISPC_TEST name reference executable args)  
-  IF (BUILD_TESTING AND EMBREE_ISPC_SUPPORT AND EMBREE_RAY_PACKETS)
-    ADD_TEST(NAME ${name}_ispc
-             WORKING_DIRECTORY ${MY_PROJECT_BINARY_DIR}
-             COMMAND ${executable}_ispc --compare ${EMBREE_MODEL_DIR}/reference/${reference}.tga ${args})
-  ENDIF()       
-ENDMACRO()
-
-MACRO (ADD_EMBREE_NORMAL_TEST name reference executable args)
-  ADD_EMBREE_NORMAL_CPP_TEST(${name} ${reference} ${executable} "${args}")
-  ADD_EMBREE_NORMAL_ISPC_TEST(${name} ${reference} ${executable} "${args}")
-ENDMACRO()
-
-MACRO (ADD_EMBREE_TEST name)
-  ADD_EMBREE_NORMAL_TEST(${name} ${name} ${name} "")
-ENDMACRO()
-
-MACRO (ADD_EMBREE_TEST2 name exe args)
-  ADD_EMBREE_NORMAL_TEST(${name} ${exe} ${exe} "${args}")
-ENDMACRO()
-
-MACRO (ADD_EMBREE_MODEL_TEST name reference executable args model)
-  IF (BUILD_TESTING)  
-    ADD_TEST(NAME ${name}
-             WORKING_DIRECTORY ${MY_PROJECT_BINARY_DIR}
-             COMMAND ${executable} -c ${EMBREE_MODEL_DIR}/${model} --compare ${EMBREE_MODEL_DIR}/reference/${reference}.tga ${args})
+  IF(   NOT EXISTS "${EMBREE_TESTING_MODEL_DIR}/embree-models-subdiv.txt"
+     OR NOT EXISTS "${EMBREE_TESTING_MODEL_DIR}/embree-models-small-win32.txt"
+     OR NOT EXISTS "${EMBREE_TESTING_MODEL_DIR}/embree-models-small-x64.txt"
+     OR NOT EXISTS "${EMBREE_TESTING_MODEL_DIR}/embree-models-large.txt")
+    MESSAGE(FATAL_ERROR "Invalid Embree testing model repository. Either disable BUILD_TESTING or properly set EMBREE_TESTING_MODEL_DIR.")
   ENDIF()
   
-  IF (EMBREE_ISPC_SUPPORT AND EMBREE_RAY_PACKETS)
-    IF (BUILD_TESTING)  
+  FILE(READ "${EMBREE_TESTING_MODEL_DIR}/embree-models-subdiv.txt" models_subdiv)
+  STRING(REGEX REPLACE "\n" ";" models_subdiv "${models_subdiv}")
+  
+  FILE(READ "${EMBREE_TESTING_MODEL_DIR}/embree-models-small-win32.txt" models_small_win32)
+  STRING(REGEX REPLACE "\n" ";" models_small_win32 "${models_small_win32}")
+  
+  FILE(READ "${EMBREE_TESTING_MODEL_DIR}/embree-models-small-x64.txt" models_small_x64)
+  STRING(REGEX REPLACE "\n" ";" models_small_x64 "${models_small_x64}")
+  
+  FILE(READ "${EMBREE_TESTING_MODEL_DIR}/embree-models-large.txt" models_large)
+  STRING(REGEX REPLACE "\n" ";" models_large "${models_large}")
+
+  IF (EMBREE_TESTING_INTENSIVE)
+    SET(models ${models_small_x64})
+    IF (${memory} GREATER 10000) 
+      SET(models ${models} ${models_large})
+    ENDIF()
+  ELSE()
+    SET(models ${models_small_win32})
+  ENDIF()
+
+  IF (WIN32)
+    SET(MY_PROJECT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}")
+  ELSE()
+    SET(MY_PROJECT_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+  ENDIF()
+  
+  MACRO (ADD_EMBREE_MODEL_TEST name reference executable args model)
+  
+    ADD_TEST(NAME ${name}
+             WORKING_DIRECTORY ${MY_PROJECT_BINARY_DIR}
+             COMMAND python ${PROJECT_SOURCE_DIR}/scripts/invoke_test.py
+                     --name ${name}
+                     --modeldir ${EMBREE_TESTING_MODEL_DIR}
+                     --reference ${reference}
+                     --model ${model}
+                     --execute ${MY_PROJECT_BINARY_DIR}/${executable} ${args})
+                     
+    IF (EMBREE_ISPC_SUPPORT AND EMBREE_RAY_PACKETS)
       ADD_TEST(NAME ${name}_ispc
                WORKING_DIRECTORY ${MY_PROJECT_BINARY_DIR}
-               COMMAND COMMAND ${executable}_ispc -c ${EMBREE_MODEL_DIR}/${model} --compare ${EMBREE_MODEL_DIR}/reference/${reference}.tga ${args})
+               COMMAND python ${PROJECT_SOURCE_DIR}/scripts/invoke_test.py
+                       --name ${name}_ispc
+                       --modeldir ${EMBREE_TESTING_MODEL_DIR}
+                       --reference ${reference}
+                       --model ${model}
+                       --execute ${MY_PROJECT_BINARY_DIR}/${executable}_ispc ${args})
     ENDIF()
-  ENDIF()
-ENDMACRO()
+  ENDMACRO()
   
-MACRO (ADD_EMBREE_MODELS_TEST model_list_file name reference executable)
-  IF (BUILD_TESTING)  
-
-    SET(full_model_list_file ${EMBREE_TESTING_MODEL_DIR}/${model_list_file})
-    
-    IF(NOT EXISTS "${full_model_list_file}")
-      MESSAGE(FATAL_ERROR "File ${EMBREE_TESTING_MODEL_DIR}/${model_list_file} does not exist!")
-    ENDIF()
-
-    FILE(READ "${full_model_list_file}" models)
-    STRING(REGEX REPLACE "\n" ";" models "${models}")
-    
+  MACRO (ADD_EMBREE_MODELS_TEST name reference executable)
     FOREACH (model ${models})
       STRING(REGEX REPLACE "/" "_" modelname "${model}")
       STRING(REGEX REPLACE ".ecs" "" modelname "${modelname}")
       ADD_EMBREE_MODEL_TEST(${name}_${modelname} ${reference}_${modelname} ${executable} "${ARGN}" ${model})
     ENDFOREACH()
-  ENDIF()
-ENDMACRO()
+  ENDMACRO()
 
-# add klocwork test
-IF (EMBREE_TESTING_KLOCWORK)
-  ADD_TEST(NAME Klocwork-Build WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${PROJECT_SOURCE_DIR}/scripts/klocwork_build.sh)
-  ADD_TEST(NAME Klocwork-Check WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${PROJECT_SOURCE_DIR}/scripts/klocwork_check.sh)
-  SET_TESTS_PROPERTIES(Klocwork-Build PROPERTIES TIMEOUT 2400)
-  SET_TESTS_PROPERTIES(Klocwork-Check PROPERTIES TIMEOUT 300)
+  MACRO (ADD_EMBREE_SUBDIV_MODELS_TEST name reference executable)
+    FOREACH (model ${models_subdiv})
+      STRING(REGEX REPLACE "/" "_" modelname "${model}")
+      STRING(REGEX REPLACE ".ecs" "" modelname "${modelname}")
+      ADD_EMBREE_MODEL_TEST(${name}_${modelname} ${reference}_${modelname} ${executable} "${ARGN}" ${model})
+    ENDFOREACH()
+  ENDMACRO()
+
+ELSE()
+
+  MACRO (ADD_EMBREE_MODEL_TEST name reference executable args model)
+  ENDMACRO()
+
+  MACRO (ADD_EMBREE_SUBDIV_MODELS_TEST name reference executable)
+  ENDMACRO()
+
+  MACRO (ADD_EMBREE_MODELS_TEST name)
+  ENDMACRO()
+
 ENDIF()
 
-# add valgrind test
+MACRO (ADD_EMBREE_TEST name)
+  ADD_EMBREE_MODEL_TEST(${name} ${name} ${name} "" "default")
+ENDMACRO()
+
+MACRO (ADD_EMBREE_TEST2 name exe args)
+  ADD_EMBREE_MODEL_TEST(${name} ${exe} ${exe} "${args}" "default")
+ENDMACRO()
+
 IF (EMBREE_TESTING_MEMCHECK)
   find_program( EMBREE_MEMORYCHECK_COMMAND valgrind )
-  set( EMBREE_MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --leak-check=full --show-leak-kinds=definite --errors-for-leak-kinds=definite --error-exitcode=1" )
-  IF (NOT EMBREE_MEMORYCHECK_COMMAND)
-    MESSAGE(FATAL_ERROR "valgrind not found")
-  ENDIF()
+  set( EMBREE_MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --leak-check=full" )
+
   FUNCTION(ADD_MEMCHECK_TEST name binary)
     set(memcheck_command "${EMBREE_MEMORYCHECK_COMMAND} ${EMBREE_MEMORYCHECK_COMMAND_OPTIONS}")
     separate_arguments(memcheck_command)

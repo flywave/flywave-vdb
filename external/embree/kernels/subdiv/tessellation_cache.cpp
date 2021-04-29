@@ -1,7 +1,21 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "tessellation_cache.h"
+
 
 namespace embree
 {
@@ -28,8 +42,7 @@ namespace embree
   {
     size = 0;
     data = nullptr;
-    hugepages = false;
-    maxBlocks              = size/BLOCK_SIZE;
+    maxBlocks              = size/64;
     localTime              = NUM_CACHE_SEGMENTS;
     next_block             = 0;
     numRenderThreads       = 0;
@@ -84,52 +97,53 @@ namespace embree
   void SharedLazyTessellationCache::allocNextSegment() 
   {
     if (reset_state.try_lock())
-    {
-      if (next_block >= switch_block_threshold)
       {
-        /* lock the linked list of thread states */
-        
-        linkedlist_mtx.lock();
-        
-        /* block all threads */
-        for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
-          if (lockThread(t,THREAD_BLOCK_ATOMIC_ADD) != 0)
-            waitForUsersLessEqual(t,THREAD_BLOCK_ATOMIC_ADD);
-        
-        /* switch to the next segment */
-        addCurrentIndex();
-        CACHE_STATS(PRINT("RESET TESS CACHE"));
-        
+	if (next_block >= switch_block_threshold)
+	  {
+            /* lock the linked list of thread states */
+
+            linkedlist_mtx.lock();
+
+            /* block all threads */
+	    for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
+	      if (lockThread(t) == 1)
+		waitForUsersLessEqual(t,1);
+
+
+            /* switch to the next segment */
+	    addCurrentIndex();
+	    CACHE_STATS(PRINT("RESET TESS CACHE"));
+
 #if FORCE_SIMPLE_FLUSH == 1
-        next_block = 0;
-        switch_block_threshold = maxBlocks;
+	    next_block = 0;
+	    switch_block_threshold = maxBlocks;
 #else
-        const size_t region = localTime % NUM_CACHE_SEGMENTS;
-        next_block = region * (maxBlocks/NUM_CACHE_SEGMENTS);
-        switch_block_threshold = next_block + (maxBlocks/NUM_CACHE_SEGMENTS);
-        assert( switch_block_threshold <= maxBlocks );
+	    const size_t region = localTime % NUM_CACHE_SEGMENTS;
+	    next_block = region * (maxBlocks/NUM_CACHE_SEGMENTS);
+	    switch_block_threshold = next_block + (maxBlocks/NUM_CACHE_SEGMENTS);
+	    assert( switch_block_threshold <= maxBlocks );
 #endif
-        
-        CACHE_STATS(SharedTessellationCacheStats::cache_flushes++);
-        
-        /* release all blocked threads */
-        
-        for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
-          unlockThread(t,-THREAD_BLOCK_ATOMIC_ADD);
-        
-        /* unlock the linked list of thread states */
-        
-        linkedlist_mtx.unlock();
-	
-        
+
+	    CACHE_STATS(SharedTessellationCacheStats::cache_flushes++);
+
+            /* release all blocked threads */
+
+	    for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
+	      unlockThread(t);
+
+            /* unlock the linked list of thread states */
+
+            linkedlist_mtx.unlock();
+	    
+
+	  }
+	reset_state.unlock();
       }
-      reset_state.unlock();
-    }
     else
       reset_state.wait_until_unlocked();	   
   }
-  
-  
+
+
   void SharedLazyTessellationCache::reset()
   {
     /* lock the reset_state */
@@ -140,8 +154,8 @@ namespace embree
 
     /* block all threads */
     for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
-      if (lockThread(t,THREAD_BLOCK_ATOMIC_ADD) != 0)
-        waitForUsersLessEqual(t,THREAD_BLOCK_ATOMIC_ADD);
+      if (lockThread(t) == 1)
+        waitForUsersLessEqual(t,1);
 
     /* reset to the first segment */
     next_block = 0;
@@ -156,7 +170,7 @@ namespace embree
 
     /* release all blocked threads */
     for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
-      unlockThread(t,-THREAD_BLOCK_ATOMIC_ADD);
+      unlockThread(t);
 
     /* unlock the linked list of thread states */
     linkedlist_mtx.unlock();	    
@@ -175,15 +189,15 @@ namespace embree
 
     /* block all threads */
     for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
-      if (lockThread(t,THREAD_BLOCK_ATOMIC_ADD) != 0)
-        waitForUsersLessEqual(t,THREAD_BLOCK_ATOMIC_ADD);
+      if (lockThread(t) == 1)
+        waitForUsersLessEqual(t,1);
 
     /* reallocate data */
-    if (data) os_free(data,size,hugepages);
+    if (data) os_free(data,size);
     size      = new_size;
     data      = nullptr;
-    if (size) data = (float*)os_malloc(size,hugepages);
-    maxBlocks = size/BLOCK_SIZE;    
+    if (size) data = (float*)os_malloc(size); // FIXME: do os_reserve under linux
+    maxBlocks = size/64;    
 
     /* invalidate entire cache */
     localTime += NUM_CACHE_SEGMENTS; 
@@ -201,7 +215,7 @@ namespace embree
 
     /* release all blocked threads */
     for (ThreadWorkState *t=current_t_state;t!=nullptr;t=t->next)
-      unlockThread(t,-THREAD_BLOCK_ATOMIC_ADD);
+      unlockThread(t);
 
     /* unlock the linked list of thread states */
     linkedlist_mtx.unlock();	    
@@ -220,6 +234,7 @@ namespace embree
   std::atomic<size_t> SharedTessellationCacheStats::cache_misses(0);
   std::atomic<size_t> SharedTessellationCacheStats::cache_flushes(0);  
   SpinLock   SharedTessellationCacheStats::mtx;  
+  std::atomic<size_t> *SharedTessellationCacheStats::cache_patch_builds(nullptr);
   size_t SharedTessellationCacheStats::cache_num_patches(0);
 
   void SharedTessellationCacheStats::printStats()
@@ -231,6 +246,17 @@ namespace embree
     PRINT(100.0f * cache_hits / cache_accesses);
     assert(cache_hits + cache_misses == cache_accesses);
     PRINT(cache_num_patches);
+    size_t patches = 0;
+    size_t builds  = 0;
+    for (size_t i=0;i<cache_num_patches;i++)
+      if (cache_patch_builds[i])
+	{
+	  patches++;
+	  builds += cache_patch_builds[i];
+	}
+    PRINT(patches);
+    PRINT(builds);
+    PRINT((double)builds/patches);
   }
 
   void SharedTessellationCacheStats::clearStats()
@@ -239,83 +265,27 @@ namespace embree
     SharedTessellationCacheStats::cache_hits      = 0;
     SharedTessellationCacheStats::cache_misses    = 0;
     SharedTessellationCacheStats::cache_flushes   = 0;
+    for (size_t i=0;i<cache_num_patches;i++)
+      cache_patch_builds[i] = 0;
   }
 
-  struct cache_regression_test : public RegressionTest
+  void SharedTessellationCacheStats::incPatchBuild(const size_t ID, const size_t numPatches)
   {
-    BarrierSys barrier;
-    std::atomic<size_t> numFailed;
-    std::atomic<int> threadIDCounter;
-    static const size_t numEntries = 4*1024;
-    SharedLazyTessellationCache::CacheEntry entry[numEntries];
-
-    cache_regression_test() 
-      : RegressionTest("cache_regression_test"), numFailed(0), threadIDCounter(0)
-    {
-      registerRegressionTest(this);
-    }
-
-    static void thread_alloc(cache_regression_test* This)
-    {
-      int threadID = This->threadIDCounter++;
-      size_t maxN = SharedLazyTessellationCache::sharedLazyTessellationCache.maxAllocSize()/4;
-      This->barrier.wait();
-
-      for (size_t j=0; j<100000; j++)
+    if (!cache_patch_builds)
       {
-        size_t elt = (threadID+j)%numEntries;
-        size_t N = min(1+10*(elt%1000),maxN);
-          
-        volatile int* data = (volatile int*) SharedLazyTessellationCache::lookup(This->entry[elt],0,[&] () {
-            int* data = (int*) SharedLazyTessellationCache::sharedLazyTessellationCache.malloc(4*N);
-            for (size_t k=0; k<N; k++) data[k] = (int)elt;
-            return data;
-          });
-        
-        if (data == nullptr) {
-          SharedLazyTessellationCache::sharedLazyTessellationCache.unlock();
-          This->numFailed++;
-          continue;
-        }
-            
-        /* check memory block */
-        for (size_t k=0; k<N; k++) {
-          if (data[k] != (int)elt) {
-            This->numFailed++;
-            break;
-          }
-        }
-        
-        SharedLazyTessellationCache::sharedLazyTessellationCache.unlock();
+	mtx.lock();
+	if (!cache_patch_builds)
+	  {
+	    PRINT(numPatches);
+	    cache_num_patches = numPatches;
+	    cache_patch_builds = (std::atomic<size_t>*)os_malloc(numPatches*sizeof(std::atomic<size_t>));
+	    memset(cache_patch_builds,0,numPatches*sizeof(std::atomic<size_t>));
+	  }
+	mtx.unlock();
       }
-      This->barrier.wait();
-    }
-    
-    bool run ()
-    {
-      numFailed.store(0);
-
-      size_t numThreads = getNumberOfLogicalThreads();
-      barrier.init(numThreads+1);
-
-      /* create threads */
-      std::vector<thread_t> threads;
-      for (size_t i=0; i<numThreads; i++)
-        threads.push_back(createThread((thread_func)thread_alloc,this,0,i));
-
-      /* run test */ 
-      barrier.wait();
-      barrier.wait();
-
-      /* destroy threads */
-      for (size_t i=0; i<numThreads; i++)
-        join(threads[i]);
-
-      return numFailed == 0;
-    }
-  };
-
-  cache_regression_test cache_regression;
+    assert(ID < cache_num_patches);
+    cache_patch_builds[ID]++;
+  }
 };
 
 extern "C" void printTessCacheStats()

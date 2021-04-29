@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "tokenstream.h"
 #include "../math/math.h"
@@ -11,7 +24,6 @@ namespace embree
   const std::string TokenStream::ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const std::string TokenStream::numbers = "0123456789";
   const std::string TokenStream::separators = "\n\t\r ";
-  const std::string TokenStream::stringChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _.,+-=:/*\\";
 
   /* creates map for fast categorization of characters */
   static void createCharMap(bool map[256], const std::string& chrs) {
@@ -28,7 +40,6 @@ namespace embree
   {
     createCharMap(isAlphaMap,alpha);
     createCharMap(isSepMap,seps);
-    createCharMap(isStringCharMap,stringChars);
   }
 
   bool TokenStream::decDigits(std::string& str_o)
@@ -138,11 +149,7 @@ namespace embree
     std::string str;
     if (cin->peek() != '\"') return false;
     cin->drop();
-    while (cin->peek() != '\"') {
-      const int c = cin->get();
-      if (!isStringChar(c)) THROW_RUNTIME_ERROR("invalid string character "+std::string(1,c)+" at "+loc.str());
-      str += (char)c;
-    }
+    while (cin->peek() != '\"') str += (char)cin->get();
     cin->drop();
     token = Token(str,Token::TY_STRING,loc);
     return true;

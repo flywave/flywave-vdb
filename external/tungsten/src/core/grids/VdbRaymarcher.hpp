@@ -23,9 +23,9 @@ public:
 template <typename TreeT, int ChildNodeLevel>
 class VdbRaymarcher
 {
-    typedef typename TreeT::RootNodeType::NodeChainType ChainT;
-    typedef typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel - 1>>::type NodeT;
-    typedef typename openvdb::tree::ValueAccessor<const TreeT> AccessorT;
+    using ChainT = typename TreeT::RootNodeType::NodeChainType;
+    using NodeT = typename ChainT::template Get<ChildNodeLevel>;
+    using AccessorT = typename openvdb::tree::ValueAccessor<const TreeT>;
 
     openvdb::math::DDA<DdaRay, NodeT::TOTAL> _dda;
     VdbRaymarcher<TreeT, ChildNodeLevel - 1> _child;

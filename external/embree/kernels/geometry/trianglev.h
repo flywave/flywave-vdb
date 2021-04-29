@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -11,19 +24,19 @@ namespace embree
   template <int M>
   struct TriangleMv
   { 
+    typedef Vec3<vfloat<M>> Vec3vfM;
+
   public:
     struct Type : public PrimitiveType 
     {
-      const char* name() const;
-      size_t sizeActive(const char* This) const;
-      size_t sizeTotal(const char* This) const;
-      size_t getBytes(const char* This) const;
+      Type();
+      size_t size(const char* This) const;
     };
     static Type type;
 
   public:
 
-    /* Returns maximum number of stored triangles */
+    /* Returns maximal number of stored triangles */
     static __forceinline size_t max_size() { return M; }
     
     /* Returns required number of primitive blocks for N primitives */
@@ -35,33 +48,31 @@ namespace embree
     __forceinline TriangleMv() {}
 
     /* Construction from vertices and IDs */
-    __forceinline TriangleMv(const Vec3vf<M>& v0, const Vec3vf<M>& v1, const Vec3vf<M>& v2, const vuint<M>& geomIDs, const vuint<M>& primIDs)
+    __forceinline TriangleMv(const Vec3vfM& v0, const Vec3vfM& v1, const Vec3vfM& v2, const vint<M>& geomIDs, const vint<M>& primIDs)
       : v0(v0), v1(v1), v2(v2), geomIDs(geomIDs), primIDs(primIDs) {}
     
     /* Returns a mask that tells which triangles are valid */
-    __forceinline vbool<M> valid() const { return geomIDs != vuint<M>(-1); }
+    __forceinline vbool<M> valid() const { return geomIDs != vint<M>(-1); }
 
     /* Returns true if the specified triangle is valid */
     __forceinline bool valid(const size_t i) const { assert(i<M); return geomIDs[i] != -1; }
 
     /* Returns the number of stored triangles */
-    __forceinline size_t size() const { return bsf(~movemask(valid())); }
+    __forceinline size_t size() const { return __bsf(~movemask(valid())); }
 
     /* Returns the geometry IDs */
-    __forceinline       vuint<M>& geomID()       { return geomIDs; }
-    __forceinline const vuint<M>& geomID() const { return geomIDs; }
-    __forceinline unsigned int geomID(const size_t i) const { assert(i<M); return geomIDs[i]; }
+    __forceinline vint<M> geomID() const { return geomIDs; }
+    __forceinline int geomID(const size_t i) const { assert(i<M); return geomIDs[i]; }
 
     /* Returns the primitive IDs */
-    __forceinline       vuint<M>& primID()       { return primIDs; }
-    __forceinline const vuint<M>& primID() const { return primIDs; }
-    __forceinline unsigned int primID(const size_t i) const { assert(i<M); return primIDs[i]; }
+    __forceinline vint<M> primID() const { return primIDs; }
+    __forceinline int  primID(const size_t i) const { assert(i<M); return primIDs[i]; }
 
     /* Calculate the bounds of the triangles */
     __forceinline BBox3fa bounds() const 
     {
-      Vec3vf<M> lower = min(v0,v1,v2);
-      Vec3vf<M> upper = max(v0,v1,v2);
+      Vec3vfM lower = min(v0,v1,v2);
+      Vec3vfM upper = max(v0,v1,v2);
       vbool<M> mask = valid();
       lower.x = select(mask,lower.x,vfloat<M>(pos_inf));
       lower.y = select(mask,lower.y,vfloat<M>(pos_inf));
@@ -85,22 +96,47 @@ namespace embree
       vfloat<M>::store_nt(&dst->v2.x,src.v2.x);
       vfloat<M>::store_nt(&dst->v2.y,src.v2.y);
       vfloat<M>::store_nt(&dst->v2.z,src.v2.z);
-      vuint<M>::store_nt(&dst->geomIDs,src.geomIDs);
-      vuint<M>::store_nt(&dst->primIDs,src.primIDs);
+      vint<M>::store_nt(&dst->geomIDs,src.geomIDs);
+      vint<M>::store_nt(&dst->primIDs,src.primIDs);
     }
 
     /* Fill triangle from triangle list */
-    __forceinline void fill(const PrimRef* prims, size_t& begin, size_t end, Scene* scene)
+    __forceinline void fill(atomic_set<PrimRefBlock>::block_iterator_unsafe& prims, Scene* scene, const bool list)
     {
-      vuint<M> vgeomID = -1, vprimID = -1;
-      Vec3vf<M> v0 = zero, v1 = zero, v2 = zero;
+      vint<M> vgeomID = -1, vprimID = -1;
+      Vec3vfM v0 = zero, v1 = zero, v2 = zero;
+      
+      for (size_t i=0; i<M && prims; i++, prims++)
+      {
+	const PrimRef& prim = *prims;
+	const unsigned geomID = prim.geomID();
+        const unsigned primID = prim.primID();
+        const TriangleMesh* __restrict__ const mesh = scene->getTriangleMesh(geomID);
+        const TriangleMesh::Triangle& tri = mesh->triangle(primID);
+        const Vec3fa& p0 = mesh->vertex(tri.v[0]);
+        const Vec3fa& p1 = mesh->vertex(tri.v[1]);
+        const Vec3fa& p2 = mesh->vertex(tri.v[2]);
+        vgeomID [i] = geomID;
+        vprimID [i] = primID;
+        v0.x[i] = p0.x; v0.y[i] = p0.y; v0.z[i] = p0.z;
+        v1.x[i] = p1.x; v1.y[i] = p1.y; v1.z[i] = p1.z;
+        v2.x[i] = p2.x; v2.y[i] = p2.y; v2.z[i] = p2.z;
+      }
+      TriangleMv::store_nt(this,TriangleMv(v0,v1,v2,vgeomID,vprimID));
+    }
+
+    /* Fill triangle from triangle list */
+    __forceinline void fill(const PrimRef* prims, size_t& begin, size_t end, Scene* scene, const bool list)
+    {
+      vint<M> vgeomID = -1, vprimID = -1;
+      Vec3vfM v0 = zero, v1 = zero, v2 = zero;
       
       for (size_t i=0; i<M && begin<end; i++, begin++)
       {
 	const PrimRef& prim = prims[begin];
         const unsigned geomID = prim.geomID();
         const unsigned primID = prim.primID();
-        const TriangleMesh* __restrict__ const mesh = scene->get<TriangleMesh>(geomID);
+        const TriangleMesh* __restrict__ const mesh = scene->getTriangleMesh(geomID);
         const TriangleMesh::Triangle& tri = mesh->triangle(primID);
         const Vec3fa& p0 = mesh->vertex(tri.v[0]);
         const Vec3fa& p1 = mesh->vertex(tri.v[1]);
@@ -118,8 +154,8 @@ namespace embree
     __forceinline BBox3fa update(TriangleMesh* mesh)
     {
       BBox3fa bounds = empty;
-      vuint<M> vgeomID = -1, vprimID = -1;
-      Vec3vf<M> v0 = zero, v1 = zero, v2 = zero;
+      vint<M> vgeomID = -1, vprimID = -1;
+      Vec3vfM v0 = zero, v1 = zero, v2 = zero;
       
       for (size_t i=0; i<M; i++)
       {
@@ -142,12 +178,11 @@ namespace embree
     }
    
   public:
-    Vec3vf<M> v0;      // 1st vertex of the triangles
-    Vec3vf<M> v1;      // 2nd vertex of the triangles
-    Vec3vf<M> v2;      // 3rd vertex of the triangles
-  private:
-    vuint<M> geomIDs; // geometry ID
-    vuint<M> primIDs; // primitive ID
+    Vec3vfM v0;      // 1st vertex of the triangles
+    Vec3vfM v1;      // 2nd vertex of the triangles
+    Vec3vfM v2;      // 3rd vertex of the triangles
+    vint<M> geomIDs; // geometry ID
+    vint<M> primIDs; // primitive ID
   };
 
   template<int M>

@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "barrier.h"
 #include "condition.h"
@@ -72,7 +85,7 @@ namespace embree
 
   public:
     HANDLE events[2];
-    atomic<size_t> i;
+    volatile size_t i;
     atomic<size_t> enterCount;
     atomic<size_t> exitCount;
     size_t barrierSize;
@@ -93,7 +106,6 @@ namespace embree
     
     __forceinline void init(size_t N) 
     {
-      assert(count == 0);
       count = 0;
       barrierSize = N;
     }
@@ -182,7 +194,7 @@ namespace embree
         for (size_t i=1; i<threadCount; i++)
         {
           while (likely(count0[i] == 0)) 
-            pause_cpu();
+            __pause_cpu();
         }
         mode  = 1;
         flag1 = 0;
@@ -194,7 +206,7 @@ namespace embree
         count0[threadIndex] = 1;
         {
           while (likely(flag0 == 0))
-            pause_cpu();
+            __pause_cpu();
         }
         
       }		
@@ -209,7 +221,7 @@ namespace embree
         for (size_t i=1; i<threadCount; i++)
         {		
           while (likely(count1[i] == 0))
-            pause_cpu();
+            __pause_cpu();
         }
         
         mode  = 0;
@@ -222,7 +234,7 @@ namespace embree
         count1[threadIndex] = 1;
         {
           while (likely(flag1 == 0))
-            pause_cpu();
+            __pause_cpu();
         }
       }		
     }					

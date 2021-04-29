@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -11,7 +24,7 @@
 
 #include <immintrin.h>
 
-#if defined(__BMI__) && defined(__GNUC__) && !defined(__INTEL_COMPILER)
+#if defined(__BMI__) && defined(__GNUC__)
   #if !defined(_tzcnt_u32)
     #define _tzcnt_u32 __tzcnt_u32
   #endif
@@ -30,7 +43,9 @@
 #endif
 
 #if defined(__WIN32__)
-#  define NOMINMAX
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
 #  include <windows.h>
 #endif
 
@@ -58,7 +73,7 @@ namespace embree
     return (size_t)li.QuadPart;
   }
   
-  __forceinline int bsf(int v) {
+  __forceinline int __bsf(int v) {
 #if defined(__AVX2__) 
     return _tzcnt_u32(v);
 #else
@@ -66,7 +81,7 @@ namespace embree
 #endif
   }
   
-  __forceinline unsigned bsf(unsigned v) {
+  __forceinline unsigned __bsf(unsigned v) {
 #if defined(__AVX2__) 
     return _tzcnt_u32(v);
 #else
@@ -75,7 +90,7 @@ namespace embree
   }
   
 #if defined(__X86_64__)
-  __forceinline size_t bsf(size_t v) {
+  __forceinline size_t __bsf(size_t v) {
 #if defined(__AVX2__) 
     return _tzcnt_u64(v);
 #else
@@ -84,30 +99,30 @@ namespace embree
   }
 #endif
   
-  __forceinline int bscf(int& v) 
+  __forceinline int __bscf(int& v) 
   {
-    int i = bsf(v);
+    int i = __bsf(v);
     v &= v-1;
     return i;
   }
   
-  __forceinline unsigned bscf(unsigned& v) 
+  __forceinline unsigned __bscf(unsigned& v) 
   {
-    unsigned i = bsf(v);
+    unsigned i = __bsf(v);
     v &= v-1;
     return i;
   }
   
 #if defined(__X86_64__)
-  __forceinline size_t bscf(size_t& v) 
+  __forceinline size_t __bscf(size_t& v) 
   {
-    size_t i = bsf(v);
+    size_t i = __bsf(v);
     v &= v-1;
     return i;
   }
 #endif
   
-  __forceinline int bsr(int v) {
+  __forceinline int __bsr(int v) {
 #if defined(__AVX2__) 
     return 31 - _lzcnt_u32(v);
 #else
@@ -115,7 +130,7 @@ namespace embree
 #endif
   }
   
-  __forceinline unsigned bsr(unsigned v) {
+  __forceinline unsigned __bsr(unsigned v) {
 #if defined(__AVX2__) 
     return 31 - _lzcnt_u32(v);
 #else
@@ -124,11 +139,11 @@ namespace embree
   }
   
 #if defined(__X86_64__)
-  __forceinline size_t bsr(size_t v) {
+  __forceinline size_t __bsr(size_t v) {
 #if defined(__AVX2__) 
     return 63 -_lzcnt_u64(v);
 #else
-    unsigned long r = 0; _BitScanReverse64(&r, v); return r;
+	  unsigned long r = 0; _BitScanReverse64(&r, v); return r;
 #endif
   }
 #endif
@@ -139,33 +154,33 @@ namespace embree
     return _lzcnt_u32(x);
 #else
     if (unlikely(x == 0)) return 32;
-    return 31 - bsr(x);    
+    return 31 - __bsr(x);    
 #endif
   }
   
-  __forceinline int btc(int v, int i) {
+  __forceinline int __btc(int v, int i) {
     long r = v; _bittestandcomplement(&r,i); return r;
   }
   
-  __forceinline int bts(int v, int i) {
+  __forceinline int __bts(int v, int i) {
     long r = v; _bittestandset(&r,i); return r;
   }
   
-  __forceinline int btr(int v, int i) {
+  __forceinline int __btr(int v, int i) {
     long r = v; _bittestandreset(&r,i); return r;
   }
   
 #if defined(__X86_64__)
   
-  __forceinline size_t btc(size_t v, size_t i) {
+  __forceinline size_t __btc(size_t v, size_t i) {
     size_t r = v; _bittestandcomplement64((__int64*)&r,i); return r;
   }
   
-  __forceinline size_t bts(size_t v, size_t i) {
+  __forceinline size_t __bts(size_t v, size_t i) {
     __int64 r = v; _bittestandset64(&r,i); return r;
   }
   
-  __forceinline size_t btr(size_t v, size_t i) {
+  __forceinline size_t __btr(size_t v, size_t i) {
     __int64 r = v; _bittestandreset64(&r,i); return r;
   }
   
@@ -219,7 +234,7 @@ namespace embree
     return (((uint64_t)high) << 32) + (uint64_t)low;
   }
   
-  __forceinline int bsf(int v) {
+  __forceinline int __bsf(int v) {
 #if defined(__AVX2__) 
     return _tzcnt_u32(v);
 #else
@@ -228,7 +243,7 @@ namespace embree
   }
   
 #if defined(__X86_64__)
-  __forceinline unsigned bsf(unsigned v) 
+  __forceinline unsigned __bsf(unsigned v) 
   {
 #if defined(__AVX2__) 
     return _tzcnt_u32(v);
@@ -238,7 +253,7 @@ namespace embree
   }
 #endif
   
-  __forceinline size_t bsf(size_t v) {
+  __forceinline size_t __bsf(size_t v) {
 #if defined(__AVX2__)
 #if defined(__X86_64__)
     return _tzcnt_u64(v);
@@ -250,30 +265,30 @@ namespace embree
 #endif
   }
 
-  __forceinline int bscf(int& v) 
+  __forceinline int __bscf(int& v) 
   {
-    int i = bsf(v);
+    int i = __bsf(v);
     v &= v-1;
     return i;
   }
   
 #if defined(__X86_64__)
-  __forceinline unsigned int bscf(unsigned int& v) 
+  __forceinline unsigned int __bscf(unsigned int& v) 
   {
-    unsigned int i = bsf(v);
+    unsigned int i = __bsf(v);
     v &= v-1;
     return i;
   }
 #endif
   
-  __forceinline size_t bscf(size_t& v) 
+  __forceinline size_t __bscf(size_t& v) 
   {
-    size_t i = bsf(v);
+    size_t i = __bsf(v);
     v &= v-1;
     return i;
   }
   
-  __forceinline int bsr(int v) {
+  __forceinline int __bsr(int v) {
 #if defined(__AVX2__) 
     return 31 - _lzcnt_u32(v);
 #else
@@ -282,7 +297,7 @@ namespace embree
   }
   
 #if defined(__X86_64__)
-  __forceinline unsigned bsr(unsigned v) {
+  __forceinline unsigned __bsr(unsigned v) {
 #if defined(__AVX2__) 
     return 31 - _lzcnt_u32(v);
 #else
@@ -291,7 +306,7 @@ namespace embree
   }
 #endif
   
-  __forceinline size_t bsr(size_t v) {
+  __forceinline size_t __bsr(size_t v) {
 #if defined(__AVX2__)
 #if defined(__X86_64__)
     return 63 - _lzcnt_u64(v);
@@ -309,11 +324,11 @@ namespace embree
     return _lzcnt_u32(x);
 #else
     if (unlikely(x == 0)) return 32;
-    return 31 - bsr(x);    
+    return 31 - __bsr(x);    
 #endif
   }
 
-  __forceinline size_t blsr(size_t v) {
+  __forceinline size_t __blsr(size_t v) {
 #if defined(__AVX2__) 
 #if defined(__INTEL_COMPILER)
     return _blsr_u64(v);
@@ -329,31 +344,31 @@ namespace embree
 #endif
   }
   
-  __forceinline int btc(int v, int i) {
+  __forceinline int __btc(int v, int i) {
     int r = 0; asm ("btc %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags" ); return r;
   }
   
-  __forceinline int bts(int v, int i) {
+  __forceinline int __bts(int v, int i) {
     int r = 0; asm ("bts %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
   }
   
-  __forceinline int btr(int v, int i) {
+  __forceinline int __btr(int v, int i) {
     int r = 0; asm ("btr %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
   }
   
-  __forceinline size_t btc(size_t v, size_t i) {
+  __forceinline size_t __btc(size_t v, size_t i) {
     size_t r = 0; asm ("btc %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags" ); return r;
   }
   
-  __forceinline size_t bts(size_t v, size_t i) {
+  __forceinline size_t __bts(size_t v, size_t i) {
     size_t r = 0; asm ("bts %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
   }
   
-  __forceinline size_t btr(size_t v, size_t i) {
+  __forceinline size_t __btr(size_t v, size_t i) {
     size_t r = 0; asm ("btr %1,%0" : "=r"(r) : "r"(i), "0"(v) : "flags"); return r;
   }
 
-  __forceinline int32_t atomic_cmpxchg(int32_t volatile* value, int32_t comparand, const int32_t input) {
+  __forceinline int32_t atomic_cmpxchg( int32_t volatile* value, int32_t comparand, const int32_t input ) {
     return __sync_val_compare_and_swap(value, comparand, input);
   }
   
@@ -363,39 +378,18 @@ namespace embree
 /// All Platforms
 ////////////////////////////////////////////////////////////////////////////////
   
-#if defined(__clang__) || defined(__GNUC__)
-#if !defined(_mm_undefined_ps)
-  __forceinline __m128 _mm_undefined_ps() { return _mm_setzero_ps(); }
-#endif
-#if !defined(_mm_undefined_si128)
-  __forceinline __m128i _mm_undefined_si128() { return _mm_setzero_si128(); }
-#endif
-#if !defined(_mm256_undefined_ps) && defined(__AVX__)
-  __forceinline __m256 _mm256_undefined_ps() { return _mm256_setzero_ps(); }
-#endif
-#if !defined(_mm256_undefined_si256) && defined(__AVX__)
-  __forceinline __m256i _mm256_undefined_si256() { return _mm256_setzero_si256(); }
-#endif
-#if !defined(_mm512_undefined_ps) && defined(__AVX512F__)
-  __forceinline __m512 _mm512_undefined_ps() { return _mm512_setzero_ps(); }
-#endif
-#if !defined(_mm512_undefined_epi32) && defined(__AVX512F__)
-  __forceinline __m512i _mm512_undefined_epi32() { return _mm512_setzero_si512(); }
-#endif
-#endif
-
 #if defined(__SSE4_2__)
   
-  __forceinline int popcnt(int in) {
+  __forceinline int __popcnt(int in) {
     return _mm_popcnt_u32(in);
   }
   
-  __forceinline unsigned popcnt(unsigned in) {
+  __forceinline unsigned __popcnt(unsigned in) {
     return _mm_popcnt_u32(in);
   }
   
 #if defined(__X86_64__)
-  __forceinline size_t popcnt(size_t in) {
+  __forceinline size_t __popcnt(size_t in) {
     return _mm_popcnt_u64(in);
   }
 #endif
@@ -411,7 +405,7 @@ namespace embree
     return clock;
   }
   
-  __forceinline void pause_cpu(const size_t N = 8)
+  __forceinline void __pause_cpu (const size_t N = 8) 
   {
     for (size_t i=0; i<N; i++)
       _mm_pause();    
@@ -437,36 +431,4 @@ namespace embree
   __forceinline void prefetchL2EX(const void* ptr) { 
     prefetchEX(ptr); 
   }
-#if defined(__AVX2__)
-   __forceinline unsigned int pext(unsigned int a, unsigned int b) { return _pext_u32(a, b); }
-   __forceinline unsigned int pdep(unsigned int a, unsigned int b) { return _pdep_u32(a, b); }
-#if defined(__X86_64__)
-   __forceinline size_t pext(size_t a, size_t b) { return _pext_u64(a, b); }
-   __forceinline size_t pdep(size_t a, size_t b) { return _pdep_u64(a, b); }
-#endif
-#endif
-
-#if defined(__AVX512F__)
-#if defined(__INTEL_COMPILER)
-   __forceinline float mm512_cvtss_f32(__m512 v) {
-     return _mm512_cvtss_f32(v);
-   }
-   __forceinline int mm512_mask2int(__mmask16 k1) {
-     return _mm512_mask2int(k1);
-   }
-   __forceinline __mmask16 mm512_int2mask(int mask) {
-     return _mm512_int2mask(mask);
-   }
-#else
-   __forceinline float mm512_cvtss_f32(__m512 v) { // FIXME: _mm512_cvtss_f32 neither supported by clang v4.0.0 nor GCC 6.3
-     return _mm_cvtss_f32(_mm512_castps512_ps128(v));
-   }
-   __forceinline int mm512_mask2int(__mmask16 k1) { // FIXME: _mm512_mask2int not yet supported by GCC 6.3
-     return (int)k1;
-   }
-   __forceinline __mmask16 mm512_int2mask(int mask) { // FIXME: _mm512_int2mask not yet supported by GCC 6.3
-     return (__mmask16)mask;
-   }
-#endif
-#endif
 }

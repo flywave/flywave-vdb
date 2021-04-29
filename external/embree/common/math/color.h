@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -40,8 +53,8 @@ namespace embree
     __forceinline Color4           ( const Color4& other ) : m128(other.m128) {}
     __forceinline Color4& operator=( const Color4& other ) { m128 = other.m128; return *this; }
 
-    __forceinline operator const __m128&() const { return m128; }
-    __forceinline operator       __m128&()       { return m128; }
+    __forceinline operator const __m128&( void ) const { return m128; }
+    __forceinline operator       __m128&( void )       { return m128; }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Set
@@ -102,8 +115,8 @@ namespace embree
     __forceinline Color           ( const Color4& other ) : m128(other.m128) {}
     __forceinline Color& operator=( const Color4& other ) { m128 = other.m128; return *this; }
 
-    __forceinline operator const __m128&() const { return m128; }
-    __forceinline operator       __m128&()       { return m128; }
+    __forceinline operator const __m128&( void ) const { return m128; }
+    __forceinline operator       __m128&( void )       { return m128; }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Set
@@ -150,22 +163,12 @@ namespace embree
     const __m128 mask = _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff));
     return _mm_and_ps(a.m128, mask);
   }
-  __forceinline const Color rcp  ( const Color& a )
-  {
-#if defined(__AVX512VL__)
-    const Color r = _mm_rcp14_ps(a.m128);
-#else
+  __forceinline const Color rcp  ( const Color& a ) {
     const Color r = _mm_rcp_ps(a.m128);
-#endif
     return _mm_sub_ps(_mm_add_ps(r, r), _mm_mul_ps(_mm_mul_ps(r, r), a));
   }
-  __forceinline const Color rsqrt( const Color& a )
-  {
-#if defined(__AVX512VL__)
-    __m128 r = _mm_rsqrt14_ps(a.m128);
-#else
+  __forceinline const Color rsqrt( const Color& a ) {
     __m128 r = _mm_rsqrt_ps(a.m128);
-#endif
     return _mm_add_ps(_mm_mul_ps(_mm_set1_ps(1.5f),r), _mm_mul_ps(_mm_mul_ps(_mm_mul_ps(a, _mm_set1_ps(-0.5f)), r), _mm_mul_ps(r, r)));
   }
   __forceinline const Color sqrt ( const Color& a ) { return _mm_sqrt_ps(a.m128); }
@@ -232,10 +235,14 @@ namespace embree
   ////////////////////////////////////////////////////////////////////////////////
 
   /*! computes luminance of a color */
-  __forceinline float luminance (const Color& a) { return madd(0.212671f,a.r,madd(0.715160f,a.g,0.072169f*a.b)); }
+  __forceinline float luminance (const Color& a) { return 0.212671f*a.r + 0.715160f*a.g + 0.072169f*a.b; }
+
+  __forceinline Color exp (const Color& a) { return Color(exp_ps(a.m128)); }
+  __forceinline Color log (const Color& a) { return Color(log_ps(a.m128)); }
+  __forceinline Color pow (const Color& a, const float& b) { return Color(select(vfloat4(a)<=vfloat4(zero),vfloat4(zero),vfloat4(exp_ps(log(a)*b)))); }
 
   /*! output operator */
-  __forceinline embree_ostream operator<<(embree_ostream cout, const Color& a) {
+  inline std::ostream& operator<<(std::ostream& cout, const Color& a) {
     return cout << "(" << a.r << ", " << a.g << ", " << a.b << ")";
   }
 }

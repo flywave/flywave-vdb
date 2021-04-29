@@ -1,15 +1,22 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #include "sysinfo.h"
 #include "intrinsics.h"
 #include "string.h"
-#include "ref.h"
-#if defined(__FREEBSD__)
-#include <sys/cpuset.h>
-#include <pthread_np.h>
-typedef cpuset_t cpu_set_t;
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 /// All Platforms
@@ -17,8 +24,6 @@ typedef cpuset_t cpu_set_t;
 
 namespace embree
 {
-  NullTy null;
-  
   std::string getPlatformName() 
   {
 #if defined(__LINUX__) && !defined(__X86_64__)
@@ -91,15 +96,13 @@ namespace embree
 
   CPUModel getCPUModel() 
   {
-    if (getCPUVendor() != "GenuineIntel")
-      return CPU_UNKNOWN;
-    
     int out[4];
     __cpuid(out, 0);
     if (out[0] < 1) return CPU_UNKNOWN;
     __cpuid(out, 1);
     int family = ((out[0] >> 8) & 0x0F) + ((out[0] >> 20) & 0xFF);
     int model  = ((out[0] >> 4) & 0x0F) | ((out[0] >> 12) & 0xF0);
+    if (family ==  11) return CPU_KNC;
     if (family !=   6) return CPU_UNKNOWN;           // earlier than P6
     if (model == 0x0E) return CPU_CORE1;             // Core 1
     if (model == 0x0F) return CPU_CORE2;             // Core 2, 65 nm
@@ -114,20 +117,18 @@ namespace embree
     if (model == 0x2D) return CPU_CORE_SANDYBRIDGE;  // Core i7, SandyBridge
     if (model == 0x45) return CPU_HASWELL;           // Haswell
     if (model == 0x3C) return CPU_HASWELL;           // Haswell
-    if (model == 0x55) return CPU_SKYLAKE_SERVER;   // Skylake server based CPUs
     return CPU_UNKNOWN;
   }
 
   std::string stringOfCPUModel(CPUModel model)
   {
     switch (model) {
+    case CPU_KNC             : return "Knights Corner";
     case CPU_CORE1           : return "Core1";
     case CPU_CORE2           : return "Core2";
     case CPU_CORE_NEHALEM    : return "Nehalem";
     case CPU_CORE_SANDYBRIDGE: return "SandyBridge";
     case CPU_HASWELL         : return "Haswell";
-    case CPU_KNIGHTS_LANDING : return "Knights Landing";
-    case CPU_SKYLAKE_SERVER  : return "Skylake Server";
     default                  : return "Unknown CPU";
     }
   }
@@ -179,11 +180,31 @@ namespace embree
   {
 #if defined (__WIN32__)
     int64_t xcr0 = 0; // int64_t is workaround for compiler bug under VS2013, Win32
+#if defined(__INTEL_COMPILER) 
     xcr0 = _xgetbv(0);
-    return xcr0;
-#else
-    int xcr0 = 0;
+#elif (defined(_MSC_VER) && (_MSC_FULL_VER >= 160040219)) // min VS2010 SP1 compiler is required
+    xcr0 = _xgetbv(0); 
+#elif ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4))
     __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
+#else
+#pragma message ("WARNING: AVX not supported by your compiler.")
+    xcr0 = 0;
+#endif
+    return xcr0;
+
+#else
+
+    int xcr0 = 0;
+#if defined(__INTEL_COMPILER) 
+    __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
+#elif ((__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)) && (!defined(__MACOSX__) || defined(__TARGET_AVX__) || defined(__TARGET_AVX2__))
+    __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
+#elif ((__clang_major__ > 3) || (__clang_major__ == 3 && __clang_minor__ >= 1))
+    __asm__ ("xgetbv" : "=a" (xcr0) : "c" (0) : "%edx" );
+#else
+#pragma message ("WARNING: AVX not supported by your compiler.")
+    xcr0 = 0;
+#endif
     return xcr0;
 #endif
   }
@@ -230,39 +251,32 @@ namespace embree
       ymm_enabled = xmm_enabled && ((xcr0 & 0x04) == 0x04); /* checks if ymm state are enabled in XCR0 */
       zmm_enabled = ymm_enabled && ((xcr0 & 0xE0) == 0xE0); /* checks if OPMASK state, upper 256-bit of ZMM0-ZMM15 and ZMM16-ZMM31 state are enabled in XCR0 */
     }
-    if (xmm_enabled) cpu_features |= CPU_FEATURE_XMM_ENABLED;
-    if (ymm_enabled) cpu_features |= CPU_FEATURE_YMM_ENABLED;
-    if (zmm_enabled) cpu_features |= CPU_FEATURE_ZMM_ENABLED;
     
-    if (cpuid_leaf_1[EDX] & CPU_FEATURE_BIT_SSE   ) cpu_features |= CPU_FEATURE_SSE;
-    if (cpuid_leaf_1[EDX] & CPU_FEATURE_BIT_SSE2  ) cpu_features |= CPU_FEATURE_SSE2;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE3  ) cpu_features |= CPU_FEATURE_SSE3;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSSE3 ) cpu_features |= CPU_FEATURE_SSSE3;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE4_1) cpu_features |= CPU_FEATURE_SSE41;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE4_2) cpu_features |= CPU_FEATURE_SSE42;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_POPCNT) cpu_features |= CPU_FEATURE_POPCNT;
-    
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_AVX   ) cpu_features |= CPU_FEATURE_AVX | CPU_FEATURE_PSEUDO_HIFREQ256BIT;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_F16C  ) cpu_features |= CPU_FEATURE_F16C;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_RDRAND) cpu_features |= CPU_FEATURE_RDRAND;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX2  ) cpu_features |= CPU_FEATURE_AVX2;
-    if (cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_FMA3  ) cpu_features |= CPU_FEATURE_FMA3;
+    if (xmm_enabled && cpuid_leaf_1[EDX] & CPU_FEATURE_BIT_SSE   ) cpu_features |= CPU_FEATURE_SSE;
+    if (xmm_enabled && cpuid_leaf_1[EDX] & CPU_FEATURE_BIT_SSE2  ) cpu_features |= CPU_FEATURE_SSE2;
+    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE3  ) cpu_features |= CPU_FEATURE_SSE3;
+    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSSE3 ) cpu_features |= CPU_FEATURE_SSSE3;
+    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE4_1) cpu_features |= CPU_FEATURE_SSE41;
+    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_SSE4_2) cpu_features |= CPU_FEATURE_SSE42;
+    if (               cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_POPCNT) cpu_features |= CPU_FEATURE_POPCNT;
+    if (ymm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_AVX   ) cpu_features |= CPU_FEATURE_AVX;
+    if (xmm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_F16C  ) cpu_features |= CPU_FEATURE_F16C;
+    if (               cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_RDRAND) cpu_features |= CPU_FEATURE_RDRAND;
+    if (ymm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX2  ) cpu_features |= CPU_FEATURE_AVX2;
+    if (ymm_enabled && cpuid_leaf_1[ECX] & CPU_FEATURE_BIT_FMA3  ) cpu_features |= CPU_FEATURE_FMA3;
     if (cpuid_leaf_e1[ECX] & CPU_FEATURE_BIT_LZCNT) cpu_features |= CPU_FEATURE_LZCNT;
     if (cpuid_leaf_7 [EBX] & CPU_FEATURE_BIT_BMI1 ) cpu_features |= CPU_FEATURE_BMI1;
     if (cpuid_leaf_7 [EBX] & CPU_FEATURE_BIT_BMI2 ) cpu_features |= CPU_FEATURE_BMI2;
 
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512F   ) cpu_features |= CPU_FEATURE_AVX512F;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512DQ  ) cpu_features |= CPU_FEATURE_AVX512DQ;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512PF  ) cpu_features |= CPU_FEATURE_AVX512PF;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512ER  ) cpu_features |= CPU_FEATURE_AVX512ER; 
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512CD  ) cpu_features |= CPU_FEATURE_AVX512CD;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512BW  ) cpu_features |= CPU_FEATURE_AVX512BW;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512IFMA) cpu_features |= CPU_FEATURE_AVX512IFMA;
-    if (cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512VL  ) cpu_features |= CPU_FEATURE_AVX512VL;
-    if (cpuid_leaf_7[ECX] & CPU_FEATURE_BIT_AVX512VBMI) cpu_features |= CPU_FEATURE_AVX512VBMI;
-
-    if (getCPUModel() == CPU_SKYLAKE_SERVER)
-      cpu_features &= ~CPU_FEATURE_PSEUDO_HIFREQ256BIT;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512F   ) cpu_features |= CPU_FEATURE_AVX512F;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512DQ  ) cpu_features |= CPU_FEATURE_AVX512DQ;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512PF  ) cpu_features |= CPU_FEATURE_AVX512PF;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512ER  ) cpu_features |= CPU_FEATURE_AVX512ER; 
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512CD  ) cpu_features |= CPU_FEATURE_AVX512CD;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512BW  ) cpu_features |= CPU_FEATURE_AVX512BW;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512IFMA) cpu_features |= CPU_FEATURE_AVX512IFMA;
+    if (zmm_enabled && cpuid_leaf_7[EBX] & CPU_FEATURE_BIT_AVX512VL  ) cpu_features |= CPU_FEATURE_AVX512VL;
+    if (zmm_enabled && cpuid_leaf_7[ECX] & CPU_FEATURE_BIT_AVX512VBMI) cpu_features |= CPU_FEATURE_AVX512VBMI;
 
     return cpu_features;
   }
@@ -270,9 +284,6 @@ namespace embree
   std::string stringOfCPUFeatures(int features)
   {
     std::string str;
-    if (features & CPU_FEATURE_XMM_ENABLED) str += "XMM ";
-    if (features & CPU_FEATURE_YMM_ENABLED) str += "YMM ";
-    if (features & CPU_FEATURE_ZMM_ENABLED) str += "ZMM ";
     if (features & CPU_FEATURE_SSE   ) str += "SSE ";
     if (features & CPU_FEATURE_SSE2  ) str += "SSE2 ";
     if (features & CPU_FEATURE_SSE3  ) str += "SSE3 ";
@@ -288,6 +299,7 @@ namespace embree
     if (features & CPU_FEATURE_LZCNT ) str += "LZCNT ";
     if (features & CPU_FEATURE_BMI1  ) str += "BMI1 ";
     if (features & CPU_FEATURE_BMI2  ) str += "BMI2 ";
+    if (features & CPU_FEATURE_KNC   ) str += "KNC ";
     if (features & CPU_FEATURE_AVX512F) str += "AVX512F ";
     if (features & CPU_FEATURE_AVX512DQ) str += "AVX512DQ ";
     if (features & CPU_FEATURE_AVX512PF) str += "AVX512PF ";
@@ -312,6 +324,7 @@ namespace embree
     if (isa == AVX2) return "AVX2";
     if (isa == AVX512KNL) return "AVX512KNL";
     if (isa == AVX512SKX) return "AVX512SKX";
+    if (isa == KNC) return "KNC";
     return "UNKNOWN";
   }
 
@@ -333,6 +346,7 @@ namespace embree
     if (hasISA(features,AVX2)) v += "AVX2 ";
     if (hasISA(features,AVX512KNL)) v += "AVX512KNL ";
     if (hasISA(features,AVX512SKX)) v += "AVX512SKX ";
+    if (hasISA(features,KNC)) v += "KNC ";
     return v;
   }
 }
@@ -345,14 +359,12 @@ namespace embree
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <psapi.h>
 
 namespace embree
 {
   std::string getExecutableFileName() {
     char filename[1024];
-    if (!GetModuleFileName(nullptr, filename, sizeof(filename)))
-      return std::string();
+    if (!GetModuleFileName(nullptr, filename, sizeof(filename))) return std::string();
     return std::string(filename);
   }
 
@@ -381,7 +393,6 @@ namespace embree
       GetSystemInfo(&sysinfo);
       nThreads = sysinfo.dwNumberOfProcessors;
     }
-    assert(nThreads);
     return nThreads;
   }
 
@@ -389,8 +400,7 @@ namespace embree
   {
     HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
     if (handle == INVALID_HANDLE_VALUE) return 80;
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    memset(&info,0,sizeof(info));
+    CONSOLE_SCREEN_BUFFER_INFO info = { { 0 } };
     GetConsoleScreenBufferInfo(handle, &info);
     return info.dwSize.X;
   }
@@ -405,20 +415,6 @@ namespace embree
 
   void sleepSeconds(double t) {
     Sleep(DWORD(1000.0*t));
-  }
-
-  size_t getVirtualMemoryBytes()
-  {
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo( GetCurrentProcess( ), &info, sizeof(info) );
-    return (size_t)info.QuotaPeakPagedPoolUsage;
-  }
-
-  size_t getResidentMemoryBytes()
-  {
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo( GetCurrentProcess( ), &info, sizeof(info) );
-    return (size_t)info.WorkingSetSize;
   }
 }
 #endif
@@ -436,28 +432,11 @@ namespace embree
 {
   std::string getExecutableFileName() 
   {
-    std::string pid = "/proc/" + toString(getpid()) + "/exe";
-    char buf[4096];
-    memset(buf,0,sizeof(buf));
-    if (readlink(pid.c_str(), buf, sizeof(buf)-1) == -1)
-      return std::string();
+    char pid[32]; sprintf(pid, "/proc/%d/exe", getpid());
+    char buf[1024];
+    int bytes = readlink(pid, buf, sizeof(buf)-1);
+    if (bytes != -1) buf[bytes] = '\0';
     return std::string(buf);
-  }
-
-  size_t getVirtualMemoryBytes()
-  {
-    size_t virt, resident, shared;
-    std::ifstream buffer("/proc/self/statm");
-    buffer >> virt >> resident >> shared;
-    return virt*sysconf(_SC_PAGE_SIZE);
-  }
-
-  size_t getResidentMemoryBytes()
-  {
-    size_t virt, resident, shared;
-    std::ifstream buffer("/proc/self/statm");
-    buffer >> virt >> resident >> shared;
-    return resident*sysconf(_SC_PAGE_SIZE);
   }
 }
 
@@ -476,20 +455,10 @@ namespace embree
   std::string getExecutableFileName()
   {
     const int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
-    char buf[4096];
-    memset(buf,0,sizeof(buf));
-    size_t len = sizeof(buf)-1;
-    if (sysctl(mib, 4, buf, &len, 0x0, 0) == -1)
-      return std::string();
+    char buf[1024];
+    size_t len = sizeof(buf);
+    if (sysctl(mib, 4, buf, &len, 0x0, 0) == -1) *buf = '\0';
     return std::string(buf);
-  }
-
-  size_t getVirtualMemoryBytes() {
-    return 0;
-  }
-   
-  size_t getResidentMemoryBytes() {
-    return 0;
   }
 }
 
@@ -507,19 +476,10 @@ namespace embree
 {
   std::string getExecutableFileName()
   {
-    char buf[4096];
+    char buf[1024];
     uint32_t size = sizeof(buf);
-    if (_NSGetExecutablePath(buf, &size) != 0)
-      return std::string();
+    if (_NSGetExecutablePath(buf, &size) != 0) return std::string();
     return std::string(buf);
-  }
-
-  size_t getVirtualMemoryBytes() {
-    return 0;
-  }
-   
-  size_t getResidentMemoryBytes() {
-    return 0;
   }
 }
 
@@ -534,25 +494,13 @@ namespace embree
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-#include <pthread.h>
 
 namespace embree
 {
   unsigned int getNumberOfLogicalThreads() 
   {
     static int nThreads = -1;
-    if (nThreads != -1) return nThreads;
-
-#if defined(__MACOSX__)
-    nThreads = sysconf(_SC_NPROCESSORS_ONLN); // does not work in Linux LXC container
-    assert(nThreads);
-#else
-    cpu_set_t set;
-    if (pthread_getaffinity_np(pthread_self(), sizeof(set), &set) == 0)
-      nThreads = CPU_COUNT(&set);
-#endif
-    
-    assert(nThreads);
+    if (nThreads == -1) nThreads = sysconf(_SC_NPROCESSORS_CONF);
     return nThreads;
   }
 

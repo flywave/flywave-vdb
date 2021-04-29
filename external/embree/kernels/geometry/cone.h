@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -139,7 +152,7 @@ namespace embree
         if (shouldhit) failed |= std::isinf(t0) ? t0 != t.lower : (t0 == -1E6) ? t.lower > -1E6f : abs(t0-t.lower) > eps;
         if (shouldhit) failed |= std::isinf(t1) ? t1 != t.upper : (t1 == +1E6) ? t.upper < +1E6f : abs(t1-t.upper) > eps;
         if (!failed) return true;
-        embree_cout << "Cone test " << id << " failed: cone = " << cone << ", ray = " << ray << ", hit = " << hit << ", t = " << t << embree_endl; 
+        std::cout << "Cone test " << id << " failed: cone = " << cone << ", ray = " << ray << ", hit = " << hit << ", t = " << t << std::endl; 
         return false;
       }
 
@@ -173,7 +186,7 @@ namespace embree
       }
 
       /*! output operator */
-      friend __forceinline embree_ostream operator<<(embree_ostream cout, const Cone& c) {
+      friend __forceinline std::ostream& operator<<(std::ostream& cout, const Cone& c) {
         return cout << "Cone { p0 = " << c.p0 << ", r0 = " << c.r0 << ", p1 = " << c.p1 << ", r1 = " << c.r1 << "}";
       }
     };

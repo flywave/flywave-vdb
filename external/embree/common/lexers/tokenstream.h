@@ -1,5 +1,18 @@
-// Copyright 2009-2020 Intel Corporation
-// SPDX-License-Identifier: Apache-2.0
+// ======================================================================== //
+// Copyright 2009-2016 Intel Corporation                                    //
+//                                                                          //
+// Licensed under the Apache License, Version 2.0 (the "License");          //
+// you may not use this file except in compliance with the License.         //
+// You may obtain a copy of the License at                                  //
+//                                                                          //
+//     http://www.apache.org/licenses/LICENSE-2.0                           //
+//                                                                          //
+// Unless required by applicable law or agreed to in writing, software      //
+// distributed under the License is distributed on an "AS IS" BASIS,        //
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
+// See the License for the specific language governing permissions and      //
+// limitations under the License.                                           //
+// ======================================================================== //
 
 #pragma once
 
@@ -94,7 +107,7 @@ namespace embree
       if (t.ty == TY_INT) return cout << "Int(" << t.i << ")";
       if (t.ty == TY_FLOAT) return cout << "Float(" << t.f << ")";
       if (t.ty == TY_IDENTIFIER) return cout << "Id(" << t.str << ")";
-      if (t.ty == TY_STRING) return cout << "String(" << t.str << ")";
+      if (t.ty == TY_STRING) return cout << "String(" + t.str + ")";
       if (t.ty == TY_SYMBOL) return cout << "Symbol(" << t.str << ")";
       return cout << "unknown";
     }
@@ -120,7 +133,6 @@ namespace embree
     static const std::string ALPHA;
     static const std::string numbers;
     static const std::string separators;
-    static const std::string stringChars;
 
   public:
     TokenStream(const Ref<Stream<int> >& cin,
@@ -145,20 +157,16 @@ namespace embree
     Ref<Stream<int> > cin;
     bool isSepMap[256];
     bool isAlphaMap[256];
-    bool isStringCharMap[256];
     std::vector<std::string> symbols;
 
     /*! checks if a character is a separator */
-    __forceinline bool isSeparator(unsigned int c) const { return c<256 && isSepMap[c]; }
+    __forceinline bool isSeparator(int c) const { return isSepMap[c]; }
 
     /*! checks if a character is a number */
-    __forceinline bool isDigit(unsigned int c) const {  return c >= '0' && c <= '9'; }
-
-    /*! checks if a character is valid inside a string */
-    __forceinline bool isStringChar(unsigned int c) const { return c<256 && isStringCharMap[c]; }
+    __forceinline bool isDigit(int c) const {  return c >= '0' && c <= '9';}
 
     /*! checks if a character is legal for an identifier */
-    __forceinline bool isAlpha(unsigned int c) const {  return c<256 && isAlphaMap[c];  }
-    __forceinline bool isAlphaNum(unsigned int c) const { return isAlpha(c) || isDigit(c); }
+    __forceinline bool isAlpha(int c) const {  return isAlphaMap[c];  }
+    __forceinline bool isAlphaNum(int c) const { return isAlpha(c) || isDigit(c); }
   };
 }

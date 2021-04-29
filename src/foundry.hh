@@ -7,7 +7,7 @@
 
 #include <openvdb/Types.h>
 
-struct _triangle_t;
+struct _io_triangle_t;
 
 namespace flywave {
 

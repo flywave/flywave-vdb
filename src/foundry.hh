@@ -3,10 +3,11 @@
 #include "mesh_adapter.hh"
 #include "texture2d.hh"
 #include "voxel_pixel.hh"
-#include "voxelizer_api_impl.hh"
 #include "xparam.hh"
 
 #include <openvdb/Types.h>
+
+struct _triangle_t;
 
 namespace flywave {
 

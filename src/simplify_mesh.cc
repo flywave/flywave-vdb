@@ -1,4 +1,5 @@
 #include "simplify_mesh.hh"
+#include "voxelizer_api_impl.hh"
 
 namespace flywave {
 

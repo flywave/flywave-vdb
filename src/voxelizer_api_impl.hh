@@ -21,7 +21,7 @@ struct _io_vertex_t {
   }
 };
 
-struct _triangle_t {
+struct _io_triangle_t {
   _io_vertex_t vertices[3];
   uint32_t node;
   uint32_t tex;

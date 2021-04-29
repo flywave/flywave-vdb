@@ -101,7 +101,7 @@ public:
   simplify_mesh(const simplify_mesh &m);
 
   void lock(std::vector<bool> &locked);
-  void get_triangles(struct _triangle_t *triangles, uint32_t node);
+  void get_triangles(struct _io_triangle_t *triangles, uint32_t node);
 
   void unlock_border();
   void lock_border();

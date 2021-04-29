@@ -18,6 +18,8 @@ FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_duplicate(voxel_pixel_t *vox) {
   return nullptr;
 }
 
+FLYWAVE_VDB_API void make_triangles(voxel_pixel_t *vox) {}
+
 #ifdef __cplusplus
 }
 #endif

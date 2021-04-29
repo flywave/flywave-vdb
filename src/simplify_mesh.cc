@@ -118,7 +118,7 @@ void simplify_mesh::lock(std::vector<bool> &locked) {
       face[i].ClearW();
 }
 
-void simplify_mesh::get_triangles(struct _triangle_t *triangles,
+void simplify_mesh::get_triangles(struct _io_triangle_t *triangles,
                                   uint32_t node) {
   int count = 0;
   for (uint32_t i = 0; i < face.size(); i++) {
@@ -126,7 +126,7 @@ void simplify_mesh::get_triangles(struct _triangle_t *triangles,
     if (t.IsD())
       continue;
 
-    struct _triangle_t &triangle = triangles[count++];
+    struct _io_triangle_t &triangle = triangles[count++];
     for (uint32_t k = 0; k < 3; k++) {
       struct _io_vertex_t &vertex = triangle.vertices[k];
       simplify_vertex &v = *t.V(k);

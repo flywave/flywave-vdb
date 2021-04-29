@@ -14,6 +14,8 @@ extern "C" {
 #endif
 
 typedef struct _voxel_pixel_t voxel_pixel_t;
+typedef struct _io_vertex_t io_vertex_t;
+typedef struct _io_triangle_t io_triangle_t;
 
 extern FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_create();
 extern FLYWAVE_VDB_API void voxel_pixel_free(voxel_pixel_t *vox);

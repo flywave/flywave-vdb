@@ -19,6 +19,7 @@ public:
 
 public:
   vertext_sampler(vdb::math::Transform::Ptr xform) : _xform(xform) {}
+  virtual ~vertext_sampler() = default;
 
   virtual std::tuple<vertex_grid::Ptr, int32_grid::Ptr>
   sampler(triangles_stream &stream, clip_box_createor &bc) = 0;
@@ -27,8 +28,6 @@ public:
 
   static std::unique_ptr<vertext_sampler>
   make_mesh_sampler(vdb::math::Transform::Ptr xform, sampler_type type);
-
-  virtual ~vertext_sampler() = default;
 
 protected:
   vdb::math::Transform::Ptr _xform;

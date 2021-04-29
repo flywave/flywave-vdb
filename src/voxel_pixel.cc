@@ -18,20 +18,20 @@ namespace flywave {
 template <typename RealType> struct ValueRange {
 public:
   ValueRange()
-      : m_min(std::numeric_limits<RealType>::max()),
-        m_max(std::numeric_limits<RealType>::min()) {}
-  ValueRange(RealType min_, RealType max_) : m_min(min_), m_max(max_) {}
+      : _min(std::numeric_limits<RealType>::max()),
+        _max(std::numeric_limits<RealType>::min()) {}
+  ValueRange(RealType min_, RealType max_) : _min(min_), _max(max_) {}
 
-  RealType getMin() const { return m_min; }
-  RealType getMax() const { return m_max; }
+  RealType getMin() const { return _min; }
+  RealType getMax() const { return _max; }
 
   void addValue(RealType value) {
-    m_min = std::min(m_min, value);
-    m_max = std::max(m_max, value);
+    _min = std::min(_min, value);
+    _max = std::max(_max, value);
   }
 
 private:
-  RealType m_min, m_max;
+  RealType _min, _max;
 };
 
 typedef ValueRange<float> FloatRange;

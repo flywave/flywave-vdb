@@ -1,7 +1,7 @@
 #include "voxelizer_api.h"
 #include "voxelizer_api_impl.hh"
 
-#include "micronizer.hh"
+#include "voxel_pixel_sampler.hh"
 #include "voxel_mesh.hh"
 
 using namespace flywave;

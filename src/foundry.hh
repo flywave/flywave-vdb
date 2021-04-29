@@ -7,7 +7,15 @@
 
 #include <openvdb/Types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct _io_triangle_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 namespace flywave {
 

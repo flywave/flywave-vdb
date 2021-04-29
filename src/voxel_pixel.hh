@@ -10,10 +10,10 @@ namespace flywave {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
-class micronizer;
+class voxel_pixel_sampler;
 
 class voxel_pixel {
-  friend class micronizer;
+  friend class voxel_pixel_sampler;
 
 public:
   voxel_pixel()
@@ -62,7 +62,11 @@ public:
 
   static voxel_pixel create_voxel_pixel() { return voxel_pixel(); }
 
-  enum class composite_type { op_union, op_intersection, op_difference };
+  enum class composite_type : uint32_t {
+    op_union,
+    op_intersection,
+    op_difference
+  };
 
   void composite(voxel_pixel &pot, const composite_type &type);
 

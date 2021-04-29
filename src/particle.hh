@@ -8,13 +8,13 @@ namespace flywave {
 
 class vdb_particle {
 protected:
-  struct Particle {
+  struct particle {
     openvdb::Vec3R p, v;
     openvdb::Real r;
   };
   openvdb::Real _radius_scale;
   openvdb::Real _velocity_scale;
-  std::vector<Particle> _particle_list;
+  std::vector<particle> _particle_list;
 
 public:
   typedef openvdb::Vec3R PosType;
@@ -24,7 +24,7 @@ public:
 
   void add(const openvdb::Vec3R &p, const openvdb::Real &r,
            const openvdb::Vec3R &v = openvdb::Vec3R(0, 0, 0)) {
-    Particle pa;
+    particle pa;
     pa.p = p;
     pa.r = r;
     pa.v = v;

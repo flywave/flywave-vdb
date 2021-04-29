@@ -3,7 +3,7 @@
 #include "projection.hh"
 #include "resolution.hh"
 #include "sampler.hh"
-#include "simplify_mesh.hh"
+#include "texture_mesh.hh"
 #include "voxel_pixel.hh"
 #include "voxelizer_api.h"
 
@@ -265,8 +265,8 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
   points_ptr.reset();
   quads_ptr.reset();
 
-  std::unique_ptr<simplify_mesh> _smesh = std::make_unique<simplify_mesh>();
-  simplify_mesh &smesh = *_smesh;
+  std::unique_ptr<texture_mesh> _smesh = std::make_unique<texture_mesh>();
+  texture_mesh &smesh = *_smesh;
 
   int face_count = 0;
   for (auto kv : group_triangles) {
@@ -277,10 +277,10 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
 
     smesh.textures.emplace_back(std::to_string(mtl_index));
 
-    auto vertex_iter = vcg::tri::Allocator<simplify_mesh>::AddVertices(
+    auto vertex_iter = vcg::tri::Allocator<texture_mesh>::AddVertices(
         smesh, faces.size() * 3);
     auto face_iter =
-        vcg::tri::Allocator<simplify_mesh>::AddFaces(smesh, faces.size());
+        vcg::tri::Allocator<texture_mesh>::AddFaces(smesh, faces.size());
 
     auto value_face = faces.begin();
     while (face_iter != smesh.face.end()) {
@@ -326,10 +326,10 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
 
   group_triangles_ptr.reset();
 
-  vcg::tri::Clean<simplify_mesh>::RemoveDuplicateVertex(smesh);
-  vcg::tri::Allocator<simplify_mesh>::CompactVertexVector(smesh);
-  vcg::tri::Allocator<simplify_mesh>::CompactFaceVector(smesh);
-  vcg::tri::UpdateNormal<simplify_mesh>::PerVertex(smesh);
+  vcg::tri::Clean<texture_mesh>::RemoveDuplicateVertex(smesh);
+  vcg::tri::Allocator<texture_mesh>::CompactVertexVector(smesh);
+  vcg::tri::Allocator<texture_mesh>::CompactFaceVector(smesh);
+  vcg::tri::UpdateNormal<texture_mesh>::PerVertex(smesh);
 
   int locked_border_count = 0;
   {
@@ -342,7 +342,7 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
       }
     };
     {
-      std::unordered_map<simplify_mesh::VertexPointer, lock_condition> v_map;
+      std::unordered_map<texture_mesh::VertexPointer, lock_condition> v_map;
 
       for (auto &iter : smesh.face) {
         int i = 0;
@@ -403,7 +403,7 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
   }
 
 #if false
-    vcg::tri::io::ExporterOBJ<simplify_mesh>::Save(smesh, "./test.obj", 0);
+    vcg::tri::io::ExporterOBJ<texture_mesh>::Save(smesh, "./test.obj", 0);
 #endif
 
   rettriangles.resize(smesh.FN());

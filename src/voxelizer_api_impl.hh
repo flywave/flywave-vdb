@@ -1,5 +1,6 @@
 #pragma once
 
+#include "foundry.hh"
 #include "voxel_pixel.hh"
 
 #ifdef __cplusplus
@@ -8,6 +9,10 @@ extern "C" {
 
 struct _voxel_pixel_t {
   flywave::voxel_pixel *ptr;
+};
+
+struct _textute_foundry_t {
+  std::shared_ptr<flywave::textute_foundry> ptr;
 };
 
 struct _io_vertex_t {

@@ -15,7 +15,8 @@ public:
       return nullptr;
 
     texture2d<vdb::math::Vec4<uint8_t>>::Ptr _texture =
-        texture2d<vdb::math::Vec4<uint8_t>>::create({img_size.first, img_size.second});
+        texture2d<vdb::math::Vec4<uint8_t>>::create(
+            {img_size.first, img_size.second});
 
     _texture->fill('\0');
     int count = 0;

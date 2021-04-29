@@ -5,6 +5,7 @@
 #include "sampler.hh"
 #include "simplify_mesh.hh"
 #include "voxel_pixel.hh"
+#include "voxelizer_api.h"
 
 #include "tolerance.hh"
 

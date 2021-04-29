@@ -2,8 +2,8 @@
 #include "grid_api_impl.hh"
 
 #include "grid.hh"
-#include "vdb_mesh.hh"
 #include "particle.hh"
+#include "vdb_mesh.hh"
 
 #include <openvdb/tools/Dense.h>
 #include <openvdb/util/Util.h>
@@ -204,7 +204,8 @@ FLYWAVE_VDB_API void vdb_rebuild(vdb_grid_t *bGrid, float iso, float exWidth,
   bGrid->ptr->rebuild(iso, exWidth, inWidth);
 }
 
-FLYWAVE_VDB_API float *vdb_dense(vdb_grid_t *bGrid, int *width, int *height, int *depth) {
+FLYWAVE_VDB_API float *vdb_dense(vdb_grid_t *bGrid, int *width, int *height,
+                                 int *depth) {
   openvdb::FloatGrid::Ptr grid =
       openvdb::gridPtrCast<openvdb::FloatGrid>(bGrid->ptr->grid());
 

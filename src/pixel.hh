@@ -61,7 +61,7 @@ class pixel {
 public:
   pixel() : _value(0) {}
 
-  pixel(float value) : _value(value) {}
+  pixel(double value) : _value(value) {}
 
   pixel(const pixel &pix) noexcept { memcpy(this, &pix, sizeof(pixel)); }
 
@@ -122,10 +122,10 @@ public:
     return f(_data);
   }
 
-  operator float() const { return _value; }
+  operator double() const { return _value; }
 
   union {
-    float _value;
+    double _value;
     pixel_data _data;
   };
 };

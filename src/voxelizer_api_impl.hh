@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 struct _voxel_pixel_t {
-  flywave::voxel_pixel *ptr;
+  std::shared_ptr<flywave::voxel_pixel> ptr;
 };
 
 struct _textute_foundry_t {

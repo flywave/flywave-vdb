@@ -305,9 +305,7 @@ Tungsten::Vec3f voxel_pixel_grid::emission(Tungsten::Vec3f p) const {
         _voxelPixel->get_pixel_grid()->tree(),
         openvdb::Vec3R(op.x(), op.y(), op.z()));
     Tungsten::Vec3f result =
-        _emissionScale * Tungsten::Vec3f(pix._data._color.x() / 255,
-                                         pix._data._color.y() / 255,
-                                         pix._data._color.z() / 255);
+        _emissionScale * Tungsten::Vec3f(pix.as_vec3f().asPointer());
     if (_scaleEmissionByDensity)
       result *= density(p);
     return result;

@@ -124,6 +124,17 @@ public:
 
   operator double() const { return _value; }
 
+  vdb::math::Vec3<float> as_vec3f() const {
+    return vdb::math::Vec3<float>(
+        _data._color.x() / 255, _data._color.y() / 255, _data._color.z() / 255);
+  }
+
+  vdb::math::Vec4<float> as_vec4f() const {
+    return vdb::math::Vec4<float>(
+        _data._color.x() / 255, _data._color.y() / 255, _data._color.z() / 255,
+        _data._color.w() / 255);
+  }
+
   union {
     double _value;
     pixel_data _data;

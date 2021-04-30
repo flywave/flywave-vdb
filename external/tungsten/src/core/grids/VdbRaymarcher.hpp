@@ -8,6 +8,8 @@
 
 namespace Tungsten {
 
+namespace vdb = openvdb::OPENVDB_VERSION_NAME;
+
 class DdaRay
 {
     openvdb::Vec3f _pos, _dir, _invDir;
@@ -28,7 +30,7 @@ class VdbRaymarcher
     using NodeT = typename ChainT::template Get<ChildNodeLevel - 1>;
     using AccessorT = typename openvdb::tree::ValueAccessor<const TreeT>;
 
-    openvdb::math::DDA<DdaRay, NodeT::TOTAL> _dda;
+    vdb::math::DDA<DdaRay, NodeT::TOTAL> _dda;
     VdbRaymarcher<TreeT, ChildNodeLevel - 1> _child;
 
 public:
@@ -60,7 +62,7 @@ class VdbRaymarcher<TreeT, 0>
 {
     typedef typename openvdb::tree::ValueAccessor<const TreeT> AccessorT;
 
-    openvdb::math::DDA<DdaRay, 0> _dda;
+    vdb::math::DDA<DdaRay, 0> _dda;
 
 public:
     template<typename Intersector>

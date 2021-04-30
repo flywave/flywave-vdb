@@ -108,6 +108,9 @@ public:
   renderer_status status();
 
   std::unique_ptr<Tungsten::Vec3c[]> frame_buffer(Tungsten::Vec2i &resolution);
+
+  std::unique_ptr<Tungsten::uint8, void (*)(void *)>
+  frame_buffer_png(Tungsten::Vec2i &resolution);
 };
 
 } // namespace flywave

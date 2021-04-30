@@ -1,4 +1,19 @@
 #include "pbr_renderer.hh"
+#include <lodepng/lodepng.h>
+
+#include <io/JsonLoadException.hpp>
+#include <io/FileIterables.hpp>
+#include <io/ZipWriter.hpp>
+#include <io/CliParser.hpp"
+#include <io/Scene.hpp>
+#include <io/Path.hpp>
+
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
+#include <rapidjson/document.h>
+#include <unordered_map>
+#include <unordered_set>
+#include <iostream>
 
 namespace flywave {
 
@@ -162,4 +177,135 @@ pbr_renderer::frame_buffer(Tungsten::Vec2i &resolution) {
 
   return std::move(ldr);
 }
+
+std::unique_ptr<Tungsten::uint8, void (*)(void *)>
+pbr_renderer::frame_buffer_png(Tungsten::Vec2i &resolution) {
+  std::unique_ptr<Tungsten::uint8, void (*)(void *)> null_(
+      nullptr, [](void *) -> void {});
+  std::unique_ptr<Tungsten::Vec3c[]> ldr = frame_buffer(resolution);
+  if (!ldr)
+    return std::move(null_);
+
+  Tungsten::uint8 *encoded = nullptr;
+  size_t encodedSize;
+  if (lodepng_encode_memory(&encoded, &encodedSize, &ldr[0].x(), resolution.x(),
+                            resolution.y(), LCT_RGB, 8) != 0)
+    return std::move(null_);
+
+  ldr.reset();
+
+  return std::unique_ptr<Tungsten::uint8, void (*)(void *)>(encoded, free);
+}
+
+static void zipResources(Tungsten::Scene *scene)
+{
+    if (!parser.isPresent(OPT_OUTPUT))
+        parser.fail("No output file specified");
+
+    int compressionLevel = 5;
+    if (parser.isPresent(OPT_COMPRESSION_LEVEL))
+        compressionLevel = std::atoi(parser.param(OPT_COMPRESSION_LEVEL).c_str());
+
+    std::unordered_set<Tungsten::Path> remappedPaths;
+    auto remap = [&](const Tungsten::Path &p) {
+        Tungsten::Path result = p.stripParent();
+        int index = 1;
+        if (p.isDirectory())
+            while (remappedPaths.count(result))
+                result = p.baseName() + tfm::format("%03d", index++);
+        else
+            while (remappedPaths.count(result))
+                result = p.baseName() + tfm::format("%03d", index++) + p.extension();
+        remappedPaths.insert(result);
+        return std::move(result);
+    };
+
+    try {
+        Tungsten::ZipWriter writer(Path(parser.param(OPT_OUTPUT)));
+        auto addFile = [&](const Tungsten::Path &src, const Tungsten::Path &dst) {
+            if (!writer.addFile(src, dst, compressionLevel))
+                std::cout << "Warning: Failed to add file " << src << " to zip package" << std::endl;
+        };
+        auto addDirectory = [&](const Tungsten::Path &dst) {
+            if (!writer.addDirectory(dst))
+                std::cout << "Warning: Failed to add directory " << dst << " to zip package" << std::endl;
+        };
+
+        for (const auto &r : scene->resources()) {
+            Tungsten::Path &path = *r.second;
+            Tungsten::Path zipPath = remap(path);
+
+            if (path.isDirectory()) {
+                Tungsten::Path root(path, "");
+                for (const Tungsten::Path &p : root.recursive()) {
+                    if (p.isDirectory())
+                        addDirectory(zipPath/p);
+                    else
+                        addFile(p, zipPath/p);
+                }
+            } else {
+                addFile(path, zipPath);
+            }
+
+            path = zipPath;
+        }
+
+        rapidjson::Document document;
+        document.SetObject();
+        *(static_cast<rapidjson::Value *>(&document)) = scene->toJson(document.GetAllocator());
+
+        rapidjson::GenericStringBuffer<rapidjson::UTF8<>> buffer;
+        rapidjson::PrettyWriter<rapidjson::GenericStringBuffer<rapidjson::UTF8<>>> jsonWriter(buffer);
+        document.Accept(jsonWriter);
+
+        std::string json = buffer.GetString();
+        writer.addFile(json.c_str(), json.size(), scene->path().fileName(), compressionLevel);
+    } catch (const std::runtime_error &e) {
+        parser.fail("Failed to package zip: %s", e.what());
+    }
+}
+
+static void relocateResources(Tungsten::Scene *scene)
+{
+    if (!parser.isPresent(OPT_OUTPUT))
+        parser.fail("No output file specified");
+
+    Tungsten::Path output(parser.param(OPT_OUTPUT));
+    if (!Tungsten::FileUtils::createDirectory(output, true))
+        parser.fail("Failed to create output directory at '%s'", output);
+
+    Tungsten::Path resourceParent = output;
+
+    Tungsten::Path normalizedOutput = output.normalize();
+    Tungsten::Path outputTail;
+    Tungsten::Path normalizedSceneFolder = scene->path().parent().normalize();
+    while (!normalizedOutput.empty()) {
+        if (normalizedOutput == normalizedSceneFolder) {
+            resourceParent = outputTail;
+            break;
+        }
+        outputTail = normalizedOutput.fileName()/outputTail;
+        normalizedOutput = normalizedOutput.parent().stripSeparator();
+    }
+
+    for (const auto &r : scene->resources()) {
+        Tungsten::Path newPath = output/r.first.fileName();
+
+        bool success;
+        if (parser.isPresent(OPT_PATHS_ONLY))
+            success = true;
+        else if (parser.isPresent(OPT_COPY_RELOCATE))
+            success = Tungsten::FileUtils::copyFile(r.first, newPath, false);
+        else
+            success = Tungsten::FileUtils::moveFile(r.first, newPath, true);
+
+        if (!success)
+            std::cout << "Failed to relocate resource " << r.first << std::endl;
+        else
+            *r.second = resourceParent/r.first.fileName();
+    }
+
+    Tungsten::Scene::save(scene->path(), *scene);
+}
+
 } // namespace flywave

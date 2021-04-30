@@ -60,7 +60,6 @@ Pixmap3f nfor_denoiser(render_buffer_3f image,
         *image.bufferB, *image.bufferA, filteredFeaturesA,
         *image.bufferVariance, 3, 9, k);
 
-    // MSE estimation (section 5.3)
     Pixmap3f noisyMse(w, h);
     for (int i = 0; i < w * h; ++i) {
       Vec3f mseA = sqr((*image.bufferB)[i] - filteredColorA[i]) -
@@ -75,23 +74,19 @@ Pixmap3f nfor_denoiser(render_buffer_3f image,
     filteredColorsA.emplace_back(std::move(filteredColorA));
     filteredColorsB.emplace_back(std::move(filteredColorB));
 
-    // MSE filtering
     mses.emplace_back(nlMeans(noisyMse, *image.buffer, *image.bufferVariance, 1,
                               9, 1.0f, 1.0f, true));
   }
 
-  // Bandwidth selection (section 5.3)
-  // Generate selection map
   Pixmap3f noisySelection(w, h);
   for (int i = 0; i < w * h; ++i)
     for (int j = 0; j < 3; ++j)
       noisySelection[i][j] = mses[0][i][j] < mses[1][i][j] ? 0.0f : 1.0f;
   mses.clear();
-  // Filter selection map
+
   Pixmap3f selection = nlMeans(noisySelection, *image.buffer,
                                *image.bufferVariance, 1, 9, 1.0f, 1.0f, true);
 
-  // Apply selection map
   Pixmap3f resultA(w, h);
   Pixmap3f resultB(w, h);
   for (int i = 0; i < w * h; ++i) {
@@ -104,7 +99,6 @@ Pixmap3f nfor_denoiser(render_buffer_3f image,
   filteredColorsA.clear();
   filteredColorsB.clear();
 
-  // Second filter pass (section 5.4)
   std::vector<PixmapF> finalFeatures;
   for (size_t i = 0; i < filteredFeaturesA.size(); ++i) {
     PixmapF combinedFeature(w, h);

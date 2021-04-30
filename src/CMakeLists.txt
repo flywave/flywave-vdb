@@ -1,6 +1,12 @@
 
 include_directories(${FLYWAVE_INCLUDE_DIRS})
 
+if (MSVC)
+    add_definitions(-DCONSTEXPR=const -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
+else()
+    add_definitions(-DCONSTEXPR=constexpr)
+endif()
+
 FILE( GLOB vdb_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.cc )
 FILE( GLOB vdb_HEADER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.hh ${CMAKE_CURRENT_SOURCE_DIR}/*.h )
 

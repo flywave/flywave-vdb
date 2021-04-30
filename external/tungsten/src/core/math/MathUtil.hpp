@@ -1,9 +1,9 @@
 #ifndef MATHUTIL_HPP_
 #define MATHUTIL_HPP_
 
-#include "Vec.hpp"
-
 #include "IntTypes.hpp"
+
+#include "Vec.hpp"
 
 namespace Tungsten {
 

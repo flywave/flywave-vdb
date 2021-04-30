@@ -1,7 +1,6 @@
 #pragma once
 
 #include "barycentric.hh"
-#include "rasterize.hh"
 #include "triangle.hh"
 
 namespace flywave {

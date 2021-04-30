@@ -2,9 +2,9 @@
 
 #define OPENVDB_AVAILABLE 1
 
-#include <grids/VdbRaymarcher.hpp>
 #include <grids/GridFactory.hpp>
 #include <grids/VdbGrid.hpp>
+#include <grids/VdbRaymarcher.hpp>
 
 #include <sampling/PathSampleGenerator.hpp>
 
@@ -21,10 +21,10 @@
 
 namespace Tungsten {
 
-DEFINE_STRINGABLE_ENUM(GridFactory, "grid", ({
-    {"vdb", std::make_shared<VdbGrid>},
-    {"voxel_pixel", std::make_shared<flywave::voxel_pixel_grid>}
-}))
+DEFINE_STRINGABLE_ENUM(GridFactory, "grid",
+                       ({{"vdb", std::make_shared<VdbGrid>},
+                         {"voxel_pixel",
+                          std::make_shared<flywave::voxel_pixel_grid>}}))
 
 }
 

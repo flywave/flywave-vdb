@@ -107,7 +107,11 @@ add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)
 file(GLOB_RECURSE Core_SOURCES "src/core/*.cpp")
 add_library(tungsten STATIC ${Core_SOURCES})
 
+file(GLOB_RECURSE Denoiser_SOURCES "src/denoiser/*.cpp")
+add_library(denoiser STATIC ${Denoiser_SOURCES})
+
 IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
   SET_TARGET_PROPERTIES(tungsten  PROPERTIES FOLDER external/tungsten)
   SET_TARGET_PROPERTIES(tungsten_thirdparty  PROPERTIES FOLDER external/tungsten)
+  SET_TARGET_PROPERTIES(denoiser  PROPERTIES FOLDER external/tungsten)
 ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

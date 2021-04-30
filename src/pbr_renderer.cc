@@ -68,10 +68,8 @@ bool pbr_renderer::render_scene() {
 
   try {
     Tungsten::DirectoryChange context(inputDirectory);
-
     _scene->rendererSettings().setOutputDirectory(_outputDirectory);
 
-    int maxSpp = _scene->rendererSettings().spp();
     {
       std::unique_lock<std::mutex> lock(_sceneMutex);
       _flattenedScene.reset(_scene->makeTraceable(_seed));

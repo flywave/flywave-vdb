@@ -111,6 +111,9 @@ public:
 
   std::unique_ptr<Tungsten::uint8, void (*)(void *)>
   frame_buffer_png(Tungsten::Vec2i &resolution);
+
+  bool relocate(const std::string &output_s, bool copyRelocate = false);
+  bool ziparchive(const std::string &output, int compressionLevel = 5);
 };
 
 } // namespace flywave

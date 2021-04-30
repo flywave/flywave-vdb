@@ -9,9 +9,9 @@ namespace Tungsten {
 #else
 #define OPENVDB_ENTRY
 #endif
-
+/**
 DEFINE_STRINGABLE_ENUM(GridFactory, "grid", ({
     OPENVDB_ENTRY
 }))
-
+**/
 }

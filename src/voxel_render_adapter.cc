@@ -1,6 +1,10 @@
 #include "voxel_render_adapter.hh"
 
+#define OPENVDB_AVAILABLE 1
+
 #include <grids/VdbRaymarcher.hpp>
+#include <grids/GridFactory.hpp>
+#include <grids/VdbGrid.hpp>
 
 #include <sampling/PathSampleGenerator.hpp>
 
@@ -14,6 +18,15 @@
 #include <media/VoxelMedium.hpp>
 
 #include <openvdb/tools/Interpolation.h>
+
+namespace Tungsten {
+
+DEFINE_STRINGABLE_ENUM(GridFactory, "grid", ({
+    {"vdb", std::make_shared<VdbGrid>},
+    {"voxel_pixel", std::make_shared<flywave::voxel_pixel_grid>}
+}))
+
+}
 
 namespace flywave {
 

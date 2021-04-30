@@ -1,7 +1,5 @@
 #pragma once
 
-#define OPENVDB_AVAILABLE 1
-
 #include "voxel_pixel.hh"
 
 #include <grids/Grid.hpp>
@@ -82,8 +80,5 @@ public:
                                       float t0, float t1,
                                       float tau) const override;
 };
-
-std::shared_ptr<Tungsten::Medium>
-create_medium(std::shared_ptr<flywave::voxel_pixel> vp);
 
 } // namespace flywave

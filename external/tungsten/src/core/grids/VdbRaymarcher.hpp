@@ -23,8 +23,9 @@ public:
 template <typename TreeT, int ChildNodeLevel>
 class VdbRaymarcher
 {
-    using ChainT = typename TreeT::RootNodeType::NodeChainType;
-    using NodeT = typename ChainT::template Get<ChildNodeLevel>;
+    using RootType = typename TreeT::RootNodeType;
+    using ChainT = typename RootType::NodeChainType;
+    using NodeT = typename ChainT::template Get<ChildNodeLevel - 1>;
     using AccessorT = typename openvdb::tree::ValueAccessor<const TreeT>;
 
     openvdb::math::DDA<DdaRay, NodeT::TOTAL> _dda;

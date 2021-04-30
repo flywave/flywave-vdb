@@ -6,7 +6,6 @@
 
 #include <thread/ThreadUtils.hpp>
 
-#include <io/CliParser.hpp>
 #include <io/DirectoryChange.hpp>
 #include <io/FileUtils.hpp>
 #include <io/JsonLoadException.hpp>
@@ -114,6 +113,8 @@ public:
 
   bool relocate(const std::string &output_s, bool copyRelocate = false);
   bool ziparchive(const std::string &output, int compressionLevel = 5);
+
+  bool denoiser(const std::string &target);
 };
 
 } // namespace flywave

@@ -133,7 +133,6 @@ void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               vdb::math::Transform::Ptr transform,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id) {
-
   std::vector<typename vertext_sampler::int32_grid::TreeType::LeafNodeType *>
       nodes;
   nodes.reserve(index->tree().leafCount());

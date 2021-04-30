@@ -1,5 +1,5 @@
-#include "denoiser.hh"
 #include "Version.hpp"
+#include "pbr_renderer.hh"
 
 #include "thread/ThreadUtils.hpp"
 
@@ -189,24 +189,15 @@ void load_input_buffers(render_buffer_3f &image,
   }
 }
 
-bool denoiser(const std::string &scene_, const std::string &target) {
-  Tungsten::Path sceneFile(scene_);
+bool pbr_renderer::denoiser(const std::string &target) {
   Tungsten::Path targetFile(target);
-
-  std::unique_ptr<Tungsten::Scene> scene;
-  try {
-    scene.reset(Tungsten::Scene::load(sceneFile));
-  } catch (const Tungsten::JsonLoadException &e) {
-    std::cerr << e.what() << std::endl;
-    return false;
-  }
 
   Tungsten::ThreadUtils::startThreads(
       std::max(Tungsten::ThreadUtils::idealThreadCount() - 1, 1u));
 
   render_buffer_3f image;
   std::vector<render_buffer_f> features;
-  load_input_buffers(image, features, *scene);
+  load_input_buffers(image, features, *_scene);
 
   Tungsten::Timer timer;
   Tungsten::Pixmap3f result =

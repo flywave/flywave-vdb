@@ -1,7 +1,7 @@
 package vdb
 
 type Mask struct {
-	Volume *Grid
+	Volume *FloatGrid
 	Min    float64
 	Max    float64
 	Invert bool
@@ -9,14 +9,14 @@ type Mask struct {
 
 func NewMask() *Mask {
 	return &Mask{
-		Volume: NewGrid(),
+		Volume: NewFloatGrid(),
 		Min:    0,
 		Max:    0,
 		Invert: false,
 	}
 }
 
-func NewMaskFromGrid(g *Grid) *Mask {
+func NewMaskFromGrid(g *FloatGrid) *Mask {
 	return &Mask{
 		Volume: g,
 		Min:    0,

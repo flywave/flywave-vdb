@@ -41,10 +41,14 @@ FLYWAVE_VDB_API void voxel_pixel_voxel_resolution(voxel_pixel_t *vox,
                                                   double *mat) {}
 
 FLYWAVE_VDB_API vdb_float_grid_t *
-voxel_pixel_get_voxel_grid(voxel_pixel_t *vox) {}
+voxel_pixel_get_voxel_grid(voxel_pixel_t *vox) {
+    return nullptr;
+}
 
-FLYWAVE_VDB_API vdb_float_grid_t *
-voxel_pixel_get_pixel_grid(voxel_pixel_t *vox) {}
+FLYWAVE_VDB_API vdb_pixel_grid_t *
+voxel_pixel_get_pixel_grid(voxel_pixel_t *vox) {
+  return nullptr;
+}
 
 FLYWAVE_VDB_API void voxel_pixel_set_voxel_grid(voxel_pixel_t *vox,
                                                 vdb_float_grid_t *vg) {}

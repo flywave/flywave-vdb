@@ -1,6 +1,7 @@
 #include "io_jpeg.hh"
 
 #include <algorithm>
+#include <cassert>
 #include <memory>
 #include <setjmp.h>
 #include <string.h>

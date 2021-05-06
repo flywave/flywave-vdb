@@ -1,5 +1,6 @@
 
 #include "voxel_pixel.hh"
+#include "bbox.hh"
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -299,6 +300,129 @@ void voxel_pixel::read(const std::string &file) {
     _vertex->setGridClass(vdb::GRID_LEVEL_SET);
   }
   is.close();
+}
+
+pixel_grid::Ptr voxel_pixel::extract_color(voxel_pixel &spot) {
+  auto grid = vdb::tools::clip(*get_voxel_grid(), *spot.get_voxel_grid(), true);
+  auto _extracted_color = pixel_grid::create();
+
+  auto assessor = _extracted_color->getAccessor();
+  auto color_accessor = get_voxel_grid()->getAccessor();
+  for (auto iter = grid->tree().beginValueOn(); iter; ++iter) {
+    vdb::Coord flat_coord = iter.getCoord();
+    flat_coord.x() = 0;
+    assessor.setValue(flat_coord, color_accessor.getValue(iter.getCoord()));
+  }
+
+  composite(spot, voxel_pixel::composite_type::op_difference);
+
+  return _extracted_color;
+}
+
+void voxel_pixel::fill_color(voxel_pixel &spot, pixel_grid::Ptr _colors) {
+  auto accessor = _colors->getAccessor();
+  for (auto iter = spot.get_pixel_grid()->beginValueOn(); iter; ++iter) {
+    auto coord = iter.getCoord();
+    coord.x() = 0;
+    if (accessor.isValueOn(coord))
+      iter.setValue(accessor.getValue(coord));
+  }
+
+  composite(spot, voxel_pixel::composite_type::op_union);
+}
+
+class search_surface_op {
+public:
+  using index_tree = vdb::tree::Tree4<int32_t, 5, 4, 3>::Type;
+
+public:
+  search_surface_op(const bbox2<double> &range, std::vector<vdb::Coord> &nodes,
+                    vertex_grid &grid, index_tree &index)
+      : _nodes(nodes), _index_tree(&index), _range(range), _grid(grid) {}
+
+  search_surface_op(search_surface_op &other, tbb::split)
+      : _nodes(other._nodes), _index_tree(&_local_tree), _range(other._range),
+        _grid(other._grid) {}
+
+  void operator()(const tbb::blocked_range<size_t> &range) {
+    vdb::tree::ValueAccessor<index_tree> paccess(*_index_tree);
+    auto acc = _grid.getAccessor();
+    for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+      auto &coord = _nodes[n];
+
+      if (!acc.isValueOn(coord) || acc.getValue(coord) > 0)
+        continue;
+      vdb::Coord flat_coord(0, coord.y(), coord.z());
+      if (paccess.isValueOn(flat_coord)) {
+        if (paccess.getValue(flat_coord) < coord.x()) {
+          paccess.setValue(flat_coord, coord.x());
+        }
+      } else {
+        paccess.setValue(flat_coord, coord.x());
+      }
+    }
+  }
+
+  void join(search_surface_op &surface) {
+    _index_tree->merge(*surface._index_tree);
+  }
+
+private:
+  std::vector<vdb::Coord> &_nodes;
+  index_tree _local_tree;
+  index_tree *_index_tree;
+  vertex_grid &_grid;
+  bbox2<double> _range;
+};
+
+vdb::BBoxd voxel_pixel::eval_max_min_elevation(vdb::BBoxd _in) {
+  if (get_voxel_grid()->empty()) {
+    return vdb::BBoxd({0, 0, 0}, {0, 0, 0});
+  }
+
+  std::vector<vdb::Coord> _nodes;
+
+  vdb::CoordBBox leaf_box;
+  get_voxel_grid()->tree().evalLeafBoundingBox(leaf_box);
+  auto min = voxel_resolution()->worldToIndex(_in.min());
+  auto max = voxel_resolution()->worldToIndex(_in.max());
+  int start_x = leaf_box.min().x();
+  int start_y = min.y();
+  int start_z = min.z();
+
+  int end_x = leaf_box.max().x();
+  int end_y = max.y();
+  int end_z = max.z();
+
+  vdb::Coord start_coord(start_x, start_y, start_z);
+  for (int x = start_x; x <= end_x; x++) {
+    for (int y = start_y; y <= end_y; y++) {
+      for (int z = start_z; z <= end_z; z++) {
+        _nodes.emplace_back(vdb::Coord(x, y, z));
+      }
+    }
+  }
+
+  const tbb::blocked_range<size_t> nodeRange(0, _nodes.size());
+
+  search_surface_op::index_tree _index_tree;
+  search_surface_op op(bbox2<double>({min.y(), min.z()}, {max.y(), max.z()}),
+                       _nodes, *get_voxel_grid(), _index_tree);
+  // op(nodeRange);
+  tbb::parallel_reduce(nodeRange, op);
+
+  int32_t _min = std::numeric_limits<int32_t>::max();
+  int32_t _max = std::numeric_limits<int32_t>::min();
+
+  for (auto iter = _index_tree.beginValueOn(); iter; ++iter) {
+    _min = std::min(_min, iter.getValue());
+    _max = std::max(_max, iter.getValue());
+  }
+
+  return vdb::BBoxd(voxel_resolution()->indexToWorld(
+                        vdb::Vec3d(_min, _in.min().y(), _in.min().z())),
+                    voxel_resolution()->indexToWorld(
+                        vdb::Vec3d(_max, _in.max().y(), _in.max().z())));
 }
 
 } // namespace flywave

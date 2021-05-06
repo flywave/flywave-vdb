@@ -57,6 +57,18 @@ void mesh_data::add_face(std::vector<openvdb::Vec4I> f) {
   _faces.insert(_faces.end(), f.begin(), f.end());
 }
 
+void mesh_data::add_texcoord(openvdb::Vec2s t) { _texcoords.push_back(t); }
+
+void mesh_data::add_texcoord(std::vector<openvdb::Vec2s> t) {
+  _texcoords.insert(_texcoords.end(), t.begin(), t.end());
+}
+
+void mesh_data::add_normal(openvdb::Vec3s n) { _normals.push_back(n); }
+
+void mesh_data::add_normal(std::vector<openvdb::Vec3s> n) {
+  _normals.insert(_normals.end(), n.begin(), n.end());
+}
+
 void mesh_data::add_smooth_face(int mtl_id,
                                 const std::vector<openvdb::Vec3I> &fs) {
   auto it = _smooth_faces_map.find(mtl_id);

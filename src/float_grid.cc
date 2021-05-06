@@ -14,13 +14,14 @@
 
 namespace flywave {
 
-vdb_float_grid::vdb_float_grid() { openvdb::initialize(); }
+vdb_float_grid::vdb_float_grid() {}
 
 vdb_float_grid::vdb_float_grid(vdb_float_grid *grid) {
-  openvdb::initialize();
   _grid = grid->grid()->deepCopy();
   _display = grid->display().duplicate();
 }
+
+vdb_float_grid::vdb_float_grid(float_grid::Ptr grid) : _grid(grid) {}
 
 vdb_float_grid::~vdb_float_grid() {}
 

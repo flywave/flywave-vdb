@@ -15,6 +15,8 @@ class vdb_float_grid {
 public:
   vdb_float_grid();
   vdb_float_grid(vdb_float_grid *grid);
+  vdb_float_grid(float_grid::Ptr grid);
+
   ~vdb_float_grid();
 
   float_grid::Ptr grid();

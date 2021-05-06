@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 #include <zlib.h>
+#include <cassert>
 
 namespace flywave {
 

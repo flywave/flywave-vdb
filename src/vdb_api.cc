@@ -348,7 +348,7 @@ FLYWAVE_VDB_API _Bool vdb_pixel_grid_transform(vdb_pixel_grid_t *grid,
 FLYWAVE_VDB_API void vdb_pixel_grid_set(vdb_pixel_grid_t *grid, int x, int y,
                                         int z, vdb_pixel_t v) {
   flywave::pixel_data pd;
-  pd._type = static_cast<flywave::pixel_data::type_t>(v.type);
+  pd._type = static_cast<flywave::pixel_data::type_t>(v.tp);
   pd._material_id = v.material_id;
   pd._feature_id = v.feature_id;
   pd._color.x() = v.color_r;
@@ -363,7 +363,7 @@ FLYWAVE_VDB_API vdb_pixel_t vdb_pixel_grid_get(vdb_pixel_grid_t *grid, int x,
                                                int y, int z) {
   flywave::pixel p = (*grid->ptr)(x, y, z);
   vdb_pixel_t ret;
-  ret.type = static_cast<vdb_pixel_type_t>(p._data._type);
+  ret.tp = static_cast<vdb_pixel_type_t>(p._data._type);
   ret.material_id = p._data._material_id;
   ret.feature_id = p._data._feature_id;
   ret.color_r = p._data._color.x();
@@ -378,7 +378,7 @@ FLYWAVE_VDB_API vdb_pixel_t vdb_pixel_grid_linear_get(vdb_pixel_grid_t *grid,
                                                       float z) {
   flywave::pixel p = (*grid->ptr)(x, y, z);
   vdb_pixel_t ret;
-  ret.type = static_cast<vdb_pixel_type_t>(p._data._type);
+  ret.tp = static_cast<vdb_pixel_type_t>(p._data._type);
   ret.material_id = p._data._material_id;
   ret.feature_id = p._data._feature_id;
   ret.color_r = p._data._color.x();

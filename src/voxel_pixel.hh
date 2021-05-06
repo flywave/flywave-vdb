@@ -74,6 +74,12 @@ public:
 
   void clear() { return clear_unuse_materials(); }
 
+  pixel_grid::Ptr extract_color(voxel_pixel &spot);
+
+  void fill_color(voxel_pixel &spot, pixel_grid::Ptr _colors);
+
+  vdb::BBoxd eval_max_min_elevation(vdb::BBoxd _in);
+
 private:
   voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               vdb::math::Transform::Ptr);

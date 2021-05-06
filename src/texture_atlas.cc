@@ -62,7 +62,7 @@ public:
 
 std::vector<texture_atlas_generator::texture_ptr> &
 texture_atlas_generator::generate(texture_mesh &_texture_mesh,
-                                 texture_mesh &output_mesh) {
+                                  texture_mesh &output_mesh) {
   int current_texture_id = -1;
   _textures.clear();
   std::unordered_map<int, std::vector<texture_face *>> texture_index_map;
@@ -82,9 +82,9 @@ texture_atlas_generator::generate(texture_mesh &_texture_mesh,
 
   for (auto &iter : texture_index_map) {
     vcg::tri::Allocator<texture_mesh>::AddFaces(texture_meshies[iter.first],
-                                                 iter.second.size());
+                                                iter.second.size());
     vcg::tri::Allocator<texture_mesh>::AddVertices(texture_meshies[iter.first],
-                                                    iter.second.size() * 3);
+                                                   iter.second.size() * 3);
     int face_index = 0;
     for (auto &face : iter.second) {
       auto &tar_face = texture_meshies[iter.first].face[face_index];
@@ -133,7 +133,7 @@ texture_atlas_generator::generate(texture_mesh &_texture_mesh,
     output_mesh.Clear();
     vcg::tri::Allocator<texture_mesh>::AddFaces(output_mesh, sum_face_size);
     vcg::tri::Allocator<texture_mesh>::AddVertices(output_mesh,
-                                                    sum_face_size * 3);
+                                                   sum_face_size * 3);
 
     int face_index = 0;
     for (auto &iter : texture_meshies) {

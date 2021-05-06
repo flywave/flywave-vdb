@@ -1,5 +1,8 @@
 #include "texture_data.hh"
 
+#include <memory>
+#include <string.h>
+
 #include "io_jpeg.hh"
 #include "io_png.hh"
 

@@ -16,9 +16,12 @@ class vdb_pixel_grid {
 public:
   vdb_pixel_grid();
   vdb_pixel_grid(vdb_pixel_grid *grid);
+  vdb_pixel_grid(pixel_grid::Ptr grid);
   ~vdb_pixel_grid();
 
   pixel_grid::Ptr grid();
+
+  void paint_texture(pixel_grid::Ptr texvol);
 
   bool read(const char *vFile);
   bool write(const char *vFile);

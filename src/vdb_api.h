@@ -81,9 +81,9 @@ extern FLYWAVE_VDB_API float *vdb_float_grid_dense(vdb_float_grid_t *bGrid,
                                                    int *width, int *height,
                                                    int *depth);
 
-extern FLYWAVE_VDB_API float *vdb_closest_point(vdb_float_grid_t *grid,
-                                                float *vPoints, int vCount,
-                                                int *rSize);
+extern FLYWAVE_VDB_API float *
+vdb_float_grid_closest_point(vdb_float_grid_t *grid, float *vPoints, int vCount,
+                             int *rSize);
 
 extern FLYWAVE_VDB_API void vdb_float_grid_set(vdb_float_grid_t *grid, int x,
                                                int y, int z, float v);
@@ -109,15 +109,10 @@ extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_write(vdb_pixel_grid_t *grid,
 extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_transform(vdb_pixel_grid_t *grid,
                                                       double *matrix,
                                                       int mCount);
-enum vdb_pixel_type_t : uint8_t {
-  color,
-  material,
-  material_and_color,
-  invalid
-};
+enum vdb_pixel_type_t { color, material, material_and_color, invalid };
 
 typedef struct _vdb_pixel_t {
-  vdb_pixel_type_t type;
+  uint8_t tp;
   uint8_t material_id;
   uint16_t feature_id;
   uint8_t color_r;

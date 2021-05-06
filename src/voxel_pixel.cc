@@ -15,12 +15,12 @@
 
 namespace flywave {
 
-template <typename RealType> struct ValueRange {
+template <typename RealType> struct value_range {
 public:
-  ValueRange()
+  value_range()
       : _min(std::numeric_limits<RealType>::max()),
         _max(std::numeric_limits<RealType>::min()) {}
-  ValueRange(RealType min_, RealType max_) : _min(min_), _max(max_) {}
+  value_range(RealType min_, RealType max_) : _min(min_), _max(max_) {}
 
   RealType getMin() const { return _min; }
   RealType getMax() const { return _max; }
@@ -34,9 +34,7 @@ private:
   RealType _min, _max;
 };
 
-typedef ValueRange<float> FloatRange;
-
-enum class FilterMode { BOX, MULTIRES, AUTO };
+typedef value_range<float> float_range;
 
 template <typename T> struct identity { using type = T; };
 
@@ -47,7 +45,7 @@ inline T unlerp(typename identity<T>::type a, typename identity<T>::type b,
 }
 
 inline openvdb::CoordBBox
-getIndexSpaceBoundingBox(const openvdb::GridBase &grid) {
+get_index_space_bounding_box(const openvdb::GridBase &grid) {
   try {
     const auto file_bbox_min =
         openvdb::Coord(grid.metaValue<openvdb::Vec3i>("file_bbox_min"));
@@ -72,8 +70,8 @@ getIndexSpaceBoundingBox(const openvdb::GridBase &grid) {
 }
 
 template <typename SamplingFunc, typename RealType>
-bool sampleVolume(const openvdb::Coord &extents, SamplingFunc sampling_func,
-                  FloatRange &out_value_range, RealType *out_samples) {
+bool sample_volume(const openvdb::Coord &extents, SamplingFunc sampling_func,
+                   float_range &out_value_range, RealType *out_samples) {
   const auto domain = openvdb::CoordBBox(openvdb::Coord(0, 0, 0),
                                          extents - openvdb::Coord(1, 1, 1));
   if (domain.empty()) {
@@ -81,7 +79,7 @@ bool sampleVolume(const openvdb::Coord &extents, SamplingFunc sampling_func,
   }
   const auto num_voxels = domain.volume();
 
-  typedef tbb::enumerable_thread_specific<FloatRange> PerThreadRange;
+  typedef tbb::enumerable_thread_specific<float_range> PerThreadRange;
   PerThreadRange ranges;
   const openvdb::Vec3i stride = {1, extents.x(), extents.x() * extents.y()};
   tbb::atomic<bool> cancelled;
@@ -106,8 +104,8 @@ bool sampleVolume(const openvdb::Coord &extents, SamplingFunc sampling_func,
     }
   });
 
-  out_value_range = FloatRange();
-  for (const FloatRange &per_thread_range : ranges) {
+  out_value_range = float_range();
+  for (const float_range &per_thread_range : ranges) {
     out_value_range.addValue(per_thread_range.getMin());
     out_value_range.addValue(per_thread_range.getMax());
   }
@@ -125,12 +123,13 @@ bool sampleVolume(const openvdb::Coord &extents, SamplingFunc sampling_func,
 }
 
 template <typename RealType>
-bool sampleGrid(const openvdb::FloatGrid &grid,
-                const openvdb::Coord &sampling_extents, FloatRange &value_range,
-                openvdb::Vec3d &scale, RealType *out_data) {
+bool sample_grid(const openvdb::FloatGrid &grid,
+                 const openvdb::Coord &sampling_extents,
+                 float_range &value_range, openvdb::Vec3d &scale,
+                 RealType *out_data) {
   assert(out_data);
 
-  const auto grid_bbox_is = getIndexSpaceBoundingBox(grid);
+  const auto grid_bbox_is = get_index_space_bounding_box(grid);
   const auto bbox_world = grid.transform().indexToWorld(grid_bbox_is);
 
   scale = bbox_world.extents();
@@ -151,7 +150,7 @@ bool sampleGrid(const openvdb::FloatGrid &grid,
     return sampler.wsSample(sample_pos_ws);
   };
 
-  sampleVolume(sampling_extents, sampling_func, value_range, out_data);
+  sample_volume(sampling_extents, sampling_func, value_range, out_data);
 }
 
 voxel_pixel::voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
@@ -222,7 +221,6 @@ void voxel_pixel_difference(voxel_pixel &tpot, voxel_pixel &spot) {
 
 void voxel_pixel::composite(voxel_pixel &pot, const composite_type &type) {
   _resolution = pot._resolution;
-
   if (!pot.is_empty()) {
     switch (type) {
     case composite_type::op_union:

@@ -4,30 +4,66 @@
 namespace flywave {
 
 voxel_mesh_adapter::voxel_mesh_adapter(
-    voxel_mesh &&hm, std::unordered_map<int, material> &map,
-    std::unordered_map<std::string, texture> &tex_map)
+    std::shared_ptr<voxel_mesh> hm,
+    std::unordered_map<int, std::shared_ptr<material>> &map,
+    std::unordered_map<std::string, std::shared_ptr<texture>> &tex_map)
     : _map(map), _tex_map(tex_map), _mesh(hm) {}
 
 void voxel_mesh_adapter::fill_meterial(std::shared_ptr<mesh_adapter> ada) {
   auto bg = _map.begin();
   while (bg != _map.end()) {
     auto &mt = bg->second;
-    auto md = std::make_shared<material_data>(mt);
+    auto md = std::make_shared<material_data>(*mt);
     md->_material_id = bg->first;
-    if (mt.diffuse_texname.empty()) {
+    if (mt->diffuse_texname.empty()) {
       material_group g{md};
       ada->add_material(g);
     } else {
       auto st_p = std::make_shared<uv_st_policy>(
-          std::make_unique<uv_reader_impl>(_mesh));
-      auto &tx = _tex_map.find(mt.diffuse_texname)->second;
+          std::make_unique<uv_reader_impl>(*_mesh));
+      auto &tx = _tex_map.find(mt->diffuse_texname)->second;
 
-      texture_sampler sampler{st_p, std::make_shared<color_extract_impl>(tx)};
+      texture_sampler sampler{st_p, std::make_shared<color_extract_impl>(*tx)};
       material_group g{md, sampler};
       ada->add_material(g);
     }
     bg++;
   }
+}
+
+material::material(const material_data &data) {
+  type = data.type;
+  color.x() = data.color.x() / 255;
+  color.y() = data.color.y() / 255;
+  color.z() = data.color.z() / 255;
+
+  ambient.x() = data.ambient.x() / 255;
+  ambient.y() = data.ambient.y() / 255;
+  ambient.z() = data.ambient.z() / 255;
+
+  emissive.x() = data.emissive.x() / 255;
+  emissive.y() = data.emissive.y() / 255;
+  emissive.z() = data.emissive.z() / 255;
+
+  specular.x() = data.specular.x() / 255;
+  specular.y() = data.specular.y() / 255;
+  specular.z() = data.specular.z() / 255;
+
+  transparency = data.opacity;
+  shiness = data.shininess;
+  metallic = data.metallic;
+  roughness = data.roughness;
+  reflectance = data.reflectance;
+  clearcoat_thickness = data.clearcoat_thickness;
+  clearcoat_roughness = data.clearcoat_roughness;
+  anisotropy = data.anisotropy;
+  anisotropy_rotation = data.anisotropy_rotation;
+  mode = data.mode;
+}
+
+material &material::operator=(const material_data &data) {
+  *this = material(data);
+  return *this;
 }
 
 material::operator material_data() const {

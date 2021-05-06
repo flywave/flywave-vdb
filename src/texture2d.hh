@@ -1172,6 +1172,18 @@ public:
   }
 };
 
+template <typename ColorDst, typename ColorSrc, typename UnaryOperation>
+void transform_color(const texture2d<ColorSrc> &img_src,
+                     texture2d<ColorDst> &img_dst, UnaryOperation op) {
+  img_dst.allocate(std::make_pair(img_src.width(), img_src.height()));
+
+  for (size_t x = 0; x < img_src.width(); ++x) {
+    for (size_t y = 0; y < img_src.height(); ++y) {
+      img_dst.color(x, y) = op(img_src.color(x, y));
+    }
+  }
+}
+
 } // namespace flywave
 
 namespace std {

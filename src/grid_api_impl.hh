@@ -1,13 +1,18 @@
 #pragma once
 
-#include "grid.hh"
+#include "float_grid.hh"
+#include "pixel_grid.hh"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct _vdb_grid_t {
-  flywave::vdb_grid *ptr;
+struct _vdb_float_grid_t {
+  flywave::vdb_float_grid *ptr;
+};
+
+struct _vdb_pixel_grid_t {
+  flywave::vdb_pixel_grid *ptr;
 };
 
 #ifdef __cplusplus

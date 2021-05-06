@@ -72,7 +72,7 @@ public:
 
   bool ray_test(const vdb::math::Ray<double> &ray, openvdb::Vec3d &p);
 
-  void clean() { return clear_unuse_materials(); }
+  void clear() { return clear_unuse_materials(); }
 
 private:
   voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,

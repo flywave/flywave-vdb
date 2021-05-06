@@ -1,6 +1,6 @@
 #pragma once
 
-#include "foundry.hh"
+#include "repacker.hh"
 #include "texture_mesh.hh"
 
 #include <openvdb/openvdb.h>
@@ -16,10 +16,10 @@ public:
   std::vector<texture_ptr> &generate(texture_mesh &mesh,
                                      texture_mesh &output_mesh);
 
-  void push_foundry_atlas(std::shared_ptr<textute_foundry> foundry);
+  void push_atlas(std::shared_ptr<textute_repacker> foundry);
 
 private:
-  std::vector<std::shared_ptr<textute_foundry>> _foundries;
+  std::vector<std::shared_ptr<textute_repacker>> _foundries;
   std::vector<texture_ptr> _textures;
 };
 

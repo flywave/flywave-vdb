@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "color_extract.hh"
+#include "material_data.hh"
 #include "st_policy.hh"
 #include "types.hh"
 
@@ -16,95 +17,6 @@ namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 struct texture_sampler {
   std::shared_ptr<st_policy> _policy;
   std::shared_ptr<color_extract> _extract;
-};
-
-struct material_data {
-  material_id_t _material_id = -1;
-
-  enum { BASE = 0, LAMBERT = 1, PHONG = 2, PBR = 3 };
-  enum { COLOR = 0x1, TEXTURE = 0x2, BUMP = 0x4 };
-
-  uint32_t type = 0;
-  uint16_t mode{0};
-
-  vdb::math::Vec3<uint8_t> color{255, 255, 255};
-
-  vdb::math::Vec3<uint8_t> ambient{255, 255, 255};
-  vdb::math::Vec3<uint8_t> emissive{0, 0, 0};
-
-  vdb::math::Vec3<uint8_t> specular{0, 0, 0};
-
-  float opacity{1.0};
-
-  float shininess{20.0f};
-
-  float metallic{0.0f};
-  float roughness{1.0f};
-  float reflectance{0.5f};
-
-  float clearcoat_thickness{0.0f};
-  float clearcoat_roughness{0.0f};
-
-  float anisotropy{0.f};
-  float anisotropy_rotation{0.0f};
-
-  material_data(const material_data &) = default;
-  material_data() = default;
-  material_data(material_data &&) = default;
-
-  bool operator==(const material_data &p) const {
-    if (type == p.type) {
-      switch (type) {
-      case BASE:
-        return mode == p.mode && color == p.color &&
-               vdb::math::isApproxEqual(opacity, p.opacity);
-      case LAMBERT:
-        return mode == p.mode && color == p.color &&
-               vdb::math::isApproxEqual(opacity, p.opacity) &&
-               ambient == p.ambient && emissive == p.emissive;
-      case PHONG:
-        return mode == p.mode && color == p.color &&
-               vdb::math::isApproxEqual(opacity, p.opacity) &&
-               ambient == p.ambient && emissive == p.emissive &&
-               specular == p.specular &&
-               vdb::math::isApproxEqual(shininess, p.shininess);
-      case PBR:
-        return mode == p.mode && color == p.color &&
-               vdb::math::isApproxEqual(opacity, p.opacity) &&
-               vdb::math::isApproxEqual(metallic, p.metallic) &&
-               vdb::math::isApproxEqual(roughness, p.roughness) &&
-               vdb::math::isApproxEqual(reflectance, p.reflectance) &&
-               vdb::math::isApproxEqual(clearcoat_thickness,
-                                        p.clearcoat_thickness) &&
-               vdb::math::isApproxEqual(clearcoat_roughness,
-                                        p.clearcoat_roughness) &&
-               vdb::math::isApproxEqual(anisotropy, p.anisotropy) &&
-               vdb::math::isApproxEqual(anisotropy_rotation,
-                                        p.anisotropy_rotation);
-      default:
-        break;
-      }
-    }
-    return false;
-  }
-
-  void read(std::istream &is) {
-    is >> _material_id >> type >> mode >> color.x() >> color.y() >> color.z() >>
-        ambient.x() >> ambient.y() >> ambient.z() >> emissive.x() >>
-        emissive.y() >> emissive.z() >> specular.x() >> specular.y() >>
-        specular.z() >> opacity >> shininess >> metallic >> roughness >>
-        reflectance >> clearcoat_thickness >> clearcoat_roughness >>
-        anisotropy >> anisotropy_rotation;
-  }
-
-  void write(std::ostream &os) const {
-    os << _material_id << type << mode << color.x() << color.y() << color.z()
-       << ambient.x() << ambient.y() << ambient.z() << emissive.x()
-       << emissive.y() << emissive.z() << specular.x() << specular.y()
-       << specular.z() << opacity << shininess << metallic << roughness
-       << reflectance << clearcoat_thickness << clearcoat_roughness
-       << anisotropy << anisotropy_rotation;
-  }
 };
 
 class material_group {
@@ -143,12 +55,12 @@ struct data_triangle {
 
 class mesh_adapter;
 class vertext_sampler;
-class micronizer;
+class voxel_pixel_sampler;
 
 class triangles_stream {
   friend class mesh_adapter;
   friend class vertext_sampler;
-  friend class micronizer;
+  friend class voxel_pixel_sampler;
 
 public:
   virtual ~triangles_stream() = default;

@@ -1,7 +1,12 @@
 #pragma once
 
-#include "foundry.hh"
+#include "material_data.hh"
+#include "mesh_data.hh"
+#include "repacker.hh"
+#include "texture_data.hh"
+#include "voxel_mesh.hh"
 #include "voxel_pixel.hh"
+#include "voxel_mesh_builder.hh"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,8 +16,42 @@ struct _voxel_pixel_t {
   std::shared_ptr<flywave::voxel_pixel> ptr;
 };
 
-struct _textute_foundry_t {
-  std::shared_ptr<flywave::textute_foundry> ptr;
+struct _textute_repacker_t {
+  std::shared_ptr<flywave::textute_repacker> ptr;
+};
+
+struct _voxel_mesh_t {
+  std::shared_ptr<flywave::voxel_mesh> ptr;
+  std::unordered_map<int, std::shared_ptr<flywave::material>> mtl_maps;
+  std::unordered_map<std::string, std::shared_ptr<flywave::texture>> tex_maps;
+};
+
+struct _voxel_texture_t {
+  std::shared_ptr<flywave::texture> tex;
+};
+
+struct _voxel_material_t {
+  std::shared_ptr<flywave::material> mtl;
+};
+
+struct _voxel_pixel_material_data_t {
+  std::shared_ptr<flywave::material_data> data;
+};
+
+struct _voxel_pixel_materials_t {
+  std::vector<std::shared_ptr<flywave::material_data>> mtls;
+};
+
+struct _voxel_pixel_texture_data_t {
+  std::shared_ptr<flywave::texture_data> data;
+};
+
+struct _voxel_pixel_mesh_data_t {
+  std::shared_ptr<flywave::mesh_data> data;
+};
+
+struct _voxel_mesh_builder_t {
+  std::shared_ptr<flywave::voxel_mesh_builder> ptr;
 };
 
 struct _io_vertex_t {

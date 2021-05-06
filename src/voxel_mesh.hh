@@ -86,8 +86,11 @@ public:
   material()
       : color(0.8, 0.8, 0.8), ambient(1, 1, 1), emissive(0, 0, 0),
         specular(0, 0, 0) {}
+  material(const material_data &data);
   material(material &&) = default;
   material(const material &) = default;
+
+  material &operator=(const material &) = default;
 
   void set_reflection_texname(const std::string &name) {
     if (name.empty())
@@ -161,36 +164,40 @@ public:
   void set_anisotropy(float f) { anisotropy = f; };
   void set_anisotropy_rotation(float f) { anisotropy_rotation = f; };
 
+  material &operator=(const material_data &data);
+
   explicit operator material_data() const;
 };
 
 class voxel_mesh_adapter : public triangles_stream {
 private:
   std::unordered_map<int, std::shared_ptr<material_data>> _mt_map;
-  std::unordered_map<int, material> &_map;
-  std::unordered_map<std::string, texture> &_tex_map;
-  mutable voxel_mesh _mesh;
+  std::unordered_map<int, std::shared_ptr<material>> &_map;
+  std::unordered_map<std::string, std::shared_ptr<texture>> &_tex_map;
+  mutable std::shared_ptr<voxel_mesh> _mesh;
 
 public:
-  voxel_mesh_adapter(voxel_mesh &&hm, std::unordered_map<int, material> &map,
-                     std::unordered_map<std::string, texture> &tex_map);
+  voxel_mesh_adapter(
+      std::shared_ptr<voxel_mesh> hm,
+      std::unordered_map<int, std::shared_ptr<material>> &map,
+      std::unordered_map<std::string, std::shared_ptr<texture>> &tex_map);
 
   void fill_meterial(std::shared_ptr<mesh_adapter> ada);
 
-  size_t polygonCount() const override { return _mesh.size(); }
+  size_t polygonCount() const override { return _mesh->size(); }
 
-  size_t pointCount() const override { return _mesh.size() * 3; }
+  size_t pointCount() const override { return _mesh->size() * 3; }
 
   size_t vertexCount(size_t n) const override { return 3; }
 
   void getIndexSpacePoint(size_t n, size_t v,
                           openvdb::Vec3d &pos) const override {
-    auto tri = _mesh.find_triangle(n);
+    auto tri = _mesh->find_triangle(n);
     pos = _matrix44.transformH(tri.ver[v]);
   }
 
   data_triangle find_triangle(uint32_t face_index) override {
-    auto tri = _mesh.find_triangle(face_index);
+    auto tri = _mesh->find_triangle(face_index);
     openvdb::Vec3d v1 = _matrix44.transformH(tri.ver[0]);
     openvdb::Vec3d v2 = _matrix44.transformH(tri.ver[1]);
     openvdb::Vec3d v3 = _matrix44.transformH(tri.ver[2]);

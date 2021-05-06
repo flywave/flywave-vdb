@@ -24,17 +24,17 @@ const (
 	SMOOTH_MEAN_CURVATURE = SmoothType(4)
 )
 
-type Grid struct {
-	m *C.struct__vdb_grid_t
+type FloatGrid struct {
+	m *C.struct__vdb_float_grid_t
 }
 
-func NewGrid() *Grid {
+func NewFloatGrid() *FloatGrid {
 	return &Grid{
-		m: C.vdb_create(),
+		m: C.vdb_float_grid_create(),
 	}
 }
 
-func NewGridFromPoints(points []float64, radius []float64, voxelSize float64, bandwidth float64) *Grid {
+func NewFloatGridFromPoints(points []float64, radius []float64, voxelSize float64, bandwidth float64) *FloatGrid {
 	if voxelSize < 0.01 {
 		voxelSize = 0.01
 	}
@@ -43,14 +43,14 @@ func NewGridFromPoints(points []float64, radius []float64, voxelSize float64, ba
 		bandwidth = 1
 	}
 
-	var g = &Grid{
-		m: C.vdb_create(),
+	var g = &FloatGrid{
+		m: C.vdb_float_grid_create(),
 	}
-	C.vdb_from_points(g.m, (*C.double)(unsafe.Pointer(&points[0])), C.int(len(points)), (*C.double)(unsafe.Pointer(&radius[0])), C.int(len(radius)), C.double(voxelSize), C.double(bandwidth))
+	C.vdb_float_grid_from_points(g.m, (*C.double)(unsafe.Pointer(&points[0])), C.int(len(points)), (*C.double)(unsafe.Pointer(&radius[0])), C.int(len(radius)), C.double(voxelSize), C.double(bandwidth))
 	return g
 }
 
-func NewGridFromMesh(points []float32, faces []int32, voxelSize float64, bandwidth float64) *Grid {
+func NewFloatGridFromMesh(points []float32, faces []int32, voxelSize float64, bandwidth float64) *FloatGrid {
 	if voxelSize < 0.01 {
 		voxelSize = 0.01
 	}
@@ -59,57 +59,57 @@ func NewGridFromMesh(points []float32, faces []int32, voxelSize float64, bandwid
 		bandwidth = 1
 	}
 
-	var g = &Grid{
-		m: C.vdb_create(),
+	var g = &FloatGrid{
+		m: C.vdb_float_grid_create(),
 	}
-	C.vdb_from_mesh(g.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)), (*C.int)(unsafe.Pointer(&faces[0])), C.int(len(faces)), C.double(voxelSize), C.double(bandwidth))
+	C.vdb_float_grid_from_mesh(g.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)), (*C.int)(unsafe.Pointer(&faces[0])), C.int(len(faces)), C.double(voxelSize), C.double(bandwidth))
 	return g
 }
 
-func (m *Grid) Free() {
-	C.vdb_free(m.m)
+func (m *FloatGrid) Free() {
+	C.vdb_float_grid_free(m.m)
 	m.m = nil
 }
 
-func (m *Grid) Clone() *Grid {
-	return &Grid{
-		m: C.vdb_duplicate(m.m),
+func (m *FloatGrid) Clone() *FloatGrid {
+	return &FloatGrid{
+		m: C.vdb_float_grid_duplicate(m.m),
 	}
 }
 
-func (m *Grid) Read(file string) error {
+func (m *FloatGrid) Read(file string) error {
 	if m == nil || m.m == nil {
 		return errors.New("Grid error ")
 	}
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.vdb_read(m.m, fname)
+	C.vdb_float_grid_read(m.m, fname)
 
 	return nil
 }
 
-func (m *Grid) Write(file string) error {
+func (m *FloatGrid) Write(file string) error {
 	if m == nil || m.m == nil {
 		return errors.New("Grid error ")
 	}
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.vdb_write(m.m, fname)
+	C.vdb_float_grid_write(m.m, fname)
 
 	return nil
 }
 
-func (m *Grid) ToMesh() ([]float32, []int32, error) {
+func (m *FloatGrid) ToMesh() ([]float32, []int32, error) {
 	if m == nil || m.m == nil {
-		return nil, nil, errors.New("Grid error ")
+		return nil, nil, errors.New("FloatGrid error ")
 	}
 
-	C.vdb_to_mesh(m.m)
+	C.vdb_float_grid_to_mesh(m.m)
 
 	var pointsLen C.int
-	cpoints := C.vdb_vertex_buffer(m.m, &pointsLen)
+	cpoints := C.vdb_float_grid_vertex_buffer(m.m, &pointsLen)
 
 	var cpointsSlice []C.float
 	cpointsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&cpointsSlice)))
@@ -125,7 +125,7 @@ func (m *Grid) ToMesh() ([]float32, []int32, error) {
 	C.free(unsafe.Pointer(cpoints))
 
 	var facesLen C.int
-	cfaces := C.vdb_face_buffer(m.m, &facesLen)
+	cfaces := C.vdb_float_grid_face_buffer(m.m, &facesLen)
 
 	var cfacesSlice []C.int
 	cfacesHeader := (*reflect.SliceHeader)((unsafe.Pointer(&cfacesSlice)))
@@ -142,14 +142,14 @@ func (m *Grid) ToMesh() ([]float32, []int32, error) {
 	return points, faces, nil
 }
 
-func (m *Grid) ToMeshSettings(isovalue float64, adaptivity float64) ([]float32, []int32, error) {
+func (m *FloatGrid) ToMeshSettings(isovalue float64, adaptivity float64) ([]float32, []int32, error) {
 	if m == nil || m.m == nil {
-		return nil, nil, errors.New("Grid error ")
+		return nil, nil, errors.New("FloatGrid error ")
 	}
-	C.vdb_to_mesh_settings(m.m, C.double(isovalue), C.double(adaptivity))
+	C.vdb_float_grid_to_mesh_settings(m.m, C.double(isovalue), C.double(adaptivity))
 
 	var pointsLen C.int
-	cpoints := C.vdb_vertex_buffer(m.m, &pointsLen)
+	cpoints := C.vdb_float_grid_vertex_buffer(m.m, &pointsLen)
 
 	var cpointsSlice []C.float
 	cpointsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&cpointsSlice)))
@@ -164,7 +164,7 @@ func (m *Grid) ToMeshSettings(isovalue float64, adaptivity float64) ([]float32, 
 	C.free(unsafe.Pointer(cpoints))
 
 	var facesLen C.int
-	cfaces := C.vdb_face_buffer(m.m, &facesLen)
+	cfaces := C.vdb_float_grid_face_buffer(m.m, &facesLen)
 
 	var cfacesSlice []C.int
 	cfacesHeader := (*reflect.SliceHeader)((unsafe.Pointer(&cfacesSlice)))
@@ -181,55 +181,55 @@ func (m *Grid) ToMeshSettings(isovalue float64, adaptivity float64) ([]float32, 
 	return points, faces, nil
 }
 
-func (m *Grid) Transform(matrix []float64) (bool, error) {
+func (m *FloatGrid) Transform(matrix []float64) (bool, error) {
 	if m == nil || m.m == nil {
-		return false, errors.New("Grid error ")
+		return false, errors.New("FloatGrid error ")
 	}
-	ret := C.vdb_transform(m.m, (*C.double)(unsafe.Pointer(&matrix[0])), C.int(len(matrix)))
+	ret := C.vdb_float_grid_transform(m.m, (*C.double)(unsafe.Pointer(&matrix[0])), C.int(len(matrix)))
 	return bool(ret), nil
 }
 
-func (m *Grid) BooleanUnion(csg *Grid) error {
+func (m *FloatGrid) BooleanUnion(csg *FloatGrid) error {
 	if m == nil || m.m == nil {
 		return errors.New("Union error ")
 	}
-	C.vdb_union(m.m, csg.m)
+	C.vdb_float_grid_union(m.m, csg.m)
 	return nil
 }
 
-func (m *Grid) BooleanDifference(csg *Grid) error {
+func (m *FloatGrid) BooleanDifference(csg *FloatGrid) error {
 	if m == nil || m.m == nil {
 		return errors.New("Difference error ")
 	}
-	C.vdb_difference(m.m, csg.m)
+	C.vdb_float_grid_difference(m.m, csg.m)
 	return nil
 }
 
-func (m *Grid) BooleanIntersection(csg *Grid) error {
+func (m *FloatGrid) BooleanIntersection(csg *FloatGrid) error {
 	if m == nil || m.m == nil {
 		return errors.New("Intersection error ")
 	}
-	C.vdb_intersection(m.m, csg.m)
+	C.vdb_float_grid_intersection(m.m, csg.m)
 	return nil
 }
 
-func (m *Grid) Offset(amount float64) error {
+func (m *FloatGrid) Offset(amount float64) error {
 	if m == nil || m.m == nil {
 		return errors.New("Offset error ")
 	}
-	C.vdb_offset(m.m, C.double(amount))
+	C.vdb_float_grid_offset(m.m, C.double(amount))
 	return nil
 }
 
-func (m *Grid) OffsetMask(amount float64, mask *Grid, min float64, max float64, invert bool) error {
+func (m *FloatGrid) OffsetMask(amount float64, mask *FloatGrid, min float64, max float64, invert bool) error {
 	if m == nil || m.m == nil {
 		return errors.New("OffsetMask error ")
 	}
-	C.vdb_offset_mask(m.m, C.double(amount), mask.m, C.double(min), C.double(max), C.bool(invert))
+	C.vdb_float_grid_offset_mask(m.m, C.double(amount), mask.m, C.double(min), C.double(max), C.bool(invert))
 	return nil
 }
 
-func (m *Grid) Smooth(type_ SmoothType, iterations int32, width int32) error {
+func (m *FloatGrid) Smooth(type_ SmoothType, iterations int32, width int32) error {
 	if m == nil || m.m == nil {
 		return errors.New("Smooth error ")
 	}
@@ -239,11 +239,11 @@ func (m *Grid) Smooth(type_ SmoothType, iterations int32, width int32) error {
 	if iterations < 1 {
 		iterations = 1
 	}
-	C.vdb_smooth(m.m, C.int(type_), C.int(iterations), C.int(width))
+	C.vdb_float_grid_smooth(m.m, C.int(type_), C.int(iterations), C.int(width))
 	return nil
 }
 
-func (m *Grid) SmoothMask(type_ SmoothType, iterations int32, width int32, mask *Grid, min float64, max float64, invert bool) error {
+func (m *FloatGrid) SmoothMask(type_ SmoothType, iterations int32, width int32, mask *FloatGrid, min float64, max float64, invert bool) error {
 	if m == nil || m.m == nil {
 		return errors.New("SmoothMask error ")
 	}
@@ -253,11 +253,11 @@ func (m *Grid) SmoothMask(type_ SmoothType, iterations int32, width int32, mask 
 	if iterations < 1 {
 		iterations = 1
 	}
-	C.vdb_smooth_mask(m.m, C.int(type_), C.int(iterations), C.int(width), mask.m, C.double(min), C.double(max), C.bool(invert))
+	C.vdb_float_grid_smooth_mask(m.m, C.int(type_), C.int(iterations), C.int(width), mask.m, C.double(min), C.double(max), C.bool(invert))
 	return nil
 }
 
-func (m *Grid) Blend(grid *Grid, position float64, end float64) error {
+func (m *FloatGrid) Blend(grid *FloatGrid, position float64, end float64) error {
 	if m == nil || m.m == nil {
 		return errors.New("Blend error ")
 	}
@@ -271,11 +271,11 @@ func (m *Grid) Blend(grid *Grid, position float64, end float64) error {
 		end = 1
 	}
 	position = 1 - position
-	C.vdb_blend(m.m, grid.m, C.double(position), C.double(end))
+	C.vdb_float_grid_blend(m.m, grid.m, C.double(position), C.double(end))
 	return nil
 }
 
-func (m *Grid) BlendMask(grid *Grid, position float64, end float64, mask *Grid, min float64, max float64, invert bool) error {
+func (m *FloatGrid) BlendMask(grid *FloatGrid, position float64, end float64, mask *FloatGrid, min float64, max float64, invert bool) error {
 	if m == nil || m.m == nil {
 		return errors.New("BlendMask error ")
 	}
@@ -289,17 +289,17 @@ func (m *Grid) BlendMask(grid *Grid, position float64, end float64, mask *Grid, 
 		end = 1
 	}
 	position = 1 - position
-	C.vdb_blend_mask(m.m, grid.m, C.double(position), C.double(end), mask.m, C.double(min), C.double(max), C.bool(invert))
+	C.vdb_float_grid_blend_mask(m.m, grid.m, C.double(position), C.double(end), mask.m, C.double(min), C.double(max), C.bool(invert))
 	return nil
 }
 
-func (m *Grid) ClosestPoint(points []float32) ([]float32, error) {
+func (m *FloatGrid) ClosestPoint(points []float32) ([]float32, error) {
 	if m == nil || m.m == nil {
 		return nil, errors.New("ClosestPoint error ")
 	}
 
 	var pointsLen C.int
-	cpoints := C.vdb_closest_point(m.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)), &pointsLen)
+	cpoints := C.vdb_float_grid_closest_point(m.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)), &pointsLen)
 
 	var cpointsSlice []C.float
 	cpointsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&cpointsSlice)))
@@ -316,15 +316,15 @@ func (m *Grid) ClosestPoint(points []float32) ([]float32, error) {
 	return closest_points, nil
 }
 
-func (m *Grid) Rebuild(iso float64, exWidth float64, inWidth float64) error {
+func (m *FloatGrid) Rebuild(iso float64, exWidth float64, inWidth float64) error {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error ")
 	}
-	C.vdb_rebuild(m.m, C.float(iso), C.float(exWidth), C.float(inWidth))
+	C.vdb_float_grid_rebuild(m.m, C.float(iso), C.float(exWidth), C.float(inWidth))
 	return nil
 }
 
-func (m *Grid) Dense() ([]float32, [3]int32, error) {
+func (m *FloatGrid) Dense() ([]float32, [3]int32, error) {
 	if m == nil || m.m == nil {
 		return nil, [3]int32{0, 0, 0}, errors.New("Rebuild error ")
 	}
@@ -332,7 +332,7 @@ func (m *Grid) Dense() ([]float32, [3]int32, error) {
 	var width C.int
 	var height C.int
 	var depth C.int
-	cdense := C.vdb_dense(m.m, &width, &height, &depth)
+	cdense := C.vdb_float_grid_dense(m.m, &width, &height, &depth)
 	allsize := int(width * height * depth)
 
 	var cdenseSlice []C.float
@@ -346,4 +346,57 @@ func (m *Grid) Dense() ([]float32, [3]int32, error) {
 	}
 	C.free(unsafe.Pointer(cdense))
 	return dense, [3]int32{int32(width), int32(height), int32(depth)}, nil
+}
+
+type PixelGrid struct {
+	m *C.struct__vdb_pixel_grid_t
+}
+
+func NewPixelGrid() *PixelGrid {
+	return &Grid{
+		m: C.vdb_pixel_grid_create(),
+	}
+}
+
+func (m *PixelGrid) Free() {
+	C.vdb_pixel_grid_free(m.m)
+	m.m = nil
+}
+
+func (m *PixelGrid) Clone() *PixelGrid {
+	return &PixelGrid{
+		m: C.vdb_pixel_grid_duplicate(m.m),
+	}
+}
+
+func (m *PixelGrid) Read(file string) error {
+	if m == nil || m.m == nil {
+		return errors.New("Grid error ")
+	}
+
+	fname := C.CString(file)
+	defer C.free(unsafe.Pointer(fname))
+	C.vdb_pixel_grid_read(m.m, fname)
+
+	return nil
+}
+
+func (m *PixelGrid) Write(file string) error {
+	if m == nil || m.m == nil {
+		return errors.New("Grid error ")
+	}
+
+	fname := C.CString(file)
+	defer C.free(unsafe.Pointer(fname))
+	C.vdb_pixel_grid_write(m.m, fname)
+
+	return nil
+}
+
+func (m *PixelGrid) Transform(matrix []float64) (bool, error) {
+	if m == nil || m.m == nil {
+		return false, errors.New("PixelGrid error ")
+	}
+	ret := C.vdb_pixel_grid_transform(m.m, (*C.double)(unsafe.Pointer(&matrix[0])), C.int(len(matrix)))
+	return bool(ret), nil
 }

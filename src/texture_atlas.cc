@@ -9,7 +9,7 @@ public:
 
 public:
   texture2d<vdb::math::Vec4<uint8_t>>::Ptr
-  pack_texture(std::shared_ptr<textute_foundry> tfound) {
+  pack_texture(std::shared_ptr<textute_repacker> tfound) {
     auto img_size = Param::image_size();
     if (img_size.first == 0 || img_size.second == 0)
       return nullptr;
@@ -175,8 +175,8 @@ texture_atlas_generator::generate(texture_mesh &_texture_mesh,
   return _textures;
 }
 
-void texture_atlas_generator::push_foundry_atlas(
-    std::shared_ptr<textute_foundry> foundry) {
+void texture_atlas_generator::push_atlas(
+    std::shared_ptr<textute_repacker> foundry) {
   _foundries.push_back(foundry);
 }
 

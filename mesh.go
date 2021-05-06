@@ -1,6 +1,7 @@
 package vdb
 
-type Mesh struct {
-	Points []float32
-	Faces  []int32
+type VoxelMesh struct {
+}
+
+type VoxelMeshData struct {
 }

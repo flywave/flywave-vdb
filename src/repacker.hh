@@ -21,12 +21,11 @@ namespace flywave {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
-class textute_foundry {
+class textute_repacker {
   class impl;
-
 public:
-  textute_foundry(vertex_grid::Ptr cgrid, pixel_grid::Ptr, vdb::Mat4d mat,
-                  float tpad);
+  textute_repacker(vertex_grid::Ptr cgrid, pixel_grid::Ptr, vdb::Mat4d mat,
+                   float tpad);
 
   texture2d<vdb::math::Vec4<uint8_t>>::Ptr
   extract(const fmesh_tri_patch &tri,
@@ -41,7 +40,7 @@ private:
   vdb::Mat4d _mat;
 
 public:
-  ~textute_foundry();
+  ~textute_repacker();
 };
 
 class border_lock {
@@ -56,9 +55,9 @@ public:
                      const vdb::math::Vec3<float> &) = 0;
 };
 
-class triangle_foundry {
+class triangle_repacker {
 public:
-  triangle_foundry(vertex_grid::Ptr vgrid) : _grid(vgrid) {}
+  triangle_repacker(vertex_grid::Ptr vgrid) : _grid(vgrid) {}
 
   void make_mesh_mark_seam(std::vector<vertext_type> &points,
                            std::vector<triangle_type> &tri,

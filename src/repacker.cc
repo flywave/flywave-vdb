@@ -1,4 +1,4 @@
-#include "foundry.hh"
+#include "repacker.hh"
 #include "index.hh"
 #include "projection.hh"
 #include "resolution.hh"
@@ -16,7 +16,7 @@
 
 namespace flywave {
 
-class textute_foundry::impl {
+class textute_repacker::impl {
 public:
   using sampler_type = sampling_result<pixel_grid::ValueType>;
 
@@ -41,12 +41,13 @@ private:
   std::unique_ptr<triangle_range_query<pixel_grid>> _query;
 };
 
-textute_foundry::textute_foundry(vertex_grid::Ptr cgrid, pixel_grid::Ptr pgrid,
-                                 openvdb::Mat4d mat, float pixel_pad)
+textute_repacker::textute_repacker(vertex_grid::Ptr cgrid,
+                                   pixel_grid::Ptr pgrid, openvdb::Mat4d mat,
+                                   float pixel_pad)
     : _query(std::make_unique<impl>(cgrid, pgrid)), _grid(cgrid),
       _pixel_pad(pixel_pad), _mat(mat) {}
 
-texture2d<vdb::math::Vec4<uint8_t>>::Ptr textute_foundry::extract(
+texture2d<vdb::math::Vec4<uint8_t>>::Ptr textute_repacker::extract(
     const fmesh_tri_patch &tri,
     texture2d<vdb::math::Vec4<uint8_t>>::Ptr texture) const {
   fmesh_tri_patch ptri = tri;
@@ -62,12 +63,12 @@ texture2d<vdb::math::Vec4<uint8_t>>::Ptr textute_foundry::extract(
                                 std::move(outcoordl), texture);
 }
 
-size_t textute_foundry::pixel_size() const { return _query->pixel_size(); }
+size_t textute_repacker::pixel_size() const { return _query->pixel_size(); }
 
-textute_foundry::~textute_foundry() = default;
+textute_repacker::~textute_repacker() = default;
 
 texture2d<vdb::math::Vec4<uint8_t>>::Ptr
-textute_foundry::impl::project_to_image(
+textute_repacker::impl::project_to_image(
     std::vector<sampler_type> points, const triangle_projection &prj,
     const std::vector<vdb::math::Vec2<int>> &coord,
     texture2d<vdb::math::Vec4<uint8_t>>::Ptr img) {
@@ -91,10 +92,10 @@ textute_foundry::impl::project_to_image(
   return img;
 }
 
-void triangle_foundry::make_mesh_mark_seam(std::vector<vertext_type> &points,
-                                           std::vector<triangle_type> &tri,
-                                           std::vector<quad_type> &quads,
-                                           double isovalue, double adapter) {
+void triangle_repacker::make_mesh_mark_seam(std::vector<vertext_type> &points,
+                                            std::vector<triangle_type> &tri,
+                                            std::vector<quad_type> &quads,
+                                            double isovalue, double adapter) {
   vdb::tools::volumeToMesh(*_grid, points, tri, quads, isovalue, adapter, true);
 }
 
@@ -103,8 +104,8 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
                     size_t mtl_offset, std::shared_ptr<border_lock> lock,
                     std::shared_ptr<filter_triangle> filter, double fquality,
                     double isovalue, double adapter) {
-  std::shared_ptr<triangle_foundry> vfoundry =
-      std::make_shared<triangle_foundry>(pot.get_voxel_grid());
+  std::shared_ptr<triangle_repacker> vfoundry =
+      std::make_shared<triangle_repacker>(pot.get_voxel_grid());
 
   std::unique_ptr<std::vector<vertext_type>> points_ptr =
       std::make_unique<std::vector<vertext_type>>();
@@ -277,8 +278,8 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
 
     smesh.textures.emplace_back(std::to_string(mtl_index));
 
-    auto vertex_iter = vcg::tri::Allocator<texture_mesh>::AddVertices(
-        smesh, faces.size() * 3);
+    auto vertex_iter =
+        vcg::tri::Allocator<texture_mesh>::AddVertices(smesh, faces.size() * 3);
     auto face_iter =
         vcg::tri::Allocator<texture_mesh>::AddFaces(smesh, faces.size());
 

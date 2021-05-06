@@ -1,7 +1,8 @@
 #pragma once
 
 #include "particle.hh"
-#include "vdb_mesh.hh"
+#include "mesh_data.hh"
+#include "trees.hh"
 
 #include <openvdb/openvdb.h>
 
@@ -10,43 +11,43 @@
 
 namespace flywave {
 
-class vdb_grid {
+class vdb_float_grid {
 public:
-  vdb_grid();
-  vdb_grid(vdb_grid *grid);
-  ~vdb_grid();
+  vdb_float_grid();
+  vdb_float_grid(vdb_float_grid *grid);
+  ~vdb_float_grid();
 
-  openvdb::FloatGrid::Ptr grid();
+  float_grid::Ptr grid();
 
   bool read(const char *vFile);
   bool write(const char *vFile);
 
-  bool create_from_mesh(vdb_mesh vMesh, double voxelSize, double bandwidth);
+  bool create_from_mesh(mesh_data vMesh, double voxelSize, double bandwidth);
   bool create_from_points(vdb_particle vPoints, double voxelSize,
                           double bandwidth);
 
-  void transform(openvdb::math::Mat4d xform);
+  void transform(openvdb::Mat4d xform);
 
-  void boolean_union(vdb_grid vAdd);
-  void boolean_intersection(vdb_grid vIntersect);
-  void boolean_difference(vdb_grid vSubtract);
+  void boolean_union(vdb_float_grid vAdd);
+  void boolean_intersection(vdb_float_grid vIntersect);
+  void boolean_difference(vdb_float_grid vSubtract);
 
   void offset(double amount);
-  void offset(double amount, vdb_grid vMask, double min, double max,
+  void offset(double amount, vdb_float_grid vMask, double min, double max,
               bool invert);
 
   void smooth(int type, int iterations, int width);
-  void smooth(int type, int iterations, int width, vdb_grid vMask, double min,
+  void smooth(int type, int iterations, int width, vdb_float_grid vMask, double min,
               double max, bool invert);
 
-  void blend(vdb_grid bGrid, double bPosition, double bEnd);
-  void blend(vdb_grid bGrid, double bPosition, double bEnd, vdb_grid vMask,
+  void blend(vdb_float_grid bGrid, double bPosition, double bEnd);
+  void blend(vdb_float_grid bGrid, double bPosition, double bEnd, vdb_float_grid vMask,
              double min, double max, bool invert);
 
   void closest_point(std::vector<openvdb::Vec3R> &points,
                      std::vector<float> &distances);
 
-  vdb_mesh display();
+  mesh_data display();
 
   void update_display();
   void update_display(double isovalue, double adaptivity);
@@ -68,9 +69,10 @@ public:
   int get_face_count();
 
 private:
-  openvdb::FloatGrid::Ptr _grid;
-  vdb_mesh _display;
+  float_grid::Ptr _grid;
+  mesh_data _display;
   int _face_count;
   int _vertex_count;
 };
+
 } // namespace flywave

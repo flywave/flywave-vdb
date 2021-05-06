@@ -1,4 +1,4 @@
-#include "grid.hh"
+#include "float_grid.hh"
 
 #include <openvdb/Types.h>
 #include <openvdb/tools/Composite.h>
@@ -14,19 +14,19 @@
 
 namespace flywave {
 
-vdb_grid::vdb_grid() { openvdb::initialize(); }
+vdb_float_grid::vdb_float_grid() { openvdb::initialize(); }
 
-vdb_grid::vdb_grid(vdb_grid *grid) {
+vdb_float_grid::vdb_float_grid(vdb_float_grid *grid) {
   openvdb::initialize();
   _grid = grid->grid()->deepCopy();
   _display = grid->display().duplicate();
 }
 
-vdb_grid::~vdb_grid() {}
+vdb_float_grid::~vdb_float_grid() {}
 
-openvdb::FloatGrid::Ptr vdb_grid::grid() { return _grid; }
+openvdb::FloatGrid::Ptr vdb_float_grid::grid() { return _grid; }
 
-bool vdb_grid::read(const char *vFile) {
+bool vdb_float_grid::read(const char *vFile) {
   openvdb::io::File file(vFile);
 
   file.open();
@@ -42,7 +42,7 @@ bool vdb_grid::read(const char *vFile) {
   return true;
 }
 
-bool vdb_grid::write(const char *vFile) {
+bool vdb_float_grid::write(const char *vFile) {
   openvdb::GridPtrVec grids;
   grids.push_back(_grid);
 
@@ -53,13 +53,13 @@ bool vdb_grid::write(const char *vFile) {
   return true;
 }
 
-bool vdb_grid::create_from_mesh(vdb_mesh vMesh, double voxelSize,
-                                double bandwidth) {
+bool vdb_float_grid::create_from_mesh(mesh_data vMesh, double voxelSize,
+                                      double bandwidth) {
   if (!vMesh.is_valid()) {
     return false;
   }
 
-  openvdb::math::Transform xform;
+  vdb::math::Transform xform;
   xform.preScale(voxelSize);
 
   auto vertices = vMesh.vertices();
@@ -76,8 +76,8 @@ bool vdb_grid::create_from_mesh(vdb_mesh vMesh, double voxelSize,
   return true;
 }
 
-bool vdb_grid::create_from_points(vdb_particle vPoints, double voxelSize,
-                                  double bandwidth) {
+bool vdb_float_grid::create_from_points(vdb_particle vPoints, double voxelSize,
+                                        double bandwidth) {
   if (!vPoints.is_valid()) {
     return false;
   }
@@ -85,8 +85,8 @@ bool vdb_grid::create_from_points(vdb_particle vPoints, double voxelSize,
   _grid = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, bandwidth);
   openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid> raster(*_grid);
 
-  openvdb::math::Transform::Ptr xform =
-      openvdb::math::Transform::createLinearTransform(voxelSize);
+  vdb::math::Transform::Ptr xform =
+      vdb::math::Transform::createLinearTransform(voxelSize);
   _grid->setTransform(xform);
 
   raster.setGrainSize(1);
@@ -96,19 +96,19 @@ bool vdb_grid::create_from_points(vdb_particle vPoints, double voxelSize,
   return true;
 }
 
-void vdb_grid::rebuild(float iso, float exWidth, float inWidth) {
+void vdb_float_grid::rebuild(float iso, float exWidth, float inWidth) {
   _grid = openvdb::tools::levelSetRebuild(*_grid, 0., exWidth, inWidth);
 }
 
-void vdb_grid::transform(openvdb::math::Mat4d xform) {
+void vdb_float_grid::transform(vdb::math::Mat4d xform) {
   _grid->transform().postMult(xform);
 }
 
-void vdb_grid::boolean_union(vdb_grid vAdd) {
+void vdb_float_grid::boolean_union(vdb_float_grid vAdd) {
   auto csgGrid = vAdd.grid();
 
-  const openvdb::math::Transform &sourceXform = csgGrid->transform(),
-                                 &targetXform = _grid->transform();
+  const vdb::math::Transform &sourceXform = csgGrid->transform(),
+                             &targetXform = _grid->transform();
 
   openvdb::FloatGrid::Ptr cGrid =
       openvdb::createLevelSet<openvdb::FloatGrid>(_grid->voxelSize()[0]);
@@ -126,11 +126,11 @@ void vdb_grid::boolean_union(vdb_grid vAdd) {
   openvdb::tools::csgUnion(*_grid, *cGrid, true);
 }
 
-void vdb_grid::boolean_intersection(vdb_grid vIntersect) {
+void vdb_float_grid::boolean_intersection(vdb_float_grid vIntersect) {
   auto csgGrid = vIntersect.grid();
 
-  const openvdb::math::Transform &sourceXform = csgGrid->transform(),
-                                 &targetXform = _grid->transform();
+  const vdb::math::Transform &sourceXform = csgGrid->transform(),
+                             &targetXform = _grid->transform();
 
   openvdb::FloatGrid::Ptr cGrid =
       openvdb::createLevelSet<openvdb::FloatGrid>(_grid->voxelSize()[0]);
@@ -148,11 +148,11 @@ void vdb_grid::boolean_intersection(vdb_grid vIntersect) {
   openvdb::tools::csgIntersection(*_grid, *cGrid, true);
 }
 
-void vdb_grid::boolean_difference(vdb_grid vSubtract) {
+void vdb_float_grid::boolean_difference(vdb_float_grid vSubtract) {
   auto csgGrid = vSubtract.grid();
 
-  const openvdb::math::Transform &sourceXform = csgGrid->transform(),
-                                 &targetXform = _grid->transform();
+  const vdb::math::Transform &sourceXform = csgGrid->transform(),
+                             &targetXform = _grid->transform();
 
   openvdb::FloatGrid::Ptr cGrid =
       openvdb::createLevelSet<openvdb::FloatGrid>(_grid->voxelSize()[0]);
@@ -170,7 +170,7 @@ void vdb_grid::boolean_difference(vdb_grid vSubtract) {
   openvdb::tools::csgDifference(*_grid, *cGrid, true);
 }
 
-void vdb_grid::offset(double amount) {
+void vdb_float_grid::offset(double amount) {
   openvdb::tools::LevelSetFilter<openvdb::FloatGrid> filter(*_grid);
 
   filter.setGrainSize(1);
@@ -180,8 +180,8 @@ void vdb_grid::offset(double amount) {
   filter.offset((float)amount);
 }
 
-void vdb_grid::offset(double amount, vdb_grid vMask, double min, double max,
-                      bool invert) {
+void vdb_float_grid::offset(double amount, vdb_float_grid vMask, double min,
+                            double max, bool invert) {
   openvdb::tools::LevelSetFilter<openvdb::FloatGrid> filter(*_grid);
 
   filter.invertMask(invert);
@@ -195,7 +195,7 @@ void vdb_grid::offset(double amount, vdb_grid vMask, double min, double max,
   filter.offset((float)amount, &mMask);
 }
 
-void vdb_grid::smooth(int type, int iterations, int width) {
+void vdb_float_grid::smooth(int type, int iterations, int width) {
   openvdb::tools::LevelSetFilter<openvdb::FloatGrid> filter(*_grid);
   filter.setGrainSize(1);
 
@@ -223,8 +223,9 @@ void vdb_grid::smooth(int type, int iterations, int width) {
   }
 }
 
-void vdb_grid::smooth(int type, int iterations, int width, vdb_grid vMask,
-                      double min, double max, bool invert) {
+void vdb_float_grid::smooth(int type, int iterations, int width,
+                            vdb_float_grid vMask, double min, double max,
+                            bool invert) {
   openvdb::tools::LevelSetFilter<openvdb::FloatGrid> filter(*_grid);
 
   filter.invertMask(invert);
@@ -257,27 +258,29 @@ void vdb_grid::smooth(int type, int iterations, int width, vdb_grid vMask,
   }
 }
 
-void vdb_grid::blend(vdb_grid bGrid, double bPosition, double bEnd) {
+void vdb_float_grid::blend(vdb_float_grid bGrid, double bPosition,
+                           double bEnd) {
   openvdb::tools::LevelSetMorphing<openvdb::FloatGrid> morph(*_grid,
                                                              *bGrid.grid());
-  morph.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
-  morph.setTemporalScheme(openvdb::math::TVD_RK3);
-  morph.setTrackerSpatialScheme(openvdb::math::HJWENO5_BIAS);
-  morph.setTrackerTemporalScheme(openvdb::math::TVD_RK2);
+  morph.setSpatialScheme(vdb::math::HJWENO5_BIAS);
+  morph.setTemporalScheme(vdb::math::TVD_RK3);
+  morph.setTrackerSpatialScheme(vdb::math::HJWENO5_BIAS);
+  morph.setTrackerTemporalScheme(vdb::math::TVD_RK2);
   morph.setGrainSize(1);
 
   double bStart = bPosition * bEnd;
   morph.advect(bStart, bEnd);
 }
 
-void vdb_grid::blend(vdb_grid bGrid, double bPosition, double bEnd,
-                     vdb_grid vMask, double mMin, double mMax, bool invert) {
+void vdb_float_grid::blend(vdb_float_grid bGrid, double bPosition, double bEnd,
+                           vdb_float_grid vMask, double mMin, double mMax,
+                           bool invert) {
   openvdb::tools::LevelSetMorphing<openvdb::FloatGrid> morph(*_grid,
                                                              *bGrid.grid());
-  morph.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
-  morph.setTemporalScheme(openvdb::math::TVD_RK3);
-  morph.setTrackerSpatialScheme(openvdb::math::HJWENO5_BIAS);
-  morph.setTrackerTemporalScheme(openvdb::math::TVD_RK2);
+  morph.setSpatialScheme(vdb::math::HJWENO5_BIAS);
+  morph.setTemporalScheme(vdb::math::TVD_RK3);
+  morph.setTrackerSpatialScheme(vdb::math::HJWENO5_BIAS);
+  morph.setTrackerTemporalScheme(vdb::math::TVD_RK2);
 
   morph.setAlphaMask(*vMask.grid());
   morph.invertMask(invert);
@@ -288,16 +291,16 @@ void vdb_grid::blend(vdb_grid bGrid, double bPosition, double bEnd,
   morph.advect(bStart, bEnd);
 }
 
-void vdb_grid::closest_point(std::vector<openvdb::Vec3R> &points,
-                             std::vector<float> &distances) {
+void vdb_float_grid::closest_point(std::vector<openvdb::Vec3R> &points,
+                                   std::vector<float> &distances) {
   auto csp =
       openvdb::tools::ClosestSurfacePoint<openvdb::FloatGrid>::create(*_grid);
   csp->searchAndReplace(points, distances);
 }
 
-vdb_mesh vdb_grid::display() { return _display; }
+mesh_data vdb_float_grid::display() { return _display; }
 
-void vdb_grid::update_display() {
+void vdb_float_grid::update_display() {
   using openvdb::Index64;
 
   openvdb::tools::VolumeToMesh mesher(
@@ -322,7 +325,7 @@ void vdb_grid::update_display() {
   }
 }
 
-void vdb_grid::update_display(double isovalue, double adaptivity) {
+void vdb_float_grid::update_display(double isovalue, double adaptivity) {
   isovalue /= _grid->voxelSize().x();
 
   std::vector<openvdb::Vec3s> points;
@@ -353,7 +356,7 @@ void vdb_grid::update_display(double isovalue, double adaptivity) {
   _display.add_face(quads);
 }
 
-float *vdb_grid::get_mesh_vertices() {
+float *vdb_float_grid::get_mesh_vertices() {
   auto vertices = _display.vertices();
 
   _vertex_count = vertices.size() * 3;
@@ -372,7 +375,7 @@ float *vdb_grid::get_mesh_vertices() {
   return verticeArray;
 }
 
-int *vdb_grid::get_mesh_faces() {
+int *vdb_float_grid::get_mesh_faces() {
   auto faces = _display.faces();
 
   _face_count = faces.size() * 4;
@@ -391,23 +394,25 @@ int *vdb_grid::get_mesh_faces() {
   return faceArray;
 }
 
-int vdb_grid::get_vertex_count() { return _vertex_count; }
+int vdb_float_grid::get_vertex_count() { return _vertex_count; }
 
-int vdb_grid::get_face_count() { return _face_count; }
+int vdb_float_grid::get_face_count() { return _face_count; }
 
-void vdb_grid::set(const int i, const int j, const int k, const float &v) {
+void vdb_float_grid::set(const int i, const int j, const int k,
+                         const float &v) {
   typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
   openvdb::Coord ijk(i, j, k);
   accessor.setValue(ijk, v);
 }
 
-float vdb_grid::operator()(const int i, const int j, const int k) const {
+float vdb_float_grid::operator()(const int i, const int j, const int k) const {
   typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
   openvdb::Coord ijk(i, j, k);
   return accessor.getValue(ijk);
 }
 
-float vdb_grid::operator()(const float i, const float j, const float k) const {
+float vdb_float_grid::operator()(const float i, const float j,
+                                 const float k) const {
   typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
   openvdb::Coord ijk(i, j, k);
   return accessor.getValue(ijk);

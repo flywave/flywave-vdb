@@ -85,6 +85,15 @@ extern FLYWAVE_VDB_API float *vdb_closest_point(vdb_float_grid_t *grid,
                                                 float *vPoints, int vCount,
                                                 int *rSize);
 
+extern FLYWAVE_VDB_API void vdb_float_grid_set(vdb_float_grid_t *grid, int x,
+                                               int y, int z, float v);
+
+extern FLYWAVE_VDB_API float vdb_float_grid_get(vdb_float_grid_t *grid, int x,
+                                                int y, int z);
+
+extern FLYWAVE_VDB_API float
+vdb_float_grid_linear_get(vdb_float_grid_t *grid, float x, float y, float z);
+
 typedef struct _vdb_pixel_grid_t vdb_pixel_grid_t;
 
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create();
@@ -100,6 +109,31 @@ extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_write(vdb_pixel_grid_t *grid,
 extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_transform(vdb_pixel_grid_t *grid,
                                                       double *matrix,
                                                       int mCount);
+enum vdb_pixel_type_t : uint8_t {
+  color,
+  material,
+  material_and_color,
+  invalid
+};
+
+typedef struct _vdb_pixel_t {
+  vdb_pixel_type_t type;
+  uint8_t material_id;
+  uint16_t feature_id;
+  uint8_t color_r;
+  uint8_t color_g;
+  uint8_t color_b;
+  uint8_t color_a;
+} vdb_pixel_t;
+
+extern FLYWAVE_VDB_API void vdb_pixel_grid_set(vdb_pixel_grid_t *grid, int x,
+                                               int y, int z, vdb_pixel_t v);
+
+extern FLYWAVE_VDB_API vdb_pixel_t vdb_pixel_grid_get(vdb_pixel_grid_t *grid,
+                                                      int x, int y, int z);
+
+extern FLYWAVE_VDB_API vdb_pixel_t
+vdb_pixel_grid_linear_get(vdb_pixel_grid_t *grid, float x, float y, float z);
 
 #ifdef __cplusplus
 }

@@ -282,6 +282,22 @@ FLYWAVE_VDB_API float *vdb_float_grid_closest_point(vdb_float_grid_t *grid,
   return pArray;
 }
 
+FLYWAVE_VDB_API void vdb_float_grid_set(vdb_float_grid_t *grid, int x, int y,
+                                        int z, float v) {
+  grid->ptr->set(x, y, z, v);
+}
+
+FLYWAVE_VDB_API float vdb_float_grid_get(vdb_float_grid_t *grid, int x, int y,
+                                         int z) {
+
+  return (*grid->ptr)(x, y, z);
+}
+
+FLYWAVE_VDB_API float vdb_float_grid_linear_get(vdb_float_grid_t *grid, float x,
+                                                float y, float z) {
+  return (*grid->ptr)(x, y, z);
+}
+
 FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create() {
   vdb_pixel_grid *grid = new vdb_pixel_grid();
   vdb_pixel_grid_t *ret = new vdb_pixel_grid_t{grid};
@@ -329,6 +345,48 @@ FLYWAVE_VDB_API _Bool vdb_pixel_grid_transform(vdb_pixel_grid_t *grid,
   return true;
 }
 
+FLYWAVE_VDB_API void vdb_pixel_grid_set(vdb_pixel_grid_t *grid, int x, int y,
+                                        int z, vdb_pixel_t v) {
+  flywave::pixel_data pd;
+  pd._type = static_cast<flywave::pixel_data::type_t>(v.type);
+  pd._material_id = v.material_id;
+  pd._feature_id = v.feature_id;
+  pd._color.x() = v.color_r;
+  pd._color.y() = v.color_g;
+  pd._color.z() = v.color_b;
+  pd._color.w() = v.color_a;
+
+  grid->ptr->set(x, y, z, flywave::pixel(pd));
+}
+
+FLYWAVE_VDB_API vdb_pixel_t vdb_pixel_grid_get(vdb_pixel_grid_t *grid, int x,
+                                               int y, int z) {
+  flywave::pixel p = (*grid->ptr)(x, y, z);
+  vdb_pixel_t ret;
+  ret.type = static_cast<vdb_pixel_type_t>(p._data._type);
+  ret.material_id = p._data._material_id;
+  ret.feature_id = p._data._feature_id;
+  ret.color_r = p._data._color.x();
+  ret.color_g = p._data._color.y();
+  ret.color_b = p._data._color.z();
+  ret.color_a = p._data._color.w();
+  return ret;
+}
+
+FLYWAVE_VDB_API vdb_pixel_t vdb_pixel_grid_linear_get(vdb_pixel_grid_t *grid,
+                                                      float x, float y,
+                                                      float z) {
+  flywave::pixel p = (*grid->ptr)(x, y, z);
+  vdb_pixel_t ret;
+  ret.type = static_cast<vdb_pixel_type_t>(p._data._type);
+  ret.material_id = p._data._material_id;
+  ret.feature_id = p._data._feature_id;
+  ret.color_r = p._data._color.x();
+  ret.color_g = p._data._color.y();
+  ret.color_b = p._data._color.z();
+  ret.color_a = p._data._color.w();
+  return ret;
+}
 #ifdef __cplusplus
 }
 #endif

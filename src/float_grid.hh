@@ -1,7 +1,7 @@
 #pragma once
 
-#include "particle.hh"
 #include "mesh_data.hh"
+#include "particle.hh"
 #include "trees.hh"
 
 #include <openvdb/openvdb.h>
@@ -37,12 +37,12 @@ public:
               bool invert);
 
   void smooth(int type, int iterations, int width);
-  void smooth(int type, int iterations, int width, vdb_float_grid vMask, double min,
-              double max, bool invert);
+  void smooth(int type, int iterations, int width, vdb_float_grid vMask,
+              double min, double max, bool invert);
 
   void blend(vdb_float_grid bGrid, double bPosition, double bEnd);
-  void blend(vdb_float_grid bGrid, double bPosition, double bEnd, vdb_float_grid vMask,
-             double min, double max, bool invert);
+  void blend(vdb_float_grid bGrid, double bPosition, double bEnd,
+             vdb_float_grid vMask, double min, double max, bool invert);
 
   void closest_point(std::vector<openvdb::Vec3R> &points,
                      std::vector<float> &distances);

@@ -348,6 +348,30 @@ func (m *FloatGrid) Dense() ([]float32, [3]int32, error) {
 	return dense, [3]int32{int32(width), int32(height), int32(depth)}, nil
 }
 
+func (m *FloatGrid) Set(pos []int32, val float32) error {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error ")
+	}
+	C.vdb_float_grid_set(m.m, C.int(pos[0]), C.int(pos[1]), C.int(pos[2]), C.float(val))
+	return nil
+}
+
+func (m *FloatGrid) Get(pos []int32) (error, float32) {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error "), float32(0.0)
+	}
+    ret := float32(C.vdb_float_grid_get(m.m, C.int(pos[0]), C.int(pos[1]), C.int(pos[2])))
+	return nil, ret
+}
+
+func (m *FloatGrid) LinearGet(pos []float32) (error, float32) {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error "), float32(0.0)
+	}
+    ret := float32(C.vdb_float_grid_linear_get(m.m, C.float(pos[0]), C.float(pos[1]), C.float(pos[2])))
+	return nil, ret
+}
+
 type PixelGrid struct {
 	m *C.struct__vdb_pixel_grid_t
 }
@@ -399,4 +423,56 @@ func (m *PixelGrid) Transform(matrix []float64) (bool, error) {
 	}
 	ret := C.vdb_pixel_grid_transform(m.m, (*C.double)(unsafe.Pointer(&matrix[0])), C.int(len(matrix)))
 	return bool(ret), nil
+}
+
+type PixelType uint8
+
+const (
+	PT_COLOR      = PixelType(0)
+	PT_MATERIAL       = PixelType(1)
+	PT_MATERIAL_OR_COLOR = PixelType(2)
+	PT_INVALID        = PixelType(3)
+)
+
+type Pixel struct {
+	Type PixelType
+	MaterialId uint8
+	FeatureId uint16
+	Color [4]uint8
+}
+
+func (m *PixelGrid) Set(pos []int32, val Pixel) error {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error ")
+	}
+	C.vdb_pixel_grid_set(m.m, C.int(pos[0]), C.int(pos[1]), C.int(pos[2]), C.float(val))
+	return nil
+}
+
+func cpixel_2_pixel(cpixel C.struct__vdb_pixel_t) Pixel {
+	var p Pixel
+	p.Type = PixelType(cpixe.type)
+	p.MaterialId = uint8(cpixe.material_id)
+	p.FeatureId = uint16(cpixe.feature_id)
+	p.Color[0] = uint8(cpixe.color_r)
+	p.Color[1] = uint8(cpixe.color_g)
+	p.Color[2] = uint8(cpixe.color_b)
+	p.Color[3] = uint8(cpixe.color_a)
+	return p
+}
+
+func (m *PixelGrid) Get(pos []int32) (error, Pixel) {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error "), Pixel{}
+	}
+    cpixel := C.vdb_pixel_grid_get(m.m, C.int(pos[0]), C.int(pos[1]), C.int(pos[2]))
+	return nil, cpixel_2_pixel(ret)
+}
+
+func (m *PixelGrid) LinearGet(pos []float32) (error, Pixel) {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error "), Pixel{}
+	}
+    cpixel := float32(C.vdb_pixel_grid_linear_get(m.m, C.float(pos[0]), C.float(pos[1]), C.float(pos[2])))
+	return nil, cpixel_2_pixel(ret)
 }

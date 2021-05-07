@@ -49,9 +49,9 @@ int voxel_mesh_builder::add_material(std::shared_ptr<material> mt, int index) {
   return index;
 }
 
-voxel_mesh voxel_mesh_builder::build_mesh() {
-  voxel_mesh hms;
-  hms.add_tris(build_triangles());
+std::shared_ptr<voxel_mesh> voxel_mesh_builder::build_mesh() {
+  auto hms = std::make_shared<voxel_mesh>();
+  hms->add_tris(build_triangles());
   return hms;
 }
 

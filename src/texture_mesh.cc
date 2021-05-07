@@ -39,6 +39,48 @@ public:
   }
 };
 
+texture_mesh::texture_mesh(const texture_mesh &m) {
+  vcg::tri::Append<texture_mesh, texture_mesh>::MeshCopy(
+      *this, const_cast<texture_mesh &>(m));
+}
+
+void texture_mesh::load(voxel_io_triangle *tris, int count) {
+  vcg::tri::Allocator<texture_mesh>::AddVertices(*this, count * 3);
+  vcg::tri::Allocator<texture_mesh>::AddFaces(*this, count);
+
+  for (uint32_t i = 0; i < count; i++) {
+    voxel_io_triangle &triangle = tris[i];
+    texture_face &f = face[i];
+    for (uint32_t k = 0; k < 3; k++) {
+      voxel_io_vertex &in = triangle.vertices[k];
+      texture_vertex &v = vert[i * 3 + k];
+      if (in.b) {
+        v.SetB();
+        _has_border = true;
+      }
+      v.P() = vcg::Point3f(in.v[0], in.v[1], in.v[2]);
+      v.C() = vcg::Color4b(in.c[0], in.c[1], in.c[2], in.c[3]);
+      f.V(k) = &v;
+      f.WT(k).U() = in.t[0];
+      f.WT(k).V() = in.t[1];
+      assert(!std::isnan(in.t[0]));
+      assert(!std::isnan(in.t[1]));
+    }
+    f.node = triangle.node;
+    f.tex = triangle.tex;
+    f.mtl = triangle.mtl;
+  }
+
+  vcg::tri::Clean<texture_mesh>::RemoveDuplicateVertex(*this);
+  vcg::tri::Clean<texture_mesh>::RemoveDuplicateFace(*this);
+  vcg::tri::Clean<texture_mesh>::RemoveZeroAreaFace(*this);
+  vcg::tri::Clean<texture_mesh>::RemoveUnreferencedVertex(*this);
+  vcg::tri::UpdateNormal<texture_mesh>::PerFaceNormalized(*this);
+  vcg::tri::Allocator<texture_mesh>::CompactVertexVector(*this);
+  vcg::tri::Allocator<texture_mesh>::CompactFaceVector(*this);
+  vcg::tri::UpdateNormal<texture_mesh>::PerVertex(*this);
+}
+
 void texture_mesh::quadric_simplify_with_tex(uint32_t target) {
   _is_tex = true;
   vcg::tri::UpdateNormal<texture_mesh>::PerFaceNormalized(*this);
@@ -115,6 +157,13 @@ void texture_mesh::reset_fv() {
 
 void texture_mesh::lock(std::vector<bool> &locked) {
   for (uint32_t i = 0; i < face.size(); i++)
+    if (locked[i])
+      face[i].ClearW();
+}
+
+void texture_mesh::lock(bool *locked, int count) {
+  assert(count == face.size());
+  for (uint32_t i = 0; i < count; i++)
     if (locked[i])
       face[i].ClearW();
 }

@@ -21,7 +21,7 @@ public:
 
   virtual ~voxel_mesh_builder() = default;
 
-  voxel_mesh build_mesh();
+  std::shared_ptr<voxel_mesh> build_mesh();
 
   std::vector<triangle> build_triangles();
 

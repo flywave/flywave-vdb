@@ -39,14 +39,6 @@ struct _voxel_mesh_t {
   std::unordered_map<std::string, std::shared_ptr<flywave::texture>> tex_maps;
 };
 
-struct _voxel_texture_t {
-  std::shared_ptr<flywave::texture> tex;
-};
-
-struct _voxel_material_t {
-  std::shared_ptr<flywave::material> mtl;
-};
-
 struct _voxel_pixel_material_data_t {
   std::shared_ptr<flywave::material_data> data;
 };
@@ -73,6 +65,10 @@ struct _voxel_border_lock_t {
 
 struct _voxel_filter_triangle_t {
   std::shared_ptr<flywave::filter_triangle> ptr;
+};
+
+struct _voxel_texture2d_t {
+  std::shared_ptr<flywave::texture2d<flywave::vdb::math::Vec4<uint8_t>>> ptr;
 };
 
 struct voxel_io_vertex {

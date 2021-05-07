@@ -187,13 +187,13 @@ public:
     return it;
   }
 
-  bool
-  operator==(const const_texture_row_iterator<ColorType> &it) const noexcept {
+  bool operator==(const const_texture_row_iterator<ColorType> &it) const
+      noexcept {
     return row_ == it.row_;
   }
 
-  bool
-  operator!=(const const_texture_row_iterator<ColorType> &it) const noexcept {
+  bool operator!=(const const_texture_row_iterator<ColorType> &it) const
+      noexcept {
     return row_ != it.row_;
   }
 

@@ -40,7 +40,7 @@ class texture_vertex
 public:
   uint32_t node;
   texture_vertex() : node(0) { q.SetZero(); }
-  
+
   vcg::math::Quadric<double> &Qd() { return q; }
 
 private:
@@ -93,6 +93,7 @@ class texture_mesh : public vcg::tri::TriMesh<std::vector<texture_vertex>,
                                               std::vector<texture_face>> {
 protected:
   bool _is_tex = false;
+  bool _has_border{false};
 
   void reset_fv();
 
@@ -101,7 +102,11 @@ public:
   texture_mesh() = default;
   texture_mesh(const texture_mesh &m);
 
+  void load(voxel_io_triangle *tris, int count);
+
   void lock(std::vector<bool> &locked);
+  void lock(bool *locked, int count);
+
   void get_triangles(struct voxel_io_triangle *triangles, uint32_t node);
 
   void unlock_border();

@@ -52,6 +52,8 @@ public:
 
   bool has_texcoord() { return _texcoords.size(); }
 
+  bool has_mtl_face() { return _mtl_faces_map.size(); }
+
   bool has_mtl_normal() { return _mtl_normal_map.size(); }
 
   bool has_mtl_texcoord() { return _mtl_texcoord_map.size(); }

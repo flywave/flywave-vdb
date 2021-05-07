@@ -99,7 +99,7 @@ void triangle_repacker::make_mesh_mark_seam(std::vector<vertext_type> &points,
   vdb::tools::volumeToMesh(*_grid, points, tri, quads, isovalue, adapter, true);
 }
 
-void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
+void make_triangles(std::vector<struct voxel_io_triangle> &rettriangles,
                     voxel_pixel &pot, const vdb::Mat4d &mat, size_t text_offset,
                     size_t mtl_offset, std::shared_ptr<border_lock> lock,
                     std::shared_ptr<filter_triangle> filter, double fquality,
@@ -120,9 +120,9 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
 
   vfoundry->make_mesh_mark_seam(points, triangles, quads, isovalue, adapter);
 
-  std::unique_ptr<std::unordered_map<int, std::vector<struct _io_triangle_t>>>
+  std::unique_ptr<std::unordered_map<int, std::vector<struct voxel_io_triangle>>>
       group_triangles_ptr = std::make_unique<
-          std::unordered_map<int, std::vector<struct _io_triangle_t>>>();
+          std::unordered_map<int, std::vector<struct voxel_io_triangle>>>();
 
   auto &group_triangles = *group_triangles_ptr;
   auto accessor = pot.get_pixel_grid()->getAccessor();
@@ -172,7 +172,7 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
       return mtconfig;
     };
 
-    struct _io_triangle_t io_tri;
+    struct voxel_io_triangle io_tri;
 
     io_tri.node = 0;
     {
@@ -214,9 +214,9 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
       }
     }
 
-    struct _io_vertex_t _v0 {};
-    struct _io_vertex_t _v1 {};
-    struct _io_vertex_t _v2 {};
+    struct voxel_io_vertex _v0 {};
+    struct voxel_io_vertex _v1 {};
+    struct voxel_io_vertex _v2 {};
 
     _v0.v[0] = v0[0];
     _v0.v[1] = v0[1];
@@ -246,7 +246,7 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
     auto iter = group_triangles.find(io_tri.mtl);
     if (iter == group_triangles.end()) {
       group_triangles.emplace(io_tri.mtl,
-                              std::vector<struct _io_triangle_t>{io_tri});
+                              std::vector<struct voxel_io_triangle>{io_tri});
     } else {
       iter->second.emplace_back(io_tri);
     }
@@ -415,7 +415,7 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
   {
     size_t index = 0;
     for (auto &iter : rettriangles) {
-      struct _io_triangle_t &io_tri = rettriangles[index++];
+      struct voxel_io_triangle &io_tri = rettriangles[index++];
       io_tri = iter;
 
       if (io_tri.tex != -1)
@@ -431,7 +431,7 @@ void make_triangles(std::vector<struct _io_triangle_t> &rettriangles,
   });
 }
 
-void make_triangles(std::vector<struct _io_triangle_t> &vtriangles,
+void make_triangles(std::vector<struct voxel_io_triangle> &vtriangles,
                     voxel_pixel &pot, const vdb::Mat4d &mat, size_t text_offset,
                     size_t mtl_offset, double fquality, double isovalue,
                     double adapter) {

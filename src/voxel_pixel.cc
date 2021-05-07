@@ -161,6 +161,12 @@ voxel_pixel::voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
   _vertex->setTransform(_resolution);
 }
 
+voxel_pixel::voxel_pixel(voxel_pixel *grid)
+    : _resolution(grid->_resolution), _materials(grid->_materials) {
+  _vertex = grid->_vertex->deepCopy();
+  _pixel = grid->_pixel->deepCopy();
+}
+
 bool voxel_pixel::ray_test(const vdb::math::Ray<double> &ray,
                            openvdb::Vec3d &p) {
   if (_vertex->empty())
@@ -250,7 +256,7 @@ write_materials(std::ofstream &os,
   }
 }
 
-void voxel_pixel::write(const std::string &file) {
+bool voxel_pixel::write(const std::string &file) {
   std::ofstream os;
 
   os.open(file);
@@ -265,8 +271,12 @@ void voxel_pixel::write(const std::string &file) {
 
     _pixel->writeTopology(os);
     _pixel->writeBuffers(os);
+    os.close();
+    return true;
   }
+
   os.close();
+  return false;
 }
 
 inline void
@@ -280,7 +290,7 @@ read_materials(std::ifstream &is,
   }
 }
 
-void voxel_pixel::read(const std::string &file) {
+bool voxel_pixel::read(const std::string &file) {
   std::ifstream is;
 
   is.open(file);
@@ -298,8 +308,12 @@ void voxel_pixel::read(const std::string &file) {
 
     _vertex->setTransform(_resolution);
     _vertex->setGridClass(vdb::GRID_LEVEL_SET);
+    is.close();
+    return true;
   }
+
   is.close();
+  return false;
 }
 
 pixel_grid::Ptr voxel_pixel::extract_color(voxel_pixel &spot) {
@@ -338,11 +352,11 @@ public:
 public:
   search_surface_op(const bbox2<double> &range, std::vector<vdb::Coord> &nodes,
                     vertex_grid &grid, index_tree &index)
-      : _nodes(nodes), _index_tree(&index), _range(range), _grid(grid) {}
+      : _nodes(nodes), _index_tree(&index), _grid(grid), _range(range) {}
 
   search_surface_op(search_surface_op &other, tbb::split)
-      : _nodes(other._nodes), _index_tree(&_local_tree), _range(other._range),
-        _grid(other._grid) {}
+      : _nodes(other._nodes), _index_tree(&_local_tree), _grid(other._grid),
+        _range(other._range) {}
 
   void operator()(const tbb::blocked_range<size_t> &range) {
     vdb::tree::ValueAccessor<index_tree> paccess(*_index_tree);

@@ -31,6 +31,9 @@ public:
     _vertex->setTransform(_resolution);
     _vertex->setGridClass(openvdb::GRID_LEVEL_SET);
   }
+  voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
+              vdb::math::Transform::Ptr);
+  voxel_pixel(voxel_pixel *grid);
 
   vdb::math::Transform::Ptr voxel_resolution() const { return _resolution; }
 
@@ -56,11 +59,13 @@ public:
   }
 
 public:
-  void write(const std::string &file);
+  bool write(const std::string &file);
 
-  void read(const std::string &file);
+  bool read(const std::string &file);
 
-  static voxel_pixel create_voxel_pixel() { return voxel_pixel(); }
+  static std::shared_ptr<voxel_pixel> create_voxel_pixel() {
+    return std::make_shared<voxel_pixel>();
+  }
 
   enum class composite_type : uint32_t {
     op_union,
@@ -81,9 +86,6 @@ public:
   vdb::BBoxd eval_max_min_elevation(vdb::BBoxd _in);
 
 private:
-  voxel_pixel(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
-              vdb::math::Transform::Ptr);
-
   void merge_materials(voxel_pixel &tpot);
 
   void clear_unuse_materials();

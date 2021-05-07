@@ -22,6 +22,7 @@ struct png_context {
   int channels;
   bool need_to_synthesize_16;
   bool error_condition;
+  
   png_context() : png_ptr(nullptr), info_ptr(nullptr) {}
 };
 

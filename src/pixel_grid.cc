@@ -93,15 +93,16 @@ struct paint_texture_on_surface {
     auto orgx = _tile_bbox.max().x();
     auto to = _tile_bbox.min().x();
 
-    bbox2<double> box(vdb::Vec2d{_tile_bbox.min().y(), _tile_bbox.min().z()},
-                      vdb::Vec2d{_tile_bbox.max().y(), _tile_bbox.max().z()});
+    bbox2<double> box(
+        vdb::Vec2d{double(_tile_bbox.min().y()), double(_tile_bbox.min().z())},
+        vdb::Vec2d{double(_tile_bbox.max().y()), double(_tile_bbox.max().z())});
 
     vdb::tree::ValueAccessor<pixel_grid::TreeType> paccess(*_tile);
     for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
       auto &distNode = *_stuff_nodes[n];
       for (auto iter = distNode.beginValueOn(); iter; ++iter) {
         auto coord = iter.getCoord();
-        if (!box.contains(vdb::Vec2d{coord.y(), coord.z()}))
+        if (!box.contains(vdb::Vec2d{double(coord.y()), double(coord.z())}))
           continue;
 
         auto ray = vdb::Coord(orgx, coord.y(), coord.z());

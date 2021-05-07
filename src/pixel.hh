@@ -13,7 +13,7 @@ class pixel;
 } // namespace flywave
 
 namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
 namespace math {
 
 inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b);
@@ -22,6 +22,7 @@ inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b,
                           const flywave::pixel &);
 
 } // namespace math
+} // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 namespace flywave {
@@ -59,13 +60,16 @@ public:
 
 class pixel {
 public:
-  pixel() : _value(0) {}
+  pixel() : _data() {}
 
   pixel(double value) : _value(value) {}
 
   pixel(const pixel &pix) noexcept { memcpy(this, &pix, sizeof(pixel)); }
 
   pixel(const pixel_data &data) : _data(data) {}
+
+  static_assert(sizeof(pixel_data) == sizeof(double),
+                "pixel_data must be double");
 
   const pixel &operator=(const pixel &pix) {
     memcpy(this, &pix, sizeof(pixel));
@@ -97,9 +101,7 @@ public:
     return *this;
   }
 
-  constexpr bool is_equal(const pixel &e) const {
-    return _value == e._value; //&& e._data == _data;
-  }
+  constexpr bool is_equal(const pixel &e) const { return _value == e._value; }
 
   constexpr bool is_greater(const pixel &e) const { return _value > e._value; }
 
@@ -117,10 +119,6 @@ public:
   bool operator==(const pixel &rhs) const { return _value == rhs._value; }
 
   bool operator!=(const pixel &rhs) const { return !((*this) == rhs); }
-
-  template <typename Describer> auto describe_type(Describer f) {
-    return f(_data);
-  }
 
   operator double() const { return _value; }
 
@@ -192,23 +190,19 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 
 inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b) {
-  return isApproxEqual(a._value, b._value);
+  return (a._value == b._value);
 }
 
 inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b,
-                          const flywave::pixel &t) {
-  return isApproxEqual(a._value, b._value, t._value);
-}
-
-inline flywave::pixel abs(const flywave::pixel &v) {
-  return flywave::pixel(std::abs(v._value));
+                          const flywave::pixel &) {
+    return (a._value == b._value);
 }
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 
 namespace OPENVDB_VERSION_NAME {
 template <> inline flywave::pixel zeroVal<flywave::pixel>() {
-  return flywave::pixel(0);
+  return flywave::pixel();
 }
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

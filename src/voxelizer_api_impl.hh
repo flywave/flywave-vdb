@@ -5,19 +5,32 @@
 #include "repacker.hh"
 #include "texture_data.hh"
 #include "voxel_mesh.hh"
-#include "voxel_pixel.hh"
 #include "voxel_mesh_builder.hh"
+#include "voxel_pixel.hh"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+namespace flywave {
+class texture_atlas_generator;
+class texture_mesh;
+} // namespace flywave
+
 struct _voxel_pixel_t {
   std::shared_ptr<flywave::voxel_pixel> ptr;
 };
 
-struct _textute_repacker_t {
-  std::shared_ptr<flywave::textute_repacker> ptr;
+struct _voxel_texture_atlas_generator_t {
+  std::shared_ptr<flywave::texture_atlas_generator> ptr;
+};
+
+struct _voxel_transform_t {
+  flywave::vdb::math::Transform::Ptr ptr;
+};
+
+struct _voxel_texture_mesh_t {
+  std::shared_ptr<flywave::texture_mesh> mesh;
 };
 
 struct _voxel_mesh_t {
@@ -54,19 +67,27 @@ struct _voxel_mesh_builder_t {
   std::shared_ptr<flywave::voxel_mesh_builder> ptr;
 };
 
-struct _io_vertex_t {
+struct _voxel_border_lock_t {
+  std::shared_ptr<flywave::border_lock> ptr;
+};
+
+struct _voxel_filter_triangle_t {
+  std::shared_ptr<flywave::filter_triangle> ptr;
+};
+
+struct voxel_io_vertex {
   float v[3];
   uint8_t c[4];  // colors
   float t[2];    // texture
   bool b{false}; // border
 
-  bool operator==(const _io_vertex_t &p) const {
+  bool operator==(const voxel_io_vertex &p) const {
     return v[0] == p.v[0] && v[1] == p.v[1] && v[2] == p.v[2];
   }
 };
 
-struct _io_triangle_t {
-  _io_vertex_t vertices[3];
+struct voxel_io_triangle {
+  voxel_io_vertex vertices[3];
   uint32_t node;
   uint32_t tex;
   uint32_t mtl;

@@ -15,9 +15,9 @@ public:
                       local_feature_id_t local_feature = -1)
       : _adapter(adapter), _local_feature_id(local_feature) {}
 
-  voxel_pixel apply(float precision, clip_box_createor &creator,
-                    sampler_type type, material_merge_transfrom &tmtl,
-                    openvdb::Mat4d matrix);
+  std::shared_ptr<voxel_pixel>
+  apply(float precision, clip_box_createor &creator, sampler_type type,
+        material_merge_transfrom &tmtl, openvdb::Mat4d matrix);
 
 private:
   resolution _resolution;

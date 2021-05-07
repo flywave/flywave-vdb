@@ -12,11 +12,10 @@ void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
               const material_merge_transfrom &tmtl, mesh_adapter &_adapter,
               local_feature_id_t _local_feature_id);
 
-voxel_pixel voxel_pixel_sampler::apply(float precision,
-                                       clip_box_createor &creator,
-                                       sampler_type type,
-                                       material_merge_transfrom &tmtl,
-                                       openvdb::Mat4d matrix) {
+std::shared_ptr<voxel_pixel>
+voxel_pixel_sampler::apply(float precision, clip_box_createor &creator,
+                           sampler_type type, material_merge_transfrom &tmtl,
+                           openvdb::Mat4d matrix) {
   auto transform = _resolution.eval_resolution(precision);
   _adapter._stream->set_matrix(matrix);
   auto vsamper = vertext_sampler::make_mesh_sampler(transform, type);
@@ -33,7 +32,7 @@ voxel_pixel voxel_pixel_sampler::apply(float precision,
   pixel_grid::Ptr pixel = pixel_grid::create();
   coloring(vgrid, pixel, fgrid, transform, tmtl, _adapter, _local_feature_id);
 
-  return voxel_pixel(vgrid, pixel, transform);
+  return std::make_shared<voxel_pixel>(vgrid, pixel, transform);
 }
 
 struct paint_color_on_surface {

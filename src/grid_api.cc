@@ -1,4 +1,4 @@
-#include "vdb_api.h"
+#include "grid_api.h"
 #include "grid_api_impl.hh"
 
 #include "float_grid.hh"
@@ -17,23 +17,21 @@ extern "C" {
 #endif
 
 FLYWAVE_VDB_API vdb_float_grid_t *vdb_float_grid_create() {
-  vdb_float_grid *grid = new vdb_float_grid();
-  vdb_float_grid_t *ret = new vdb_float_grid_t{grid};
+  vdb_float_grid_t *ret =
+      new vdb_float_grid_t{std::make_shared<vdb_float_grid>()};
   return ret;
 }
 
 FLYWAVE_VDB_API void vdb_float_grid_free(vdb_float_grid_t *grid) {
   if (grid != nullptr) {
-    delete grid->ptr;
-    grid->ptr = nullptr;
     delete grid;
   }
 }
 
 FLYWAVE_VDB_API vdb_float_grid_t *
 vdb_float_grid_duplicate(vdb_float_grid_t *grid) {
-  vdb_float_grid *dup = new vdb_float_grid(grid->ptr);
-  vdb_float_grid_t *ret = new vdb_float_grid_t{dup};
+  vdb_float_grid_t *ret =
+      new vdb_float_grid_t{std::make_shared<vdb_float_grid>(grid->ptr.get())};
   return ret;
 }
 
@@ -299,23 +297,21 @@ FLYWAVE_VDB_API float vdb_float_grid_linear_get(vdb_float_grid_t *grid, float x,
 }
 
 FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create() {
-  vdb_pixel_grid *grid = new vdb_pixel_grid();
-  vdb_pixel_grid_t *ret = new vdb_pixel_grid_t{grid};
+  vdb_pixel_grid_t *ret =
+      new vdb_pixel_grid_t{std::make_shared<vdb_pixel_grid>()};
   return ret;
 }
 
 FLYWAVE_VDB_API void vdb_pixel_grid_free(vdb_pixel_grid_t *grid) {
   if (grid != nullptr) {
-    delete grid->ptr;
-    grid->ptr = nullptr;
     delete grid;
   }
 }
 
 FLYWAVE_VDB_API vdb_pixel_grid_t *
 vdb_pixel_grid_duplicate(vdb_pixel_grid_t *grid) {
-  vdb_pixel_grid *dup = new vdb_pixel_grid(grid->ptr);
-  vdb_pixel_grid_t *ret = new vdb_pixel_grid_t{dup};
+  vdb_pixel_grid_t *ret =
+      new vdb_pixel_grid_t{std::make_shared<vdb_pixel_grid>(grid->ptr.get())};
   return ret;
 }
 

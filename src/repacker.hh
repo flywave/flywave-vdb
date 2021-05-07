@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-struct _io_triangle_t;
+struct voxel_io_triangle;
 
 #ifdef __cplusplus
 }
@@ -68,13 +68,13 @@ private:
   vertex_grid::Ptr _grid;
 };
 
-void make_triangles(std::vector<struct _io_triangle_t> &vtriangles,
+void make_triangles(std::vector<struct voxel_io_triangle> &vtriangles,
                     voxel_pixel &pot, const vdb::Mat4d &mat, size_t text_offset,
                     size_t mtl_offset, std::shared_ptr<border_lock>,
                     std::shared_ptr<filter_triangle> filter, double fquality,
                     double isovalue = 0.0, double adapter = 0.01);
 
-void make_triangles(std::vector<struct _io_triangle_t> &vtriangles,
+void make_triangles(std::vector<struct voxel_io_triangle> &vtriangles,
                     voxel_pixel &pot, const vdb::Mat4d &mat, size_t text_offset,
                     size_t mtl_offset, double fquality, double isovalue = 0.0,
                     double adapter = 0.01);

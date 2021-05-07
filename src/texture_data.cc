@@ -61,7 +61,7 @@ texture_data load_png_image(std::vector<uint8_t> &&buf) {
   }
 
   png_free_decode(&decode);
-  return std::move(data);
+  return data;
 }
 
 texture_data load_texture_data(std::vector<uint8_t> buff) {

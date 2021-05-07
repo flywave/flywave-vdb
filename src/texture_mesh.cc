@@ -119,7 +119,7 @@ void texture_mesh::lock(std::vector<bool> &locked) {
       face[i].ClearW();
 }
 
-void texture_mesh::get_triangles(struct _io_triangle_t *triangles,
+void texture_mesh::get_triangles(struct voxel_io_triangle *triangles,
                                  uint32_t node) {
   int count = 0;
   for (uint32_t i = 0; i < face.size(); i++) {
@@ -127,9 +127,9 @@ void texture_mesh::get_triangles(struct _io_triangle_t *triangles,
     if (t.IsD())
       continue;
 
-    struct _io_triangle_t &triangle = triangles[count++];
+    struct voxel_io_triangle &triangle = triangles[count++];
     for (uint32_t k = 0; k < 3; k++) {
-      struct _io_vertex_t &vertex = triangle.vertices[k];
+      struct voxel_io_vertex &vertex = triangle.vertices[k];
       texture_vertex &v = *t.V(k);
       vertex.v[0] = v.P()[0];
       vertex.v[1] = v.P()[1];

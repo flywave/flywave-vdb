@@ -27,19 +27,20 @@ class texture_vertex;
 class texture_edge;
 class texture_face;
 
-struct simplify_used_types
+struct texture_used_types
     : public vcg::UsedTypes<vcg::Use<texture_vertex>::AsVertexType,
                             vcg::Use<texture_edge>::AsEdgeType,
                             vcg::Use<texture_face>::AsFaceType> {};
 
 class texture_vertex
-    : public vcg::Vertex<simplify_used_types, vcg::vertex::VFAdj,
+    : public vcg::Vertex<texture_used_types, vcg::vertex::VFAdj,
                          vcg::vertex::Coord3f, vcg::vertex::Normal3f,
                          vcg::vertex::TexCoord2f, vcg::vertex::Color4b,
                          vcg::vertex::Mark, vcg::vertex::BitFlags> {
 public:
   uint32_t node;
   texture_vertex() : node(0) { q.SetZero(); }
+  
   vcg::math::Quadric<double> &Qd() { return q; }
 
 private:
@@ -70,10 +71,10 @@ public:
   }
 };
 
-class texture_edge : public vcg::Edge<simplify_used_types> {};
+class texture_edge : public vcg::Edge<texture_used_types> {};
 
 class texture_face
-    : public vcg::Face<simplify_used_types, vcg::face::VFAdj,
+    : public vcg::Face<texture_used_types, vcg::face::VFAdj,
                        vcg::face::VertexRef, vcg::face::Normal3f,
                        vcg::face::WedgeTexCoord2f, vcg::face::BitFlags> {
 public:
@@ -101,7 +102,7 @@ public:
   texture_mesh(const texture_mesh &m);
 
   void lock(std::vector<bool> &locked);
-  void get_triangles(struct _io_triangle_t *triangles, uint32_t node);
+  void get_triangles(struct voxel_io_triangle *triangles, uint32_t node);
 
   void unlock_border();
   void lock_border();

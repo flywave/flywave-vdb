@@ -112,10 +112,9 @@ FLYWAVE_VDB_API _Bool vdb_float_grid_from_mesh(vdb_float_grid_t *grid,
 
   i = 0;
   while (i < fCount) {
-    openvdb::Vec4I face(vFaces[i], vFaces[i + 1], vFaces[i + 2],
-                        openvdb::util::INVALID_IDX);
+    openvdb::Vec3I face(vFaces[i], vFaces[i + 1], vFaces[i + 2]);
 
-    vMesh.add_face(face);
+    vMesh.add_mtl_face(none_mtl_id, face);
     i += 3;
   }
 

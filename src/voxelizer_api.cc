@@ -586,26 +586,237 @@ voxel_mesh_builder_texture_exist(voxel_mesh_builder_t *vox, const char *name) {
   return vox->ptr->texture_exist(name);
 }
 
-FLYWAVE_VDB_API voxel_texture_t *
-voxel_mesh_builder_get_texture(voxel_mesh_builder_t *vox, const char *name) {
-  return new voxel_texture_t{vox->ptr->get_textures().at(name)};
-}
-
 FLYWAVE_VDB_API _Bool
 voxel_mesh_builder_material_exist(voxel_mesh_builder_t *vox, int index) {
   return vox->ptr->get_materials().find(index) !=
          vox->ptr->get_materials().end();
 }
 
-FLYWAVE_VDB_API voxel_material_t *
-voxel_mesh_builder_get_material(voxel_mesh_builder_t *vox, int index) {
-  return new voxel_material_t{vox->ptr->get_materials().at(index)};
-}
-
 FLYWAVE_VDB_API voxel_mesh_t *
 voxel_mesh_builder_build_mesh(voxel_mesh_builder_t *vox) {
   return new voxel_mesh_t{vox->ptr->build_mesh(), vox->ptr->get_materials(),
                           vox->ptr->get_textures()};
+}
+
+FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m) { delete m; }
+
+FLYWAVE_VDB_API voxel_pixel_t *
+voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
+                          uint16_t local_feature, float precision,
+                          voxel_clip_box_createor_t *creator, int32_t type,
+                          double *matrix) {
+
+  std::unique_ptr<triangles_stream> stream =
+      std::make_unique<voxel_mesh_adapter>(m->ptr, m->mtl_maps, m->tex_maps);
+
+  mesh_adapter _mesh_adapter{std::move(stream)};
+
+  material_merge_transfrom tmtl(
+      mtls == nullptr ? std::vector<std::shared_ptr<material_data>>{}
+                      : mtls->mtls);
+
+  voxel_pixel_sampler sampler{_mesh_adapter, local_feature};
+  std::shared_ptr<flywave::voxel_pixel> stff_pot =
+      sampler.apply(precision, *creator->ptr, static_cast<sampler_type>(type),
+                    tmtl, openvdb::Mat4d(matrix));
+
+  if (mtls != nullptr)
+    mtls->mtls = tmtl.materials();
+
+  return new voxel_pixel_t{stff_pot};
+}
+
+static_assert(sizeof(c_material_data_t) == sizeof(material_data), "");
+
+FLYWAVE_VDB_API voxel_pixel_material_data_t *
+voxel_pixel_material_data_create(c_material_data_t data) {
+  return new voxel_pixel_material_data_t{
+      std::make_shared<flywave::material_data>(
+          *(reinterpret_cast<material_data *>(&data)))};
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_material_data_free(voxel_pixel_material_data_t *vox) {
+  delete vox;
+}
+
+FLYWAVE_VDB_API c_material_data_t
+voxel_pixel_material_data_get(voxel_pixel_material_data_t *vox) {
+  return *(reinterpret_cast<c_material_data_t *>(vox->data.get()));
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_material_data_set(voxel_pixel_material_data_t *vox,
+                              c_material_data_t data) {
+  vox->data = std::make_shared<flywave::material_data>(
+      *(reinterpret_cast<material_data *>(&data)));
+}
+
+FLYWAVE_VDB_API voxel_pixel_texture_data_t *
+voxel_pixel_texture_data_create(c_texture_data_t t) {
+  auto data = std::make_shared<texture_data>();
+  data->width = t.width;
+  data->height = t.height;
+  data->format = static_cast<pixel_format>(t.format);
+  size_t si = t.width * t.height;
+  switch (data->format) {
+  case pixel_format::RGB:
+    si *= 3;
+    break;
+  case pixel_format::RGBA:
+    si *= 4;
+    break;
+  default:
+    break;
+  }
+  data->data.resize(si);
+  memcpy(&data->data[0], t.data, si);
+  return new voxel_pixel_texture_data_t{data};
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_texture_data_free(voxel_pixel_texture_data_t *vox) {
+  delete vox;
+}
+
+FLYWAVE_VDB_API c_texture_data_t
+voxel_pixel_texture_data_get(voxel_pixel_texture_data_t *vox) {
+  c_texture_data_t ret;
+  ret.width = vox->data->width;
+  ret.height = vox->data->height;
+  ret.format = static_cast<int>(vox->data->format);
+  ret.data = vox->data->data.data();
+  return ret;
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_texture_data_set(voxel_pixel_texture_data_t *vox,
+                             c_texture_data_t t) {
+  auto data = std::make_shared<texture_data>();
+  data->width = t.width;
+  data->height = t.height;
+  data->format = static_cast<pixel_format>(t.format);
+  size_t si = t.width * t.height;
+  switch (data->format) {
+  case pixel_format::RGB:
+    si *= 3;
+    break;
+  case pixel_format::RGBA:
+    si *= 4;
+    break;
+  default:
+    break;
+  }
+  data->data.resize(si);
+  memcpy(&data->data[0], t.data, si);
+  vox->data = data;
+}
+
+FLYWAVE_VDB_API voxel_pixel_mesh_data_t *
+voxel_pixel_mesh_data_create(c_mesh_data_t data) {
+  auto mdata = std::make_shared<flywave::mesh_data>();
+  mdata->vertices().resize(data.v_count);
+  memcpy(&(mdata->vertices()[0]), data.vertices,
+         data.v_count * 3 * sizeof(float));
+
+  if (data.n_count > 0) {
+    mdata->normals().resize(data.n_count);
+    memcpy(&(mdata->normals()[0]), data.normals,
+           data.n_count * 3 * sizeof(float));
+  }
+
+  if (data.t_count > 0) {
+    mdata->texcoords().resize(data.t_count);
+    memcpy(&(mdata->texcoords()[0]), data.texcoords,
+           data.t_count * 2 * sizeof(float));
+  }
+
+  if (data.mtl_count > 0) {
+    for (int i = 0; i < data.mtl_count; i++) {
+      auto &mtl = data.mtl_map[i];
+      if (mtl.f_count > 0) {
+        std::vector<openvdb::Vec3I> faces;
+        faces.resize(mtl.f_count);
+        memcpy(&(faces[0]), mtl.faces, mtl.f_count * 3 * sizeof(uint32_t));
+        mdata->add_mtl_faces(mtl.mtl, faces);
+      }
+      if (mtl.n_count > 0) {
+        std::vector<openvdb::Vec3I> normals;
+        normals.resize(mtl.n_count);
+        memcpy(&(normals[0]), mtl.normals, mtl.n_count * 3 * sizeof(uint32_t));
+        mdata->add_mtl_normals(mtl.mtl, normals);
+      }
+      if (mtl.t_count > 0) {
+        std::vector<openvdb::Vec3I> texcoords;
+        texcoords.resize(mtl.t_count);
+        memcpy(&(texcoords[0]), mtl.texcoords,
+               mtl.t_count * 3 * sizeof(uint32_t));
+        mdata->add_mtl_texcoords(mtl.mtl, texcoords);
+      }
+    }
+  }
+}
+
+FLYWAVE_VDB_API void voxel_pixel_mesh_data_free(voxel_pixel_mesh_data_t *vox) {
+  delete vox;
+}
+
+class cgo_clip_box_createor : public clip_box_createor {
+public:
+  cgo_clip_box_createor(void *ctx) : _ctx(ctx) {}
+
+  bool operator()(vertex_grid::Ptr vertex, vdb::math::Transform::Ptr resolution,
+                  const vdb::BBoxd &sbox, vdb::BBoxd &cbox) override {}
+
+  void *_ctx;
+};
+
+FLYWAVE_VDB_API voxel_clip_box_createor_t *
+voxel_clip_box_createor_create(void *ctx) {
+  return new voxel_clip_box_createor_t{
+      std::make_shared<cgo_clip_box_createor>(ctx)};
+}
+
+FLYWAVE_VDB_API void
+voxel_clip_box_createor_free(voxel_clip_box_createor_t *vox) {
+  delete vox;
+}
+
+class cgo_border_lock : public border_lock {
+public:
+  cgo_border_lock(void *ctx) : _ctx(ctx) {}
+
+  bool is_need_lock(const vdb::math::Vec3<float> &a) override {}
+
+  void *_ctx;
+};
+
+FLYWAVE_VDB_API voxel_border_lock_t *voxel_border_lock_create(void *ctx) {
+  return new voxel_border_lock_t{std::make_shared<cgo_border_lock>(ctx)};
+}
+
+FLYWAVE_VDB_API void voxel_border_lock_free(voxel_border_lock_t *vox) {
+  delete vox;
+}
+
+class cgo_filter_triangle : public filter_triangle {
+public:
+  cgo_filter_triangle(void *ctx) : _ctx(ctx) {}
+
+  bool valid(const vdb::math::Vec3<float> &a, const vdb::math::Vec3<float> &,
+             const vdb::math::Vec3<float> &) override {}
+
+  void *_ctx;
+};
+
+FLYWAVE_VDB_API voxel_filter_triangle_t *
+voxel_filter_triangle_create(void *ctx) {
+  return new voxel_filter_triangle_t{
+      std::make_shared<cgo_filter_triangle>(ctx)};
+}
+
+FLYWAVE_VDB_API void voxel_filter_triangle_free(voxel_filter_triangle_t *vox) {
+  delete vox;
 }
 
 #ifdef __cplusplus

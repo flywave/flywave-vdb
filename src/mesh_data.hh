@@ -7,6 +7,8 @@
 
 namespace flywave {
 
+const int none_mtl_id = -1;
+
 class mesh_data {
 public:
   mesh_data();
@@ -17,7 +19,6 @@ public:
   bool is_valid();
 
   std::vector<openvdb::Vec3s> &vertices();
-  std::vector<openvdb::Vec4I> &faces();
   std::vector<openvdb::Vec2s> &texcoords();
   std::vector<openvdb::Vec3s> &normals();
 
@@ -40,9 +41,6 @@ public:
 
   void add_vertice(openvdb::Vec3s v);
   void add_vertice(std::vector<openvdb::Vec3s> v);
-
-  void add_face(openvdb::Vec4I f);
-  void add_face(std::vector<openvdb::Vec4I> f);
 
   void add_texcoord(openvdb::Vec2s t);
   void add_texcoord(std::vector<openvdb::Vec2s> t);
@@ -81,7 +79,6 @@ public:
 
 private:
   std::vector<openvdb::Vec3s> _vertices;
-  std::vector<openvdb::Vec4I> _faces;
   std::vector<openvdb::Vec2s> _texcoords;
   std::vector<openvdb::Vec3s> _normals;
 

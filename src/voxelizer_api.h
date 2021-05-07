@@ -28,6 +28,7 @@ typedef struct _voxel_filter_triangle_t voxel_filter_triangle_t;
 typedef struct _voxel_transform_t voxel_transform_t;
 typedef struct _voxel_texture_mesh_t voxel_texture_mesh_t;
 typedef struct _voxel_texture2d_t voxel_texture2d_t;
+typedef struct _voxel_clip_box_createor_t voxel_clip_box_createor_t;
 
 extern FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_create();
 extern FLYWAVE_VDB_API void voxel_pixel_free(voxel_pixel_t *vox);
@@ -266,6 +267,121 @@ extern FLYWAVE_VDB_API _Bool
 voxel_mesh_builder_material_exist(voxel_mesh_builder_t *vox, int index);
 extern FLYWAVE_VDB_API voxel_mesh_t *
 voxel_mesh_builder_build_mesh(voxel_mesh_builder_t *vox);
+
+extern FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m);
+extern FLYWAVE_VDB_API voxel_pixel_t *
+voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
+                          uint16_t local_feature, float precision,
+                          voxel_clip_box_createor_t *creator, int32_t type,
+                          double *matrix);
+
+typedef struct _c_material_data_t {
+  uint8_t _material_id;
+
+  uint32_t type;
+  uint16_t mode;
+
+  uint8_t color_r;
+  uint8_t color_g;
+  uint8_t color_b;
+
+  uint8_t ambient_r;
+  uint8_t ambient_g;
+  uint8_t ambient_b;
+
+  uint8_t emissive_r;
+  uint8_t emissive_g;
+  uint8_t emissive_b;
+
+  uint8_t specular_r;
+  uint8_t specular_g;
+  uint8_t specular_b;
+
+  float opacity;
+
+  float shininess;
+
+  float metallic;
+  float roughness;
+  float reflectance;
+
+  float clearcoat_thickness;
+  float clearcoat_roughness;
+
+  float anisotropy;
+  float anisotropy_rotation;
+} c_material_data_t;
+
+extern FLYWAVE_VDB_API voxel_pixel_material_data_t *
+voxel_pixel_material_data_create(c_material_data_t data);
+extern FLYWAVE_VDB_API void
+voxel_pixel_material_data_free(voxel_pixel_material_data_t *vox);
+extern FLYWAVE_VDB_API c_material_data_t
+voxel_pixel_material_data_get(voxel_pixel_material_data_t *vox);
+extern FLYWAVE_VDB_API void
+voxel_pixel_material_data_set(voxel_pixel_material_data_t *vox,
+                              c_material_data_t data);
+
+typedef struct _c_texture_data_t {
+  size_t width;
+  size_t height;
+  int format;
+  uint8_t *data;
+} c_texture_data_t;
+
+extern FLYWAVE_VDB_API voxel_pixel_texture_data_t *
+voxel_pixel_texture_data_create(c_texture_data_t t);
+extern FLYWAVE_VDB_API void
+voxel_pixel_texture_data_free(voxel_pixel_texture_data_t *vox);
+extern FLYWAVE_VDB_API c_texture_data_t
+voxel_pixel_texture_data_get(voxel_pixel_texture_data_t *vox);
+extern FLYWAVE_VDB_API void
+voxel_pixel_texture_data_set(voxel_pixel_texture_data_t *vox,
+                             c_texture_data_t data);
+
+struct _c_mesh_data_mtl_t {
+  int mtl;
+  size_t f_count;
+  size_t n_count;
+  size_t t_count;
+
+  uint32_t *faces;
+  uint32_t *normals;
+  uint32_t *texcoords;
+};
+
+typedef struct _c_mesh_data_t {
+  float *vertices;
+  size_t v_count;
+
+  float *texcoords;
+  size_t t_count;
+
+  float *normals;
+  size_t n_count;
+
+  struct _c_mesh_data_mtl_t *mtl_map;
+  size_t mtl_count;
+
+} c_mesh_data_t;
+
+extern FLYWAVE_VDB_API voxel_pixel_mesh_data_t *
+voxel_pixel_mesh_data_create(c_mesh_data_t data);
+extern FLYWAVE_VDB_API void
+voxel_pixel_mesh_data_free(voxel_pixel_mesh_data_t *vox);
+
+extern FLYWAVE_VDB_API voxel_border_lock_t *voxel_border_lock_create(void *ctx);
+extern FLYWAVE_VDB_API void voxel_border_lock_free(voxel_border_lock_t *vox);
+
+extern FLYWAVE_VDB_API voxel_filter_triangle_t *
+voxel_filter_triangle_create(void *ctx);
+extern FLYWAVE_VDB_API void
+voxel_filter_triangle_free(voxel_filter_triangle_t *vox);
+
+extern FLYWAVE_VDB_API voxel_clip_box_createor_t *
+voxel_clip_box_createor_create(void *ctx);
+extern FLYWAVE_VDB_API void
+voxel_clip_box_createor_free(voxel_clip_box_createor_t *vox);
 
 #ifdef __cplusplus
 }

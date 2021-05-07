@@ -64,9 +64,9 @@ bool vdb_float_grid::create_from_mesh(mesh_data vMesh, double voxelSize,
   xform.preScale(voxelSize);
 
   auto vertices = vMesh.vertices();
-  auto faces = vMesh.faces();
+  auto faces = vMesh.mtl_faces_map()[none_mtl_id];
 
-  openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+  openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec3I>
       mesh(vertices, faces);
   _grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
       mesh, xform, static_cast<float>(bandwidth), static_cast<float>(bandwidth),
@@ -319,9 +319,9 @@ void vdb_float_grid::update_display() {
 
   for (Index64 n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
     const openvdb::tools::PolygonPool &polygons = polygonPoolList[n];
-    for (Index64 i = 0, I = polygons.numQuads(); i < I; ++i) {
-      auto face = polygons.quad(i);
-      _display.add_face(face);
+    for (Index64 i = 0, I = polygons.numTriangles(); i < I; ++i) {
+      auto face = polygons.triangle(i);
+      _display.add_mtl_face(none_mtl_id, face);
     }
   }
 }
@@ -339,22 +339,7 @@ void vdb_float_grid::update_display(double isovalue, double adaptivity) {
   _display.clear();
 
   _display.add_vertice(points);
-
-  auto begin = triangles.begin();
-  auto end = triangles.end();
-
-  for (auto it = begin; it != end; ++it) {
-    int w = -1;
-    int x = it->x();
-    int y = it->y();
-    int z = it->z();
-
-    openvdb::Vec4I face(x, y, z, w);
-
-    _display.add_face(face);
-  }
-
-  _display.add_face(quads);
+  _display.add_mtl_faces(none_mtl_id, triangles);
 }
 
 float *vdb_float_grid::get_mesh_vertices() {
@@ -377,19 +362,18 @@ float *vdb_float_grid::get_mesh_vertices() {
 }
 
 int *vdb_float_grid::get_mesh_faces() {
-  auto faces = _display.faces();
+  auto faces = _display.mtl_faces_map()[none_mtl_id];
 
-  _face_count = faces.size() * 4;
+  _face_count = faces.size() * 3;
 
   int *faceArray = reinterpret_cast<int *>(malloc(_face_count * sizeof(int)));
 
   int i = 0;
   for (auto it = faces.begin(); it != faces.end(); ++it) {
-    faceArray[i] = it->w();
-    faceArray[i + 1] = it->x();
-    faceArray[i + 2] = it->y();
-    faceArray[i + 3] = it->z();
-    i += 4;
+    faceArray[i] = it->x();
+    faceArray[i + 1] = it->y();
+    faceArray[i + 2] = it->z();
+    i += 3;
   }
 
   return faceArray;

@@ -2,15 +2,11 @@
 
 namespace flywave {
 
-mesh_data::mesh_data() {
-  _vertices.clear();
-  _faces.clear();
-}
+mesh_data::mesh_data() { _vertices.clear(); }
 
 mesh_data mesh_data::duplicate() {
   mesh_data mesh;
   mesh.add_vertice(_vertices);
-  mesh.add_face(_faces);
   mesh.add_texcoord(_texcoords);
   mesh.add_normal(_normals);
 
@@ -33,7 +29,7 @@ mesh_data mesh_data::duplicate() {
 mesh_data::~mesh_data() {}
 
 bool mesh_data::is_valid() {
-  if (_faces.size() > 0 && _vertices.size() > 0) {
+  if (_mtl_faces_map.size() > 0 && _vertices.size() > 0) {
     return true;
   }
   return false;
@@ -41,7 +37,6 @@ bool mesh_data::is_valid() {
 
 std::vector<openvdb::Vec3s> &mesh_data::vertices() { return _vertices; }
 
-std::vector<openvdb::Vec4I> &mesh_data::faces() { return _faces; }
 std::vector<openvdb::Vec2s> &mesh_data::texcoords() { return _texcoords; }
 std::vector<openvdb::Vec3s> &mesh_data::normals() { return _normals; }
 
@@ -49,12 +44,6 @@ void mesh_data::add_vertice(openvdb::Vec3s v) { _vertices.push_back(v); }
 
 void mesh_data::add_vertice(std::vector<openvdb::Vec3s> v) {
   _vertices.insert(_vertices.end(), v.begin(), v.end());
-}
-
-void mesh_data::add_face(openvdb::Vec4I f) { _faces.push_back(f); }
-
-void mesh_data::add_face(std::vector<openvdb::Vec4I> f) {
-  _faces.insert(_faces.end(), f.begin(), f.end());
 }
 
 void mesh_data::add_texcoord(openvdb::Vec2s t) { _texcoords.push_back(t); }
@@ -153,7 +142,6 @@ void mesh_data::add_mtl_texcoords(int mtl_id,
 
 void mesh_data::clear() {
   _vertices.clear();
-  _faces.clear();
   _texcoords.clear();
   _normals.clear();
   _mtl_faces_map.clear();

@@ -23,14 +23,14 @@ func (t *Texture2D) Free() {
 	t.m = nil
 }
 
-func (t *Texture2D) GetRawData() ([]byte, uint32, uint32) {
+func (t *Texture2D) GetRawData() (ret []byte, width uint32, height uint32) {
 	var data *C.uchar
-	var width C.uint
-	var height C.uint
-	C.voxel_texture2d_get_raw_data(t.m, &data, &width, &height)
+	var cwidth C.uint
+	var cheight C.uint
+	C.voxel_texture2d_get_raw_data(t.m, &data, &cwidth, &cheight)
 	defer C.free(unsafe.Pointer(data))
 
-	si := uint32(width) * uint32(height) * uint32(4)
+	si := uint32(cwidth) * uint32(cheight) * uint32(4)
 
 	var dataSlice []C.uchar
 	dataHeader := (*reflect.SliceHeader)((unsafe.Pointer(&dataSlice)))
@@ -38,12 +38,15 @@ func (t *Texture2D) GetRawData() ([]byte, uint32, uint32) {
 	dataHeader.Len = int(si)
 	dataHeader.Data = uintptr(unsafe.Pointer(data))
 
-	ret := make([]byte, int(si))
+	ret = make([]byte, int(si))
 
 	for i := 0; i < int(si); i++ {
 		ret[i] = byte(dataSlice[i])
 	}
-	return ret, uint32(width), uint32(height)
+	width = uint32(cwidth)
+	height = uint32(cheight)
+
+	return
 }
 
 func (t *Texture2D) SetRawData(raw []byte, width uint32, height uint32) {

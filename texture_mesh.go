@@ -153,3 +153,23 @@ func (t *TextureMesh) GetTriangles(node int32) []Triangle {
 
 	return ret
 }
+
+func (m *TextureMesh) Lock(locked []bool) {
+	C.voxel_texture_mesh_lock(m.m, (*C.bool)((unsafe.Pointer)(&locked[0])), C.int(len(locked)))
+}
+
+func (m *TextureMesh) LockBorder() {
+	C.voxel_texture_mesh_lock_border(m.m)
+}
+
+func (m *TextureMesh) UnlockBorder() {
+	C.voxel_texture_mesh_unlock_border(m.m)
+}
+
+func (m *TextureMesh) QuadricSimplify(target uint32) {
+	C.voxel_texture_mesh_quadric_simplify(m.m, C.uint(target))
+}
+
+func (m *TextureMesh) QuadricSimplifyWithTex(target uint32) {
+	C.voxel_texture_mesh_quadric_simplify_with_tex(m.m, C.uint(target))
+}

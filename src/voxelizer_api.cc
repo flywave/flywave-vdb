@@ -867,12 +867,27 @@ FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_free(c_mesh_data_t *cm) {
   delete cm;
 }
 
+extern _Bool clipBoxCreateor(void *ctx, vdb_float_grid_t *vertex,
+                             voxel_transform_t *tran, double *sbox,
+                             double *cbox);
+
 class cgo_clip_box_createor : public clip_box_createor {
 public:
   cgo_clip_box_createor(void *ctx) : _ctx(ctx) {}
 
   bool operator()(vertex_grid::Ptr vertex, vdb::math::Transform::Ptr resolution,
-                  const vdb::BBoxd &sbox, vdb::BBoxd &cbox) override {}
+                  const vdb::BBoxd &sbox, vdb::BBoxd &cbox) override {
+    double csbox[6]{sbox.min().x(), sbox.min().y(), sbox.min().z(),
+                    sbox.max().x(), sbox.max().y(), sbox.max().z()};
+    double ccbox[6];
+    auto ret = clipBoxCreateor(
+        _ctx,
+        new vdb_float_grid_t{std::make_shared<flywave::vdb_float_grid>(vertex)},
+        new voxel_transform_t{resolution}, csbox, ccbox);
+    cbox = vdb::BBoxd(vdb::Vec3d{ccbox[0], ccbox[1], ccbox[2]},
+                      vdb::Vec3d{ccbox[3], ccbox[4], ccbox[5]});
+    return ret;
+  }
 
   void *_ctx;
 };
@@ -888,11 +903,15 @@ voxel_clip_box_createor_free(voxel_clip_box_createor_t *vox) {
   delete vox;
 }
 
+extern _Bool borderLockCheck(void *ctx, float *a);
+
 class cgo_border_lock : public border_lock {
 public:
   cgo_border_lock(void *ctx) : _ctx(ctx) {}
 
-  bool is_need_lock(const vdb::math::Vec3<float> &a) override {}
+  bool is_need_lock(const vdb::math::Vec3<float> &a) override {
+    return borderLockCheck(_ctx, const_cast<float *>(a.asPointer()));
+  }
 
   void *_ctx;
 };
@@ -905,12 +924,18 @@ FLYWAVE_VDB_API void voxel_border_lock_free(voxel_border_lock_t *vox) {
   delete vox;
 }
 
+extern _Bool filterTriangleValid(void *ctx, float *a, float *b, float *c);
+
 class cgo_filter_triangle : public filter_triangle {
 public:
   cgo_filter_triangle(void *ctx) : _ctx(ctx) {}
 
-  bool valid(const vdb::math::Vec3<float> &a, const vdb::math::Vec3<float> &,
-             const vdb::math::Vec3<float> &) override {}
+  bool valid(const vdb::math::Vec3<float> &a, const vdb::math::Vec3<float> &b,
+             const vdb::math::Vec3<float> &c) override {
+    return filterTriangleValid(_ctx, const_cast<float *>(a.asPointer()),
+                               const_cast<float *>(b.asPointer()),
+                               const_cast<float *>(c.asPointer()));
+  }
 
   void *_ctx;
 };

@@ -27,6 +27,10 @@ public:
 
   void set_name(const std::string &nm) { _name = nm; }
 
+  const std::string &get_name() const {
+    return _name;
+  }
+
   std::vector<mesh_data> &get_mesh_datas() { return _datas; }
 
   void add_mesh_data(mesh_data &&dt) { _datas.emplace_back(std::move(dt)); }

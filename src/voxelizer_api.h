@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 typedef struct _voxel_pixel_t voxel_pixel_t;
-typedef struct _voxel_texture_atlas_generator_t texture_atlas_generator_t;
+typedef struct _voxel_texture_atlas_generator_t voxel_texture_atlas_generator_t;
 typedef struct _voxel_mesh_t voxel_mesh_t;
 typedef struct _voxel_pixel_material_data_t voxel_pixel_material_data_t;
 typedef struct _voxel_pixel_materials_t voxel_pixel_materials_t;
@@ -72,6 +72,9 @@ extern FLYWAVE_VDB_API void
 voxel_pixel_eval_max_min_elevation(voxel_pixel_t *vox, double *bboxin,
                                    double *bboxout);
 
+extern FLYWAVE_VDB_API void
+voxel_pixel_materials_free(voxel_pixel_materials_t *mtls);
+
 typedef struct _voxel_io_vertex_t {
   float v_x;
   float v_y;
@@ -107,19 +110,20 @@ extern FLYWAVE_VDB_API void voxel_pixel_make_triangles_simple(
     double *mat, size_t tex_offset, size_t mtl_offset, double fquality,
     double isovalue, double adapter);
 
-extern FLYWAVE_VDB_API texture_atlas_generator_t *
+extern FLYWAVE_VDB_API voxel_texture_atlas_generator_t *
 voxel_pixel_make_texture_atlas_generator(voxel_pixel_t *vox, double *mat,
                                          float pixel_pad);
 
 extern FLYWAVE_VDB_API void
-voxel_texture_atlas_generator_free(texture_atlas_generator_t *tag);
+voxel_texture_atlas_generator_free(voxel_texture_atlas_generator_t *tag);
 
 extern FLYWAVE_VDB_API void voxel_texture_atlas_generator_generate(
-    texture_atlas_generator_t *tag, voxel_texture_mesh_t *tmesh,
-    voxel_texture2d_t **texs, size_t *texcount);
+    voxel_texture_atlas_generator_t *tag, voxel_texture_mesh_t *tmesh,
+    voxel_texture2d_t ***texs, size_t *texcount);
 
 extern FLYWAVE_VDB_API voxel_texture2d_t *
 voxel_texture2d_create(uint32_t width, uint32_t height);
+extern FLYWAVE_VDB_API void voxel_texture2d_free(voxel_texture2d_t *tex);
 extern FLYWAVE_VDB_API void voxel_texture2d_get_raw_data(voxel_texture2d_t *tex,
                                                          uint8_t **data,
                                                          uint32_t *width,
@@ -252,6 +256,8 @@ extern FLYWAVE_VDB_API voxel_mesh_builder_t *voxel_mesh_builder_create();
 extern FLYWAVE_VDB_API void voxel_mesh_builder_free(voxel_mesh_builder_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_mesh_builder_set_name(voxel_mesh_builder_t *vox, const char *name);
+extern FLYWAVE_VDB_API const char *
+voxel_mesh_builder_get_name(voxel_mesh_builder_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_mesh_builder_add_mesh_data(voxel_mesh_builder_t *vox,
                                  voxel_pixel_mesh_data_t *data);
@@ -278,7 +284,7 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
 typedef struct _c_material_data_t {
   uint8_t _material_id;
 
-  uint32_t type;
+  uint32_t _type;
   uint16_t mode;
 
   uint8_t color_r;
@@ -325,7 +331,7 @@ voxel_pixel_material_data_set(voxel_pixel_material_data_t *vox,
 typedef struct _c_texture_data_t {
   size_t width;
   size_t height;
-  int format;
+  uint16_t format;
   uint8_t *data;
 } c_texture_data_t;
 
@@ -370,10 +376,13 @@ voxel_pixel_mesh_data_create(c_mesh_data_t data);
 extern FLYWAVE_VDB_API void
 voxel_pixel_mesh_data_free(voxel_pixel_mesh_data_t *vox);
 
-extern FLYWAVE_VDB_API c_mesh_data_t *
+extern FLYWAVE_VDB_API c_mesh_data_t
 voxel_pixel_mesh_data_get(voxel_pixel_mesh_data_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_mesh_data_set(voxel_pixel_mesh_data_t *vox, c_mesh_data_t data);
+
+extern FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_alloc(c_mesh_data_t *cm,
+                                                          size_t mtlcount);
 extern FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_free(c_mesh_data_t *cm);
 
 extern FLYWAVE_VDB_API voxel_border_lock_t *voxel_border_lock_create(void *ctx);

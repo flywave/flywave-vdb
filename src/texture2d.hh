@@ -249,81 +249,94 @@ template <typename C> C &pixel_get(vdb::math::Vec2<C> &c, int i);
 template <typename C> C &pixel_get(vdb::math::Vec3<C> &c, int i);
 template <typename C> C &pixel_get(vdb::math::Vec4<C> &c, int i);
 
-template <> uint8_t pixel_get<uint8_t>(const uint8_t &c, int) { return c; }
-
-template <> uint16_t pixel_get<uint16_t>(const uint16_t &c, int) { return c; }
-
-template <> float pixel_get<float>(const float &c, int) { return c; }
-
-template <>
-uint8_t pixel_get<uint8_t>(const vdb::math::Vec2<uint8_t> &c, int i) {
-  return c(i);
-}
-template <>
-uint16_t pixel_get<uint16_t>(const vdb::math::Vec2<uint16_t> &c, int i) {
-  return c(i);
-}
-template <> float pixel_get<float>(const vdb::math::Vec2<float> &c, int i) {
-  return c(i);
+template <> inline uint8_t pixel_get<uint8_t>(const uint8_t &c, int) {
+  return c;
 }
 
+template <> inline uint16_t pixel_get<uint16_t>(const uint16_t &c, int) {
+  return c;
+}
+
+template <> inline float pixel_get<float>(const float &c, int) { return c; }
+
 template <>
-uint8_t pixel_get<uint8_t>(const vdb::math::Vec3<uint8_t> &c, int i) {
+inline uint8_t pixel_get<uint8_t>(const vdb::math::Vec2<uint8_t> &c, int i) {
   return c(i);
 }
 template <>
-uint16_t pixel_get<uint16_t>(const vdb::math::Vec3<uint16_t> &c, int i) {
+inline uint16_t pixel_get<uint16_t>(const vdb::math::Vec2<uint16_t> &c, int i) {
   return c(i);
 }
-template <> float pixel_get<float>(const vdb::math::Vec3<float> &c, int i) {
+template <>
+inline float pixel_get<float>(const vdb::math::Vec2<float> &c, int i) {
   return c(i);
 }
 
 template <>
-uint8_t pixel_get<uint8_t>(const vdb::math::Vec4<uint8_t> &c, int i) {
+inline uint8_t pixel_get<uint8_t>(const vdb::math::Vec3<uint8_t> &c, int i) {
   return c(i);
 }
 template <>
-uint16_t pixel_get<uint16_t>(const vdb::math::Vec4<uint16_t> &c, int i) {
+inline uint16_t pixel_get<uint16_t>(const vdb::math::Vec3<uint16_t> &c, int i) {
   return c(i);
 }
-template <> float pixel_get<float>(const vdb::math::Vec4<float> &c, int i) {
-  return c(i);
-}
-
-template <> uint8_t &pixel_get<uint8_t>(uint8_t &c, int) { return c; }
-
-template <> uint16_t &pixel_get<uint16_t>(uint16_t &c, int) { return c; }
-
-template <> float &pixel_get<float>(float &c, int) { return c; }
-
-template <> uint8_t &pixel_get<uint8_t>(vdb::math::Vec2<uint8_t> &c, int i) {
-  return c(i);
-}
-template <> uint16_t &pixel_get<uint16_t>(vdb::math::Vec2<uint16_t> &c, int i) {
-  return c(i);
-}
-template <> float &pixel_get<float>(vdb::math::Vec2<float> &c, int i) {
+template <>
+inline float pixel_get<float>(const vdb::math::Vec3<float> &c, int i) {
   return c(i);
 }
 
-template <> uint8_t &pixel_get<uint8_t>(vdb::math::Vec3<uint8_t> &c, int i) {
+template <>
+inline uint8_t pixel_get<uint8_t>(const vdb::math::Vec4<uint8_t> &c, int i) {
   return c(i);
 }
-template <> uint16_t &pixel_get<uint16_t>(vdb::math::Vec3<uint16_t> &c, int i) {
+template <>
+inline uint16_t pixel_get<uint16_t>(const vdb::math::Vec4<uint16_t> &c, int i) {
   return c(i);
 }
-template <> float &pixel_get<float>(vdb::math::Vec3<float> &c, int i) {
+template <>
+inline float pixel_get<float>(const vdb::math::Vec4<float> &c, int i) {
   return c(i);
 }
 
-template <> uint8_t &pixel_get<uint8_t>(vdb::math::Vec4<uint8_t> &c, int i) {
+template <> inline uint8_t &pixel_get<uint8_t>(uint8_t &c, int) { return c; }
+
+template <> inline uint16_t &pixel_get<uint16_t>(uint16_t &c, int) { return c; }
+
+template <> inline float &pixel_get<float>(float &c, int) { return c; }
+
+template <>
+inline uint8_t &pixel_get<uint8_t>(vdb::math::Vec2<uint8_t> &c, int i) {
   return c(i);
 }
-template <> uint16_t &pixel_get<uint16_t>(vdb::math::Vec4<uint16_t> &c, int i) {
+template <>
+inline uint16_t &pixel_get<uint16_t>(vdb::math::Vec2<uint16_t> &c, int i) {
   return c(i);
 }
-template <> float &pixel_get<float>(vdb::math::Vec4<float> &c, int i) {
+template <> inline float &pixel_get<float>(vdb::math::Vec2<float> &c, int i) {
+  return c(i);
+}
+
+template <>
+inline uint8_t &pixel_get<uint8_t>(vdb::math::Vec3<uint8_t> &c, int i) {
+  return c(i);
+}
+template <>
+inline uint16_t &pixel_get<uint16_t>(vdb::math::Vec3<uint16_t> &c, int i) {
+  return c(i);
+}
+template <> inline float &pixel_get<float>(vdb::math::Vec3<float> &c, int i) {
+  return c(i);
+}
+
+template <>
+inline uint8_t &pixel_get<uint8_t>(vdb::math::Vec4<uint8_t> &c, int i) {
+  return c(i);
+}
+template <>
+inline uint16_t &pixel_get<uint16_t>(vdb::math::Vec4<uint16_t> &c, int i) {
+  return c(i);
+}
+template <> inline float &pixel_get<float>(vdb::math::Vec4<float> &c, int i) {
   return c(i);
 }
 

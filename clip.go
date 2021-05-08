@@ -11,9 +11,9 @@ import (
 
 //export clipBoxCreateor
 func clipBoxCreateor(ctx unsafe.Pointer, vertex *C.struct__vdb_float_grid_t, tran *C.struct__voxel_transform_t, sbox *C.double, cbox *C.double) C.bool {
-
+	return false
 }
 
 type ClipBoxCreateor struct {
-	
+	m *C.struct__voxel_clip_box_createor_t
 }

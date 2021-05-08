@@ -11,8 +11,9 @@ import (
 
 //export filterTriangleValid
 func filterTriangleValid(ctx unsafe.Pointer, a *C.float, b *C.float, c *C.float) C.bool {
-
+	return false
 }
 
 type FilterTriangle struct {
+	m *C.struct__voxel_filter_triangle_t
 }

@@ -11,8 +11,9 @@ import (
 
 //export borderLockCheck
 func borderLockCheck(ctx unsafe.Pointer, a *C.float) C.bool {
-
+	return false
 }
 
 type BorderLock struct {
+	m *C.struct__voxel_border_lock_t
 }

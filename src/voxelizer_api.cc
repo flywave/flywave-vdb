@@ -159,7 +159,7 @@ FLYWAVE_VDB_API void voxel_pixel_make_triangles_simple(
          sizeof(voxel_io_triangle_t) * vtriangles.size());
 }
 
-FLYWAVE_VDB_API texture_atlas_generator_t *
+FLYWAVE_VDB_API voxel_texture_atlas_generator_t *
 voxel_pixel_make_texture_atlas_generator(voxel_pixel_t *vox, double *mat,
                                          float pixel_pad) {
   auto repacker = std::make_shared<textute_repacker>(
@@ -170,24 +170,24 @@ voxel_pixel_make_texture_atlas_generator(voxel_pixel_t *vox, double *mat,
 
   tgen->push_atlas(repacker);
 
-  return new texture_atlas_generator_t{tgen};
+  return new voxel_texture_atlas_generator_t{tgen};
 }
 
 FLYWAVE_VDB_API void
-voxel_texture_atlas_generator_free(texture_atlas_generator_t *tag) {
+voxel_texture_atlas_generator_free(voxel_texture_atlas_generator_t *tag) {
   delete tag;
 }
 
 FLYWAVE_VDB_API void voxel_texture_atlas_generator_generate(
-    texture_atlas_generator_t *tag, voxel_texture_mesh_t *tmesh,
-    voxel_texture2d_t **texs, size_t *texcount) {
+    voxel_texture_atlas_generator_t *tag, voxel_texture_mesh_t *tmesh,
+    voxel_texture2d_t ***texs, size_t *texcount) {
   auto texvecs = tag->ptr->generate(*tmesh->mesh, *tmesh->mesh);
 
   *texcount = texvecs.size();
-  *texs =
-      (voxel_texture2d_t *)malloc(sizeof(voxel_texture2d_t) * texvecs.size());
+  *texs = (voxel_texture2d_t **)malloc(sizeof(voxel_texture2d_t *) *
+                                       texvecs.size());
   for (int i = 0; i < texvecs.size(); i++) {
-    texs[i]->ptr = texvecs[i];
+    *texs[i] = new voxel_texture2d_t{texvecs[i]};
   }
 }
 
@@ -196,6 +196,10 @@ FLYWAVE_VDB_API voxel_texture2d_t *voxel_texture2d_create(uint32_t width,
   return new voxel_texture2d_t{
       flywave::texture2d<flywave::vdb::math::Vec4<uint8_t>>::create(
           std::make_pair(width, height))};
+}
+
+FLYWAVE_VDB_API void voxel_texture2d_free(voxel_texture2d_t *tex) {
+  delete tex;
 }
 
 FLYWAVE_VDB_API void voxel_texture2d_get_raw_data(voxel_texture2d_t *tex,
@@ -563,6 +567,11 @@ FLYWAVE_VDB_API void voxel_mesh_builder_set_name(voxel_mesh_builder_t *vox,
   vox->ptr->set_name(name);
 }
 
+ FLYWAVE_VDB_API const char *
+voxel_mesh_builder_get_name(voxel_mesh_builder_t *vox) {
+  return vox->ptr->get_name().c_str();
+}
+
 FLYWAVE_VDB_API void
 voxel_mesh_builder_add_mesh_data(voxel_mesh_builder_t *vox,
                                  voxel_pixel_mesh_data_t *data) {
@@ -674,6 +683,10 @@ voxel_pixel_texture_data_create(c_texture_data_t t) {
   return new voxel_pixel_texture_data_t{data};
 }
 
+FLYWAVE_VDB_API void voxel_pixel_materials_free(voxel_pixel_materials_t *mtls) {
+  delete mtls;
+}
+
 FLYWAVE_VDB_API void
 voxel_pixel_texture_data_free(voxel_pixel_texture_data_t *vox) {
   delete vox;
@@ -763,49 +776,48 @@ FLYWAVE_VDB_API void voxel_pixel_mesh_data_free(voxel_pixel_mesh_data_t *vox) {
   delete vox;
 }
 
-FLYWAVE_VDB_API c_mesh_data_t *
+FLYWAVE_VDB_API c_mesh_data_t
 voxel_pixel_mesh_data_get(voxel_pixel_mesh_data_t *vox) {
-  auto ret = new c_mesh_data_t;
-  ret->v_count = vox->data->vertices().size();
-  ret->vertices = reinterpret_cast<float *>(&(vox->data->vertices()[0]));
+  c_mesh_data_t ret;
+  ret.v_count = vox->data->vertices().size();
+  ret.vertices = reinterpret_cast<float *>(&(vox->data->vertices()[0]));
 
   if (vox->data->has_normal()) {
-    ret->n_count = vox->data->normals().size();
-    ret->normals = reinterpret_cast<float *>(&(vox->data->normals()[0]));
+    ret.n_count = vox->data->normals().size();
+    ret.normals = reinterpret_cast<float *>(&(vox->data->normals()[0]));
   }
 
   if (vox->data->has_texcoord()) {
-    ret->t_count = vox->data->texcoords().size();
-    ret->texcoords = reinterpret_cast<float *>(&(vox->data->texcoords()[0]));
+    ret.t_count = vox->data->texcoords().size();
+    ret.texcoords = reinterpret_cast<float *>(&(vox->data->texcoords()[0]));
   }
 
   if (vox->data->has_mtl_face()) {
-    ret->mtl_map = (struct _c_mesh_data_mtl_t *)malloc(
+    ret.mtl_map = (struct _c_mesh_data_mtl_t *)malloc(
         sizeof(struct _c_mesh_data_mtl_t) * vox->data->mtl_faces_map().size());
-    ret->mtl_count = vox->data->mtl_faces_map().size();
+    ret.mtl_count = vox->data->mtl_faces_map().size();
     int index = 0;
     for (auto pair : vox->data->mtl_faces_map()) {
       auto mtl = pair.first;
-      ret->mtl_map[index].mtl = mtl;
+      ret.mtl_map[index].mtl = mtl;
 
-      ret->mtl_map[index].f_count = pair.second.size();
-      ret->mtl_map[index].faces =
+      ret.mtl_map[index].f_count = pair.second.size();
+      ret.mtl_map[index].faces =
           reinterpret_cast<uint32_t *>(&(pair.second[0]));
 
       if (vox->data->mtl_normals_map().find(mtl) !=
           vox->data->mtl_normals_map().end()) {
         auto &nvs = vox->data->mtl_normals_map()[mtl];
-        ret->mtl_map[index].n_count = nvs.size();
-        ret->mtl_map[index].normals = reinterpret_cast<uint32_t *>(&(nvs[0]));
+        ret.mtl_map[index].n_count = nvs.size();
+        ret.mtl_map[index].normals = reinterpret_cast<uint32_t *>(&(nvs[0]));
       }
 
       if (vox->data->mtl_texcoords_map().find(mtl) !=
           vox->data->mtl_texcoords_map().end()) {
         auto &texs = vox->data->mtl_texcoords_map()[mtl];
 
-        ret->mtl_map[index].t_count = texs.size();
-        ret->mtl_map[index].texcoords =
-            reinterpret_cast<uint32_t *>(&(texs[0]));
+        ret.mtl_map[index].t_count = texs.size();
+        ret.mtl_map[index].texcoords = reinterpret_cast<uint32_t *>(&(texs[0]));
       }
 
       index++;
@@ -860,11 +872,17 @@ FLYWAVE_VDB_API void voxel_pixel_mesh_data_set(voxel_pixel_mesh_data_t *vox,
   vox->data = mdata;
 }
 
+FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_alloc(c_mesh_data_t *cm,
+                                                   size_t mtlcount) {
+  cm->mtl_map = (struct _c_mesh_data_mtl_t *)malloc(
+      sizeof(struct _c_mesh_data_mtl_t) * mtlcount);
+  cm->mtl_count = mtlcount;
+}
+
 FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_free(c_mesh_data_t *cm) {
   if (cm->mtl_map != nullptr) {
     ::free(cm->mtl_map);
   }
-  delete cm;
 }
 
 extern _Bool clipBoxCreateor(void *ctx, vdb_float_grid_t *vertex,

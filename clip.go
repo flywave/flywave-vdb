@@ -17,7 +17,7 @@ type ClipBoxCreateor struct {
 
 func NewClipBoxCreateor(f func(*FloatGrid, *Transform, *BBox, *BBox) bool) *ClipBoxCreateor {
 	ctx := &ClipBoxCreateor{gen: f}
-	ctx.m = C.voxel_clip_box_createor_create((unsafe.Pointer)(ctx))
+	ctx.m = C.voxel_clip_box_createor_create(unsafe.Pointer(ctx))
 	return ctx
 }
 

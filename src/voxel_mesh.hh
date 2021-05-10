@@ -182,7 +182,7 @@ public:
       std::unordered_map<int, std::shared_ptr<material>> &map,
       std::unordered_map<std::string, std::shared_ptr<texture>> &tex_map);
 
-  void fill_meterial(std::shared_ptr<mesh_adapter> ada);
+  void fill_meterial(mesh_adapter &ada);
 
   size_t polygonCount() const override { return _mesh->size(); }
 

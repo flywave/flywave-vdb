@@ -22,7 +22,7 @@ func (m *FilterTriangle) Free() {
 
 func NewFilterTriangle(f func([]float32, []float32, []float32) bool) *FilterTriangle {
 	ctx := &FilterTriangle{vaild: f}
-	ctx.m = C.voxel_filter_triangle_create((unsafe.Pointer)(ctx))
+	ctx.m = C.voxel_filter_triangle_create(unsafe.Pointer(ctx))
 	return ctx
 }
 

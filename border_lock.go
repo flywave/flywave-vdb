@@ -22,7 +22,7 @@ func (m *BorderLock) Free() {
 
 func NewBorderLock(f func([]float32) bool) *BorderLock {
 	ctx := &BorderLock{check: f}
-	ctx.m = C.voxel_border_lock_create((unsafe.Pointer)(ctx))
+	ctx.m = C.voxel_border_lock_create(unsafe.Pointer(ctx))
 	return ctx
 }
 

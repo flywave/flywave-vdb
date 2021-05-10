@@ -9,7 +9,7 @@ voxel_mesh_adapter::voxel_mesh_adapter(
     std::unordered_map<std::string, std::shared_ptr<texture>> &tex_map)
     : _map(map), _tex_map(tex_map), _mesh(hm) {}
 
-void voxel_mesh_adapter::fill_meterial(std::shared_ptr<mesh_adapter> ada) {
+void voxel_mesh_adapter::fill_meterial(mesh_adapter &ada) {
   auto bg = _map.begin();
   while (bg != _map.end()) {
     auto &mt = bg->second;
@@ -17,7 +17,7 @@ void voxel_mesh_adapter::fill_meterial(std::shared_ptr<mesh_adapter> ada) {
     md->_material_id = bg->first;
     if (mt->diffuse_texname.empty()) {
       material_group g{md};
-      ada->add_material(g);
+      ada.add_material(g);
     } else {
       auto st_p = std::make_shared<uv_st_policy>(
           std::make_unique<uv_reader_impl>(*_mesh));
@@ -25,7 +25,7 @@ void voxel_mesh_adapter::fill_meterial(std::shared_ptr<mesh_adapter> ada) {
 
       texture_sampler sampler{st_p, std::make_shared<color_extract_impl>(*tx)};
       material_group g{md, sampler};
-      ada->add_material(g);
+      ada.add_material(g);
     }
     bg++;
   }

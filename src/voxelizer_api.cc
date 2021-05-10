@@ -615,7 +615,7 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
                           voxel_clip_box_createor_t *creator, int32_t type,
                           double *matrix) {
 
-  std::unique_ptr<triangles_stream> stream =
+  std::unique_ptr<voxel_mesh_adapter> stream =
       std::make_unique<voxel_mesh_adapter>(m->ptr, m->mtl_maps, m->tex_maps);
 
   mesh_adapter _mesh_adapter{std::move(stream)};
@@ -628,7 +628,10 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
   std::shared_ptr<flywave::voxel_pixel> stff_pot =
       sampler.apply(precision, *creator->ptr, static_cast<sampler_type>(type),
                     tmtl, openvdb::Mat4d(matrix));
-
+  
+  stream->fill_meterial(_mesh_adapter);
+  stream->set_matrix(openvdb::Mat4d(matrix));
+  
   if (mtls != nullptr)
     mtls->mtls = tmtl.materials();
 

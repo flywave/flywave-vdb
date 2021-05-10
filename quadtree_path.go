@@ -1,28 +1,51 @@
 package vdb
 
+// #include <stdlib.h>
+// #include <stdint.h>
+// #cgo CFLAGS: -I ./lib
+// #cgo CXXFLAGS: -I ./lib
+// uint64_t fix_numeric_overflow(uint64_t path_mask, uint64_t level_bit) {
+// return (path_mask << level_bit);
+// }
+import "C"
+import (
+	"math"
+)
+
 type QuadtreePath struct {
 	path uint64
 }
 
 const (
-	QT_LEVEL_BITS = uint32(2)
-	QT_LEVEL_BIT_MASK = uint64(0x03)
-	QT_TOTAL_BITS = uint32(64)
+	QT_LEVEL_BITS        = uint32(2)
+	QT_LEVEL_BIT_MASK    = uint64(0x03)
+	QT_TOTAL_BITS        = uint32(64)
 	QT_DEFAULT_MAX_LEVEL = uint32(24)
-	QT_PATH_MASK = ~(~uint64(0) >> (QT_DEFAULT_MAX_LEVEL * QT_LEVEL_BITS))
-	QT_LEVEL_MASK = ~QT_PATH_MASK
-	WEB_GLOBE_MAX_ZOOM =  uint32(20)
+	QT_PATH_MASK         = ^uint64(^uint64(0) >> (QT_DEFAULT_MAX_LEVEL * QT_LEVEL_BITS))
+	QT_LEVEL_MASK        = ^QT_PATH_MASK
+	WEB_GLOBE_MAX_ZOOM   = uint32(20)
 )
 
-const (
-	_order = [][2]uint64{{0, 3}, {1, 2}}
+var (
+	_order = [][]uint64{{0, 3}, {1, 2}}
+)
+
+var (
+	MAX_LATITUDE = R2D * (2*math.Atan(math.Exp(180*D2R)) - M_PI_by2)
 )
 
 func Min(x, y uint32) uint32 {
-    if x < y {
-        return x
-    }
-    return y
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func Max(x, y uint32) uint32 {
+	if x > y {
+		return x
+	}
+	return y
 }
 
 func NewQuadtreePath() *QuadtreePath {
@@ -31,81 +54,133 @@ func NewQuadtreePath() *QuadtreePath {
 
 func NewQuadtreePathFromLevelAndRowCol(level uint32, row uint32, col uint32) *QuadtreePath {
 	p := &QuadtreePath{path: 0}
-	for ( j := 0; j < int(level); ++j) {
-	   right := int(0x01 & (col >> (level - j - 1)))
-	   top := int(0x01 & (row >> (level - j - 1)))
-	   p.path |= order[right][top] << (QT_TOTAL_BITS - ((j + 1) * QT_LEVEL_BITS));
+	for j := 0; j < int(level); j++ {
+		right := int(0x01 & (col >> (level - uint32(j) - 1)))
+		top := int(0x01 & (row >> (level - uint32(j) - 1)))
+		p.path |= _order[right][top] << (QT_TOTAL_BITS - ((uint32(j) + 1) * QT_LEVEL_BITS))
 	}
-  
-	p.path |= level;
+
+	p.path |= uint64(level)
 	return p
 }
 
 func NewQuadtreePathFromLevelAndBitList(level uint32, blist []byte) *QuadtreePath {
 	p := &QuadtreePath{path: 0}
-	p.from_branchlist(level, blist);
+	p.from_branchlist(level, blist)
 	return p
 }
 
 func NewQuadtreePathFromBitList(blist string) *QuadtreePath {
 	p := &QuadtreePath{path: 0}
-	p.from_branchlist(uint32(len(blist)),  []byte(blist));
+	p.from_branchlist(uint32(len(blist)), []byte(blist))
 	return p
 }
 
-func NewQuadtreePathFromBitList(other *QuadtreePath, level uint32) *QuadtreePath {
+func NewQuadtreePathFromBitListAndLevel(other *QuadtreePath, level uint32) *QuadtreePath {
 	lev := Min(level, other.GetLevel())
 	p := &QuadtreePath{path: 0}
-	p.path = other.path_bits(lev) | lev;
+	p.path = other.path_bits_level(lev) | uint64(lev)
 	return p
 }
 
-func geodeticToTile(lon float64,  lat float64, zoom uint8) *QuadtreePath {
-	 x := Math.Floor((lon + 180.0) / 360.0 * Math.Pow(2.0, zoom));
-	 y := Math.Floor((1.0 + Math.Log(Math.Tan(lat * Math.Pi / 180.0) +
-									 1.0 / Math.cos(lat * Math.Pi / 180.0)) /
-									 Math.Pi) /
-					 2.0 * Math.Pow(2.0, zoom));
-	return NewQuadtreePathFromLevelAndRowCol(zoom, y, x);
-  }
+func geodeticToTile(lon float64, lat float64, zoom uint8) *QuadtreePath {
+	x := math.Floor((lon + 180.0) / 360.0 * math.Pow(2.0, float64(zoom)))
+	y := math.Floor((1.0 + math.Log(math.Tan(lat*math.Pi/180.0)+
+		1.0/math.Cos(lat*math.Pi/180.0))/
+		math.Pi) /
+		2.0 * math.Pow(2.0, float64(zoom)))
+	return NewQuadtreePathFromLevelAndRowCol(uint32(zoom), uint32(y), uint32(x))
+}
 
-  func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64)  *QuadtreePath{
-	x := [2]float64{minx, miny};
-	y := [2]float64{maxx, maxy};
-	lonlat2merc(x, y, 2, D2R);
-	geometry::box<geometry::point<T, 2>> _box(geometry::point<T, 2>(x[0], y[0]),
-											  geometry::point<T, 2>(x[1], y[1]));
-	 _zoom := uint8(
-		Math.Floor(Math.Log((2 * M_PI) / _box.size()) / Math.Log(2)) - 1)
-  
-	if (_box.size() == 0) {
-	  _zoom = uint8(WEB_GLOBE_MAX_ZOOM)
+const (
+	EARTH_RADIUS        = float64(6378137.0)
+	EARTH_DIAMETER      = EARTH_RADIUS * 2.0
+	EARTH_CIRCUMFERENCE = EARTH_DIAMETER * math.Pi
+	MAXEXTENT           = EARTH_CIRCUMFERENCE / 2.0
+	M_PI_by2            = float64(math.Pi / 2)
+	D2R                 = float64(math.Pi / 180)
+	R2D                 = float64(180 / math.Pi)
+	M_PIby360           = float64(math.Pi / 360)
+	MAXEXTENTby180      = float64(MAXEXTENT / 180)
+)
+
+func lonlat2merc(x []float64, y []float64, pointCount int) bool {
+	for i := 0; i < pointCount; i++ {
+		if x[i] > 180 {
+			x[i] = 180
+		} else if x[i] < -180 {
+			x[i] = -180
+		}
+		if y[i] > MAX_LATITUDE {
+			y[i] = MAX_LATITUDE
+		} else if y[i] < -MAX_LATITUDE {
+			y[i] = -MAX_LATITUDE
+		}
+		x[i] = x[i] * MAXEXTENTby180
+		y[i] = math.Log(math.Tan((90+y[i])*M_PIby360)) * R2D
+		y[i] = y[i] * MAXEXTENTby180
+	}
+	return true
+}
+
+func merc2lonlat(x []float64, y []float64, pointCount int) bool {
+	for i := 0; i < pointCount; i++ {
+		if x[i] > MAXEXTENT {
+			x[i] = MAXEXTENT
+		} else if x[i] < -MAXEXTENT {
+			x[i] = -MAXEXTENT
+		}
+		if y[i] > MAXEXTENT {
+			y[i] = MAXEXTENT
+		} else if y[i] < -MAXEXTENT {
+			y[i] = -MAXEXTENT
+		}
+		x[i] = (x[i] / MAXEXTENT) * 180
+		y[i] = (y[i] / MAXEXTENT) * 180
+		y[i] = R2D * (2*math.Atan(math.Exp(y[i]*D2R)) - M_PI_by2)
+	}
+	return true
+}
+
+func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64) *QuadtreePath {
+	x := [2]float64{minx, miny}
+	y := [2]float64{maxx, maxy}
+	lonlat2merc(x[:], y[:], 2)
+	_box := BBox2d{x[0], y[0], x[1], y[1]}
+	_zoom := uint8(
+		math.Floor(math.Log((2*math.Pi)/_box.Size())/math.Log(2)) - 1)
+
+	if _box.Size() == 0 {
+		_zoom = uint8(WEB_GLOBE_MAX_ZOOM)
 	}
 
 	if _zoom > uint8(WEB_GLOBE_MAX_ZOOM) {
-	_zoom = WEB_GLOBE_MAX_ZOOM
-    }
-	return geodeticToTile((minx + maxx) / 2.0, (miny + maxy) / 2.0, _zoom)
-  }
+		_zoom = uint8(WEB_GLOBE_MAX_ZOOM)
+	}
+	return geodeticToTile((minx+maxx)/2.0, (miny+maxy)/2.0, _zoom)
+}
 
-func NewQuadtreePathFromBox(box []float64) *QuadtreePath {
+func NewQuadtreePathFromBox(box BBox2d) *QuadtreePath {
 	p := getTileFromBox(box[0], box[1], box[2], box[3])
 	return p
 }
 
 func (q *QuadtreePath) Valid() bool {
-	return GetLevel() <= QT_DEFAULT_MAX_LEVEL &&
-	(0 == (q.path & ~(q.path_mask(q.GetLevel()) | QT_LEVEL_MASK)))
+	return q.GetLevel() <= QT_DEFAULT_MAX_LEVEL &&
+		(0 == (q.path & ^(q.path_mask(q.GetLevel()) | QT_LEVEL_MASK)))
 }
 
 func (q *QuadtreePath) Less(other *QuadtreePath) bool {
-  minlev := (GetLevel() < other.GetLevel()) ? GetLevel() : other.GetLevel()
-  mask := ~(~uint64(0) >> (minlev * QT_LEVEL_BITS))
-  if (mask & (q.path ^ other.path)) {
-    return path_bits() < other.path_bits()
-  } else {
-    return GetLevel() < other.GetLevel()
-  }
+	minlev := other.GetLevel()
+	if q.GetLevel() < other.GetLevel() {
+		minlev = q.GetLevel()
+	}
+	mask := ^(^uint64(0) >> (minlev * QT_LEVEL_BITS))
+	if (mask & (q.path ^ other.path)) > 0 {
+		return q.path_bits() < other.path_bits()
+	} else {
+		return q.GetLevel() < other.GetLevel()
+	}
 }
 
 func (q *QuadtreePath) Greater(other *QuadtreePath) bool {
@@ -121,146 +196,137 @@ func (q *QuadtreePath) Path() uint64 {
 }
 
 func (q *QuadtreePath) ToString() string {
-	result := make([]byte, int(p.GetLevel()))
-	
-	for (i := 0; i < int(p.GetLevel()); ++i) {
-	  result[i] = byte('0') + p.level_bits_at_pos(i)
+	result := make([]byte, int(q.GetLevel()))
+
+	for i := 0; i < int(q.GetLevel()); i++ {
+		result[i] = byte('0') + byte(q.level_bits_at_pos(uint32(i)))
 	}
 	return string(result)
 }
 
 func (q *QuadtreePath) GetGenerationSequence() uint64 {
-	level_ := GetLevel()
+	level_ := q.GetLevel()
 	sequence := q.path
-	 check_for_2_or_3_mask := (uint64(0x1)) << (QT_TOTAL_BITS - 1)
-	 interchange_2_or_3_mask := (uint64(0x01)) << (QT_TOTAL_BITS - 2)
-  
-	for ( j := 0; j < int(level_)
-		 ++j, check_for_2_or_3_mask >>= 2, interchange_2_or_3_mask >>= 2) {
-	  if (sequence & check_for_2_or_3_mask) {
-		sequence ^= interchange_2_or_3_mask
-	  }
+	check_for_2_or_3_mask := (uint64(0x1)) << (QT_TOTAL_BITS - 1)
+	interchange_2_or_3_mask := (uint64(0x01)) << (QT_TOTAL_BITS - 2)
+
+	for j := 0; j < int(level_); j++ {
+		if (sequence & check_for_2_or_3_mask) > 0 {
+			sequence ^= interchange_2_or_3_mask
+		}
+		check_for_2_or_3_mask >>= 2
+		interchange_2_or_3_mask >>= 2
 	}
 	return sequence
 }
 
 func (q *QuadtreePath) Parent() *QuadtreePath {
-	 new_level := p.GetLevel() - 1
+	new_level := q.GetLevel() - 1
 
-	return &QuadtreePath{path:
-		(p.path &
-		 (QT_PATH_MASK << QT_LEVEL_BITS * (QT_DEFAULT_MAX_LEVEL - new_level))) |
-		new_level};
+	return &QuadtreePath{path: (q.path & (uint64(C.fix_numeric_overflow(C.ulong(QT_PATH_MASK), C.ulong(QT_LEVEL_BITS))) * uint64(QT_DEFAULT_MAX_LEVEL-new_level))) | uint64(new_level)}
 }
 
-func (q *QuadtreePath) Child(level uint32) *QuadtreePath {
-	 new_level := p.GetLevel() + 1;
-  return &QuadtreePath(path: p.path_bits() |
-                       uint64(child)
-                           << (QT_TOTAL_BITS - new_level * QT_LEVEL_BITS) |
-                       new_level)
+func (q *QuadtreePath) Child(child uint32) *QuadtreePath {
+	new_level := q.GetLevel() + 1
+	return &QuadtreePath{path: q.path_bits() | uint64(child)<<(QT_TOTAL_BITS-new_level*QT_LEVEL_BITS) | uint64(new_level)}
 }
 
 func (q *QuadtreePath) WhichChild() uint32 {
-	return (q.path >> (QT_TOTAL_BITS - GetLevel() * QT_LEVEL_BITS)) &
-	QT_LEVEL_BIT_MASK
+	return uint32((q.path >> (QT_TOTAL_BITS - q.GetLevel()*QT_LEVEL_BITS)) & QT_LEVEL_BIT_MASK)
 }
 
 func (q *QuadtreePath) AdvanceInLevel() bool {
-	 path_bits_ := p.path_bits()
-	 path_mask_ := p.path_mask(p.GetLevel())
-	if (path_bits_ != path_mask_) {
-	  p.path += uint64(1) << (QT_TOTAL_BITS - p.GetLevel() * QT_LEVEL_BITS);
-	  return true
+	path_bits_ := q.path_bits()
+	path_mask_ := q.path_mask(q.GetLevel())
+	if path_bits_ != path_mask_ {
+		q.path += uint64(1) << (QT_TOTAL_BITS - q.GetLevel()*QT_LEVEL_BITS)
+		return true
 	} else {
-	  return false
+		return false
 	}
 }
 
 func (q *QuadtreePath) Advance(max_level uint32) bool {
-	if (p.GetLevel() < max_level) {
-		q.path = p.Child(0).path
+	if q.GetLevel() < max_level {
+		q.path = q.Child(0).path
 		return true
-	  } else {
-		for (p.WhichChild() == 4 - 1) {
-			q.path = p.Parent()
+	} else {
+		for q.WhichChild() == 4-1 {
+			q.path = q.Parent().path
 		}
-		return p.AdvanceInLevel()
-	  }
+		return q.AdvanceInLevel()
+	}
 }
 
 func (q *QuadtreePath) IsAncestorOf(other *QuadtreePath) bool {
-	if (p.GetLevel() <= other.GetLevel()) {
-		return path_bits(p.GetLevel()) == other.path_bits(p.GetLevel())
-	  } else {
-		return false
-	  }
+	if q.GetLevel() <= other.GetLevel() {
+		return q.path_bits_level(q.GetLevel()) == other.path_bits_level(q.GetLevel())
+	}
+	return false
 }
 
 func IsPostOrder(path1 *QuadtreePath, path2 *QuadtreePath) bool {
 	return !path1.IsAncestorOf(path2) &&
-           (path2.IsAncestorOf(path1) || path2.Greater(path1));
+		(path2.IsAncestorOf(path1) || path2.Greater(path1))
 }
 
 func (q *QuadtreePath) GetLevelRowCol() (level uint32, row uint32, col uint32) {
 	rowbits := []uint32{0x00, 0x00, 0x01, 0x01}
 	colbits := []uint32{0x00, 0x01, 0x01, 0x00}
-  
-	 row_val := uint32(0);
-	 col_val := uint32(0);
-  
-	for ( j := 0; j < int(GetLevel()); ++j) {
-	   level_bits := q.level_bits_at_pos(j);
-	  row_val = (row_val << 1) | (rowbits[level_bits]);
-	  col_val = (col_val << 1) | (colbits[level_bits]);
+
+	row_val := uint32(0)
+	col_val := uint32(0)
+
+	for j := 0; j < int(q.GetLevel()); j++ {
+		level_bits := q.level_bits_at_pos(uint32(j))
+		row_val = (row_val << 1) | (rowbits[level_bits])
+		col_val = (col_val << 1) | (colbits[level_bits])
 	}
-  
-	level_ = GetLevel();
-	row = row_val;
-	col = col_val;
+
+	level = q.GetLevel()
+	row = row_val
+	col = col_val
 	return
 }
 
 func (q *QuadtreePath) GetLevel() uint32 {
-	return q.path & QT_LEVEL_MASK
+	return uint32(q.path & QT_LEVEL_MASK)
 }
 
-func (q *QuadtreePath) ChildTileCoordinates(tile_width int32, child *QuadtreePath) (success bool, level uint32, row uint32, col uint32) {
-	if (!q.IsAncestorOf(child)) {
+func (q *QuadtreePath) ChildTileCoordinates(tile_width uint32, child *QuadtreePath) (success bool, level uint32, row uint32, col uint32) {
+	if !q.IsAncestorOf(child) {
 		success = false
-		return 
-	  }
-	
-	   relative_qpath := RelativePath(q, child);
-	   level = tile_width;
-	  row = 0;
-	  col = 0;
-	  for (uint32_t level = 0; level < relative_qpath.level() && level > 1;
-		   ++level) {
-		 quad := relative_qpath.Get(level)
-		level >>= 1;
-		if (quad == 0) {
-			row += level;
-		} else if (quad == 1) {
-			row += level;
-			col += level;
-		} else if (quad == 2) {
-			col += level;
+		return
+	}
+
+	relative_qpath := RelativePath(q, child)
+	level = tile_width
+	row = 0
+	col = 0
+	for level_ := 0; level_ < int(relative_qpath.GetLevel()) && level_ > 1; level_++ {
+		quad := relative_qpath.Get(level)
+		level >>= 1
+		if quad == 0 {
+			row += level
+		} else if quad == 1 {
+			row += level
+			col += level
+		} else if quad == 2 {
+			col += level
 		}
-	  }
-	  success = true
-	  return 
+	}
+	success = true
+	return
 }
 
 func (q *QuadtreePath) Concatenate(sub_path *QuadtreePath) *QuadtreePath {
-	 level_ = GetLevel() + sub_path.GetLevel();
-	return &QuadtreePath{path:
-		(path_ & QT_PATH_MASK) |
-		((sub_path.path_ & QT_PATH_MASK) >> GetLevel() * QT_LEVEL_BITS) | level_};
+	level_ := q.GetLevel() + sub_path.GetLevel()
+	return &QuadtreePath{path: (q.path & QT_PATH_MASK) |
+		((sub_path.path & QT_PATH_MASK) >> q.GetLevel() * uint64(QT_LEVEL_BITS)) | uint64(level_)}
 }
 
 func (q *QuadtreePath) ToIndex(level uint32) uint64 {
-    return (q.path >> (QT_TOTAL_BITS - level * QT_LEVEL_BITS))
+	return (q.path >> (QT_TOTAL_BITS - level*QT_LEVEL_BITS))
 }
 
 func (q *QuadtreePath) Get(position uint32) uint32 {
@@ -270,67 +336,63 @@ func (q *QuadtreePath) Get(position uint32) uint32 {
 func (q *QuadtreePath) path_bits() uint64 { return q.path & QT_PATH_MASK }
 
 func (q *QuadtreePath) path_mask(level uint32) uint64 {
-  return QT_PATH_MASK << ((QT_DEFAULT_MAX_LEVEL - level) * QT_LEVEL_BITS)
+	return QT_PATH_MASK << ((QT_DEFAULT_MAX_LEVEL - level) * QT_LEVEL_BITS)
 }
 
 func (q *QuadtreePath) path_bits_level(level uint32) uint64 {
-  return q.path & path_mask(level)
+	return q.path & q.path_mask(level)
 }
 
 func (q *QuadtreePath) level_bits_at_pos(position uint32) uint32 {
-  return (q.path >> (QT_TOTAL_BITS - (position + 1) * QT_LEVEL_BITS)) &
-  QT_LEVEL_BIT_MASK
+	return uint32((q.path >> (QT_TOTAL_BITS - (position+1)*QT_LEVEL_BITS)) &
+		QT_LEVEL_BIT_MASK)
 }
 
 func (q *QuadtreePath) from_branchlist(level uint32, blist []byte) {
-for ( j := 0; j < int(level); ++j) {
-	q.path |= (blist[j] & QT_LEVEL_BIT_MASK)
-<< (QT_TOTAL_BITS - ((j + 1) * QT_LEVEL_BITS));
-}
-q.path |= level;
+	for j := 0; j < int(level); j++ {
+		q.path |= (uint64(blist[j]) & QT_LEVEL_BIT_MASK) << (QT_TOTAL_BITS - (uint32(j+1) * QT_LEVEL_BITS))
+	}
+	q.path |= uint64(level)
 }
 
 func RelativePath(parent *QuadtreePath, child *QuadtreePath) *QuadtreePath {
 	levelDiff := child.GetLevel() - parent.GetLevel()
 	return &QuadtreePath{path: (child.path_bits() << (parent.GetLevel() * QT_LEVEL_BITS)) |
-						 levelDiff};
+		uint64(levelDiff)}
 }
 
-func quadToBufferOffset(quad uint32,  tileWidth uint32,
-	 tileHeight uint32) uint32 {
-		switch quad {
-		case 0:
-		  return 0;
-		case 1:
-		  return tileWidth / 2;
-		case 2:
-		  return (tileHeight * tileWidth) / 2;
-		case 3:
-		  return ((tileHeight + 1) * tileWidth) / 2;
-		}
-		return 0;
+func quadToBufferOffset(quad uint32, tileWidth uint32, tileHeight uint32) uint32 {
+	switch quad {
+	case 0:
+		return 0
+	case 1:
+		return tileWidth / 2
+	case 2:
+		return (tileHeight * tileWidth) / 2
+	case 3:
+		return ((tileHeight + 1) * tileWidth) / 2
+	}
+	return 0
 }
 
-func  magnifyQuadAddr( inRow uint32,  inCol uint32,
-	 inQuad uint32) (outRow uint32,
-		outCol uint32) {
-			switch inQuad {
-			case 0:
-			  outRow = inRow * 2;
-			  outCol = inCol * 2;
-			  break;
-			case 1:
-			  outRow = inRow * 2;
-			  outCol = (inCol * 2) + 1;
-			  break;
-			case 2:
-			  outRow = (inRow * 2) + 1;
-			  outCol = inCol * 2;
-			  break;
-			case 3:
-			  outRow = (inRow * 2) + 1;
-			  outCol = (inCol * 2) + 1;
-			  break;
-			}
-			return
-		}
+func magnifyQuadAddr(inRow uint32, inCol uint32, inQuad uint32) (outRow uint32, outCol uint32) {
+	switch inQuad {
+	case 0:
+		outRow = inRow * 2
+		outCol = inCol * 2
+		break
+	case 1:
+		outRow = inRow * 2
+		outCol = (inCol * 2) + 1
+		break
+	case 2:
+		outRow = (inRow * 2) + 1
+		outCol = inCol * 2
+		break
+	case 3:
+		outRow = (inRow * 2) + 1
+		outCol = (inCol * 2) + 1
+		break
+	}
+	return
+}

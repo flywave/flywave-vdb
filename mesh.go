@@ -201,7 +201,6 @@ func (t *MeshData) Set(m *MeshModel) {
 
 		trisSlice[i].normals = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Normals[0]))
 		trisSlice[i].n_count = C.size_t(len(m.Materials[i].Normals) / 3)
-
 	}
 	C.voxel_pixel_mesh_data_set(t.m, cmeshData)
 }

@@ -20,6 +20,16 @@ func NewTextureMesh() *TextureMesh {
 	}
 }
 
+func NewTextureMeshFromMeshDatas(datas []MeshData) *TextureMesh {
+	datasSlice := make([]*C.struct__voxel_pixel_mesh_data_t, len(datas))
+	for i := 0; i < len(datas); i++ {
+		datasSlice[i] = datas[i].m
+	}
+	return &TextureMesh{
+		m: C.voxel_texture_mesh_create_from_mesh_datas(&datasSlice[0], C.int(len(datas))),
+	}
+}
+
 func NewTextureMeshFromTriangles(tris []Triangle) *TextureMesh {
 	trisSlice := make([]C.struct__voxel_io_triangle_t, len(tris))
 

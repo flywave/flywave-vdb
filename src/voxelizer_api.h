@@ -232,6 +232,9 @@ voxel_transform_world_to_index_node_centered_from_bbox(voxel_transform_t *tran,
 
 extern FLYWAVE_VDB_API voxel_texture_mesh_t *
 voxel_texture_mesh_create_from_triangles(voxel_io_triangle_t *tris, int count);
+extern FLYWAVE_VDB_API voxel_texture_mesh_t *
+voxel_texture_mesh_create_from_mesh_datas(voxel_pixel_mesh_data_t **mdatas,
+                                          int count);
 extern FLYWAVE_VDB_API voxel_texture_mesh_t *voxel_texture_mesh_create();
 extern FLYWAVE_VDB_API void voxel_texture_mesh_free(voxel_texture_mesh_t *vox);
 extern FLYWAVE_VDB_API voxel_texture_mesh_t *
@@ -273,6 +276,8 @@ extern FLYWAVE_VDB_API _Bool
 voxel_mesh_builder_material_exist(voxel_mesh_builder_t *vox, int index);
 extern FLYWAVE_VDB_API voxel_mesh_t *
 voxel_mesh_builder_build_mesh(voxel_mesh_builder_t *vox);
+extern FLYWAVE_VDB_API voxel_texture_mesh_t *
+voxel_mesh_builder_build_texture_mesh(voxel_mesh_builder_t *vox);
 
 extern FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m);
 extern FLYWAVE_VDB_API voxel_pixel_t *

@@ -102,6 +102,7 @@ public:
   texture_mesh() = default;
   texture_mesh(const texture_mesh &m);
 
+  void load(std::vector<std::shared_ptr<flywave::mesh_data>> &mdts);
   void load(voxel_io_triangle *tris, int count);
 
   void lock(std::vector<bool> &locked);

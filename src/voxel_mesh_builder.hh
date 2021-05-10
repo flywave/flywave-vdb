@@ -9,10 +9,12 @@
 
 namespace flywave {
 
+class texture_mesh;
+
 class voxel_mesh_builder {
 protected:
   std::string _name;
-  std::vector<mesh_data> _datas;
+  std::vector<std::shared_ptr<mesh_data>> _datas;
   std::unordered_map<int, std::shared_ptr<material>> _mtls;
   std::unordered_map<std::string, std::shared_ptr<texture>> _textures;
 
@@ -25,15 +27,15 @@ public:
 
   std::vector<triangle> build_triangles();
 
+  std::shared_ptr<texture_mesh> build_texture_mesh();
+
   void set_name(const std::string &nm) { _name = nm; }
 
-  const std::string &get_name() const {
-    return _name;
-  }
+  const std::string &get_name() const { return _name; }
 
-  std::vector<mesh_data> &get_mesh_datas() { return _datas; }
+  std::vector<std::shared_ptr<mesh_data>> &get_mesh_datas() { return _datas; }
 
-  void add_mesh_data(mesh_data &&dt) { _datas.emplace_back(std::move(dt)); }
+  void add_mesh_data(std::shared_ptr<mesh_data> dt) { _datas.emplace_back(dt); }
 
   int add_material_data(material_data &&md, int index = -1);
 

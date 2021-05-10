@@ -214,4 +214,65 @@ void texture_mesh::lock_border() {
   }
 }
 
+void texture_mesh::load(std::vector<std::shared_ptr<flywave::mesh_data>> &mdts) {
+  size_t s = 0;
+  size_t vers = 0;
+  for (auto &mdt : mdts) {
+    auto &verts = mdt->vertices();
+    vers += verts.size();
+
+    auto &fs = mdt->mtl_faces_map();
+    auto bg = fs.begin();
+    while (bg != fs.end()) {
+      s += bg->second.size();
+      bg++;
+    }
+  }
+
+  auto fi = vcg::tri::Allocator<texture_mesh>::AddFaces(*this, s);
+  vcg::tri::Allocator<texture_mesh>::AddVertices(*this, vers);
+
+  int befor_size = 0;
+  for (auto &mdt : mdts) {
+    auto &verts = mdt->vertices();
+    auto &texs = mdt->texcoords();
+    auto &fs = mdt->mtl_faces_map();
+    auto bg = fs.begin();
+    std::vector<bool> visit_map(verts.size(), false);
+
+    bg = fs.begin();
+    while (bg != fs.end()) {
+      auto &faces = bg->second;
+
+      for (int n = 0; n < faces.size(); n++) {
+        auto &f_index = faces[n];
+        for (int i = 0; i < 3; i++) {
+          auto ver_index = f_index[i];
+          auto &ver = verts[ver_index];
+          auto &vi = this->vert[befor_size + f_index[i]];
+          vi.P() = texture_mesh::CoordType(
+              static_cast<texture_mesh::ScalarType>(ver[0]),
+              static_cast<texture_mesh::ScalarType>(ver[1]),
+              static_cast<texture_mesh::ScalarType>(ver[2]));
+          if (mdt->has_texcoord()) {
+            float u = texs[f_index[i]][0];
+            float v = texs[f_index[i]][1];
+            vi.T() = vcg::TexCoord2f{u, v};
+            (*fi).WT(i).U() = u;
+            (*fi).WT(i).V() = v;
+          }
+          (*fi).V(i) = &vi;
+        }
+        (*fi).mtl = bg->first;
+        fi++;
+      }
+      bg++;
+    }
+    befor_size += verts.size();
+  }
+  vcg::tri::Clean<texture_mesh>::RemoveDuplicateVertex(*this);
+  vcg::tri::Allocator<texture_mesh>::CompactVertexVector(*this);
+  vcg::tri::Allocator<texture_mesh>::CompactFaceVector(*this);
+}
+
 } // namespace flywave

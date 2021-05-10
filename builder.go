@@ -57,3 +57,7 @@ func (t *VoxelMeshBuilder) MaterialExist(index int32) bool {
 func (t *VoxelMeshBuilder) BuildMesh() *VoxelMesh {
 	return &VoxelMesh{m: C.voxel_mesh_builder_build_mesh(t.m)}
 }
+
+func (t *VoxelMeshBuilder) BuildTextureMesh() *TextureMesh {
+	return &TextureMesh{m: C.voxel_mesh_builder_build_texture_mesh(t.m)}
+}

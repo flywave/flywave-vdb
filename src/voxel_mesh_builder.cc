@@ -1,16 +1,17 @@
 #include "voxel_mesh_builder.hh"
+#include "texture_mesh.hh"
 
 namespace flywave {
 
 std::vector<triangle> voxel_mesh_builder::build_triangles() {
   std::vector<triangle> ts;
   for (auto &_data : _datas) {
-    auto &mp = _data.mtl_faces_map();
+    auto &mp = _data->mtl_faces_map();
     auto bg = mp.begin();
     while (bg != mp.end()) {
-      auto &ver = _data.vertices();
+      auto &ver = _data->vertices();
       auto &fs = bg->second;
-      auto &tx = _data.texcoords();
+      auto &tx = _data->texcoords();
       for (uint32_t i = 0; i < fs.size(); i++) {
         triangle tri;
         tri.mtl_id = bg->first;
@@ -29,6 +30,12 @@ std::vector<triangle> voxel_mesh_builder::build_triangles() {
     }
   }
   return ts;
+}
+
+std::shared_ptr<texture_mesh> voxel_mesh_builder::build_texture_mesh() {
+  auto tmesh = std::make_shared<texture_mesh>();
+  tmesh->load(_datas);
+  return tmesh;
 }
 
 int voxel_mesh_builder::add_material_data(material_data &&data, int index) {

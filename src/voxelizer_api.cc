@@ -505,6 +505,19 @@ voxel_texture_mesh_create_from_triangles(voxel_io_triangle_t *tris, int count) {
   return new voxel_texture_mesh_t{mesh};
 }
 
+FLYWAVE_VDB_API voxel_texture_mesh_t *
+voxel_texture_mesh_create_from_mesh_datas(voxel_pixel_mesh_data_t **mdatas,
+                                          int count) {
+  auto mesh = std::make_shared<flywave::texture_mesh>();
+  std::vector<std::shared_ptr<flywave::mesh_data>> datas;
+  datas.resize(count);
+  for (int i = 0; i < count; i++) {
+    datas[i] = mdatas[i]->data;
+  }
+  mesh->load(datas);
+  return new voxel_texture_mesh_t{mesh};
+}
+
 FLYWAVE_VDB_API voxel_texture_mesh_t *voxel_texture_mesh_create() {
   return new voxel_texture_mesh_t{std::make_shared<flywave::texture_mesh>()};
 }
@@ -567,7 +580,7 @@ FLYWAVE_VDB_API void voxel_mesh_builder_set_name(voxel_mesh_builder_t *vox,
   vox->ptr->set_name(name);
 }
 
- FLYWAVE_VDB_API const char *
+FLYWAVE_VDB_API const char *
 voxel_mesh_builder_get_name(voxel_mesh_builder_t *vox) {
   return vox->ptr->get_name().c_str();
 }
@@ -575,7 +588,7 @@ voxel_mesh_builder_get_name(voxel_mesh_builder_t *vox) {
 FLYWAVE_VDB_API void
 voxel_mesh_builder_add_mesh_data(voxel_mesh_builder_t *vox,
                                  voxel_pixel_mesh_data_t *data) {
-  vox->ptr->add_mesh_data(std::move(*data->data));
+  vox->ptr->add_mesh_data(data->data);
 }
 
 FLYWAVE_VDB_API void voxel_mesh_builder_add_material_data(
@@ -607,6 +620,11 @@ voxel_mesh_builder_build_mesh(voxel_mesh_builder_t *vox) {
                           vox->ptr->get_textures()};
 }
 
+FLYWAVE_VDB_API voxel_texture_mesh_t *
+voxel_mesh_builder_build_texture_mesh(voxel_mesh_builder_t *vox) {
+  return new voxel_texture_mesh_t{vox->ptr->build_texture_mesh()};
+}
+
 FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m) { delete m; }
 
 FLYWAVE_VDB_API voxel_pixel_t *
@@ -628,10 +646,10 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
   std::shared_ptr<flywave::voxel_pixel> stff_pot =
       sampler.apply(precision, *creator->ptr, static_cast<sampler_type>(type),
                     tmtl, openvdb::Mat4d(matrix));
-  
+
   stream->fill_meterial(_mesh_adapter);
   stream->set_matrix(openvdb::Mat4d(matrix));
-  
+
   if (mtls != nullptr)
     mtls->mtls = tmtl.materials();
 

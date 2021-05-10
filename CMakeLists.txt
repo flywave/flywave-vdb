@@ -504,7 +504,7 @@ IF(NOT EMBREE_INCLUDE)
   LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/embree/")
   LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/embree/kernels/")
 
-  LIST(APPEND FLYWAVE_LIBRARY_DEPES "embree" "lexers" "math" "simd" "sys" "tasking")
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "embree" "lexers" "simd" "sys")
 
   SET(EMBREE_INCLUDE YES)
 ENDIF()
@@ -592,7 +592,7 @@ IF(NOT TUNGSTEN_INCLUDE)
 
   LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/tungsten/")
   
-  LIST(APPEND FLYWAVE_LIBRARY_DEPES "tungsten" "tungsten_thirdparty")
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "tungsten" "tungsten_thirdparty" "denoiser")
   
   SET(TUNGSTEN_INCLUDE YES)
 ENDIF()

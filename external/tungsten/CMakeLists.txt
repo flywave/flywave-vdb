@@ -16,7 +16,6 @@ endif()
 # Disabled for now until AVX becomes important enough to reconsider.
 SET(EMBREE_MAX_ISA "SSE4.2" CACHE STRING "Selects highest ISA to support.")
 set(USE_AVX FALSE CACHE BOOL "Use AVX.")
-set(USE_AVX2 FALSE CACHE BOOL "Use AVX2.")
 
 include(OptimizeForArchitecture)
 OptimizeForArchitecture()

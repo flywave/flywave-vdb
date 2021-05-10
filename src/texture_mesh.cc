@@ -1,6 +1,8 @@
 #include "texture_mesh.hh"
 #include "voxelizer_api_impl.hh"
 
+#include <wrap/io_trimesh/export_obj.h>
+
 namespace flywave {
 
 class union_find {
@@ -130,6 +132,58 @@ void texture_mesh::quadric_simplify_with_tex(uint32_t target) {
         }
       }
     }
+}
+
+texture_mesh::PerMeshAttributeHandle<std::vector<vcg::tri::io::Material>>
+get_material_vector_attribute(texture_mesh &m) {
+  return vcg::tri::Allocator<texture_mesh>::GetPerMeshAttribute<
+      std::vector<vcg::tri::io::Material>>(m, "materialVector");
+}
+
+bool has_material_vector_attribute(texture_mesh &m) {
+  return vcg::tri::Allocator<texture_mesh>::IsValidHandle<
+      std::vector<vcg::tri::io::Material>>(
+      m, vcg::tri::Allocator<texture_mesh>::FindPerMeshAttribute<
+             std::vector<vcg::tri::io::Material>>(m, "materialVector"));
+}
+
+texture_mesh::PerFaceAttributeHandle<int>
+get_material_index_attribute(texture_mesh &m) {
+  return vcg::tri::Allocator<texture_mesh>::GetPerFaceAttribute<int>(
+      m, "materialIndex");
+}
+
+bool has_material_index_attribute(texture_mesh &m) {
+  return vcg::tri::Allocator<texture_mesh>::IsValidHandle<int>(
+      m, vcg::tri::Allocator<texture_mesh>::FindPerFaceAttribute<int>(
+             m, "materialIndex"));
+}
+
+void texture_mesh::save(const char *filename, uint32_t node) {
+typedef texture_mesh::PerMeshAttributeHandle<
+      std::vector<vcg::tri::io::Material>>
+      material_type;
+  typedef texture_mesh::PerFaceAttributeHandle<int> material_index_type;
+
+  if (!has_material_vector_attribute(*this)) {
+    material_index_type mindexs = get_material_index_attribute(*this);
+
+    for (uint32_t i = 0; i < face.size(); i++) {
+      mindexs[i] = 0;
+    }
+
+    std::vector<vcg::tri::io::Material> &mats =
+        get_material_vector_attribute(*this)();
+
+    vcg::tri::io::Material mat;
+    mat.index = 0;
+    char str[255];
+    sprintf(str, "node_tex_%d.jpg", node);
+    mat.map_Kd = std::string(str);
+    mats.emplace_back(mat);
+  }
+  vcg::tri::io::ExporterOBJ<texture_mesh>::Save(
+      *this, filename, vcg::tri::io::Mask::IOM_VERTTEXCOORD, nullptr);
 }
 
 void texture_mesh::quadric_simplify(uint32_t target) {

@@ -104,7 +104,8 @@ public:
 
   void load(std::vector<std::shared_ptr<flywave::mesh_data>> &mdts);
   void load(voxel_io_triangle *tris, int count);
-
+  void save(const char *filename, uint32_t node);
+  
   void lock(std::vector<bool> &locked);
   void lock(bool *locked, int count);
 
@@ -112,6 +113,8 @@ public:
 
   void unlock_border();
   void lock_border();
+
+  inline bool has_border() const { return _has_border; }
 
   void quadric_simplify_with_tex(uint32_t target);
 

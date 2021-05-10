@@ -10,18 +10,22 @@ import (
 	"unsafe"
 )
 
-type ClipBoxCreateor struct {
-	m   *C.struct__voxel_clip_box_createor_t
-	gen func(*FloatGrid, *Transform, *BBox, *BBox) bool
+type ClipBoxCreateor interface {
+	Gen(*FloatGrid, *Transform, *BBox, *BBox) bool
 }
 
-func NewClipBoxCreateor(f func(*FloatGrid, *Transform, *BBox, *BBox) bool) *ClipBoxCreateor {
-	ctx := &ClipBoxCreateor{gen: f}
+type ClipBoxCreateorAdapter struct {
+	m *C.struct__voxel_clip_box_createor_t
+	f ClipBoxCreateor
+}
+
+func NewClipBoxCreateorAdapter(f ClipBoxCreateor) *ClipBoxCreateorAdapter {
+	ctx := &ClipBoxCreateorAdapter{f: f}
 	ctx.m = C.voxel_clip_box_createor_create(unsafe.Pointer(ctx))
 	return ctx
 }
 
-func (m *ClipBoxCreateor) Free() {
+func (m *ClipBoxCreateorAdapter) Free() {
 	C.voxel_clip_box_createor_free(m.m)
 	m.m = nil
 }
@@ -49,7 +53,7 @@ func clipBoxCreateor(ctx unsafe.Pointer, vertex *C.struct__vdb_float_grid_t, tra
 	outbox := &BBox{}
 	_, inbox := NewBBox(sboxSlice)
 
-	ret := C.bool((*ClipBoxCreateor)(ctx).gen(grid, t, inbox, outbox))
+	ret := C.bool((*ClipBoxCreateorAdapter)(ctx).f.Gen(grid, t, inbox, outbox))
 
 	for i := 0; i <= 6; i++ {
 		cboxSlice[i] = outbox.m[i]

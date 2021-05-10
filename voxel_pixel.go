@@ -131,11 +131,16 @@ type Triangle struct {
 	FID  uint64
 }
 
-func (m *VoxelPixel) MakeTriangles(mat []float64, texOffset int, mtlOffset int, bl *BorderLock, ft *FilterTriangle, fquality float64,
+func (m *VoxelPixel) MakeTriangles(mat []float64, texOffset int, mtlOffset int, bl BorderLock, ft FilterTriangle, fquality float64,
 	isovalue float64, adapter float64) []Triangle {
 	var tricount C.size_t
 	var ctris *C.struct__voxel_io_triangle_t
-	C.voxel_pixel_make_triangles(m.m, &ctris, &tricount, (*C.double)((unsafe.Pointer)(&mat[0])), C.size_t(texOffset), C.size_t(mtlOffset), bl.m, ft.m, C.double(fquality), C.double(isovalue), C.double(adapter))
+	cbl := NewBorderLockAdapter(bl)
+	defer cbl.Free()
+	cft := NewFilterTriangleAdapter(ft)
+	defer cft.Free()
+
+	C.voxel_pixel_make_triangles(m.m, &ctris, &tricount, (*C.double)((unsafe.Pointer)(&mat[0])), C.size_t(texOffset), C.size_t(mtlOffset), cbl.m, cft.m, C.double(fquality), C.double(isovalue), C.double(adapter))
 	defer C.free(unsafe.Pointer(ctris))
 
 	var trisSlice []C.struct__voxel_io_triangle_t

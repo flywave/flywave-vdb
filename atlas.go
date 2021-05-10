@@ -28,7 +28,7 @@ func (m *AtlasGenerator) Generate(mesh *TextureMesh) []Texture2D {
 	defer C.free(unsafe.Pointer(tex))
 
 	var texSlice []*C.struct__voxel_texture2d_t
-	texHeader := (*reflect.SliceHeader)((unsafe.Pointer(&texSlice)))
+	texHeader := (*reflect.SliceHeader)(unsafe.Pointer(&texSlice))
 	texHeader.Cap = int(si)
 	texHeader.Len = int(si)
 	texHeader.Data = uintptr(unsafe.Pointer(tex))

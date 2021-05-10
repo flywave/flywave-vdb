@@ -98,6 +98,12 @@ func (m *TextureMesh) Clone() *TextureMesh {
 	}
 }
 
+func (t *TextureMesh) Save(path string, node uint32) {
+	cpath := C.CString(path)
+	C.voxel_texture_mesh_save(t.m, cpath, C.uint(node))
+	C.free(unsafe.Pointer(cpath))
+}
+
 func (t *TextureMesh) GetTriangles(node int32) []Triangle {
 	var ctris *C.struct__voxel_io_triangle_t
 	var csi C.int
@@ -105,7 +111,7 @@ func (t *TextureMesh) GetTriangles(node int32) []Triangle {
 	C.voxel_texture_mesh_get_triangles(t.m, &ctris, &csi, C.int(node))
 
 	var trisSlice []C.struct__voxel_io_triangle_t
-	trisHeader := (*reflect.SliceHeader)((unsafe.Pointer(&trisSlice)))
+	trisHeader := (*reflect.SliceHeader)(unsafe.Pointer(&trisSlice))
 	trisHeader.Cap = int(csi)
 	trisHeader.Len = int(csi)
 	trisHeader.Data = uintptr(unsafe.Pointer(ctris))
@@ -165,7 +171,7 @@ func (t *TextureMesh) GetTriangles(node int32) []Triangle {
 }
 
 func (m *TextureMesh) Lock(locked []bool) {
-	C.voxel_texture_mesh_lock(m.m, (*C.bool)((unsafe.Pointer)(&locked[0])), C.int(len(locked)))
+	C.voxel_texture_mesh_lock(m.m, (*C.bool)(unsafe.Pointer(&locked[0])), C.int(len(locked)))
 }
 
 func (m *TextureMesh) LockBorder() {

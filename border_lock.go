@@ -10,18 +10,22 @@ import (
 	"unsafe"
 )
 
-type BorderLock struct {
-	m     *C.struct__voxel_border_lock_t
-	check func([]float32) bool
+type BorderLock interface {
+	Check([]float32) bool
 }
 
-func (m *BorderLock) Free() {
+type BorderLockAdapter struct {
+	m *C.struct__voxel_border_lock_t
+	f BorderLock
+}
+
+func (m *BorderLockAdapter) Free() {
 	C.voxel_border_lock_free(m.m)
 	m.m = nil
 }
 
-func NewBorderLock(f func([]float32) bool) *BorderLock {
-	ctx := &BorderLock{check: f}
+func NewBorderLockAdapter(f BorderLock) *BorderLockAdapter {
+	ctx := &BorderLockAdapter{f: f}
 	ctx.m = C.voxel_border_lock_create(unsafe.Pointer(ctx))
 	return ctx
 }
@@ -34,5 +38,5 @@ func borderLockCheck(ctx unsafe.Pointer, a *C.float) C.bool {
 	cpointsHeader.Len = int(3)
 	cpointsHeader.Data = uintptr(unsafe.Pointer(a))
 
-	return C.bool((*BorderLock)(ctx).check(cpointsSlice))
+	return C.bool((*BorderLockAdapter)(ctx).f.Check(cpointsSlice))
 }

@@ -567,6 +567,11 @@ voxel_texture_mesh_quadric_simplify(voxel_texture_mesh_t *vox,
   vox->mesh->quadric_simplify(target);
 }
 
+FLYWAVE_VDB_API void voxel_texture_mesh_save(voxel_texture_mesh_t *vox,
+                                             const char *path, uint32_t node) {
+  vox->mesh->save(path, node);
+}
+
 FLYWAVE_VDB_API voxel_mesh_builder_t *voxel_mesh_builder_create() {
   return new voxel_mesh_builder_t{std::make_shared<voxel_mesh_builder>()};
 }

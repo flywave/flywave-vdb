@@ -254,6 +254,9 @@ voxel_texture_mesh_quadric_simplify_with_tex(voxel_texture_mesh_t *vox,
                                              uint32_t target);
 extern FLYWAVE_VDB_API void
 voxel_texture_mesh_quadric_simplify(voxel_texture_mesh_t *vox, uint32_t target);
+extern FLYWAVE_VDB_API void voxel_texture_mesh_save(voxel_texture_mesh_t *vox,
+                                                    const char *path,
+                                                    uint32_t node);
 
 extern FLYWAVE_VDB_API voxel_mesh_builder_t *voxel_mesh_builder_create();
 extern FLYWAVE_VDB_API void voxel_mesh_builder_free(voxel_mesh_builder_t *vox);

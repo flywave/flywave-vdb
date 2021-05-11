@@ -73,6 +73,10 @@ voxel_pixel_get_pixel_grid(voxel_pixel_t *vox) {
       std::make_shared<vdb_pixel_grid>(vox->ptr->get_pixel_grid())};
 }
 
+ FLYWAVE_VDB_API int64_t voxel_pixel_get_memory_size(voxel_pixel_t *vox){
+   return vox->ptr->get_memory_size();
+}
+
 FLYWAVE_VDB_API void voxel_pixel_set_voxel_grid(voxel_pixel_t *vox,
                                                 vdb_float_grid_t *vg) {
   vox->ptr->set_voxel_grid(vg->ptr->grid());

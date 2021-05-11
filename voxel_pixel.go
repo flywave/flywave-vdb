@@ -26,6 +26,14 @@ func (m *VoxelPixel) Free() {
 	m.m = nil
 }
 
+func (t *VoxelPixel) Vaild() bool {
+	return t.m != nil
+}
+
+func (t *VoxelPixel) Size() int64 {
+	return int64(C.voxel_pixel_get_memory_size(t.m))
+}
+
 func (m *VoxelPixel) Clone() *VoxelPixel {
 	return &VoxelPixel{
 		m: C.voxel_pixel_duplicate(m.m),
@@ -34,7 +42,7 @@ func (m *VoxelPixel) Clone() *VoxelPixel {
 
 func (m *VoxelPixel) Read(file string) error {
 	if m == nil || m.m == nil {
-		return errors.New("Grid error ")
+		return errors.New("Grid error!")
 	}
 
 	fname := C.CString(file)
@@ -46,7 +54,7 @@ func (m *VoxelPixel) Read(file string) error {
 
 func (m *VoxelPixel) Write(file string) error {
 	if m == nil || m.m == nil {
-		return errors.New("Grid error ")
+		return errors.New("Grid error!")
 	}
 
 	fname := C.CString(file)
@@ -68,6 +76,11 @@ func (m *VoxelPixel) RayTest(r *Ray) (bool, []float64) {
 	p := make([]float64, 3)
 	ret := bool(C.voxel_pixel_ray_test(m.m, (*C.double)((unsafe.Pointer)(&r.origin[0])), (*C.double)((unsafe.Pointer)(&r.dir[0])), (*C.double)((unsafe.Pointer)(&p[0]))))
 	return ret, p
+}
+
+func (m *VoxelPixel) RayTests(rs []Ray) [][]float64 {
+	//TODO
+	return nil
 }
 
 func (m *VoxelPixel) VoxelResolution() *Transform {

@@ -12,7 +12,7 @@ import (
 	"math"
 )
 
-type QuadtreePath struct {
+type TileIndex struct {
 	path uint64
 }
 
@@ -48,12 +48,12 @@ func Max(x, y uint32) uint32 {
 	return y
 }
 
-func NewQuadtreePath() *QuadtreePath {
-	return &QuadtreePath{path: 0}
+func NewTileIndex() *TileIndex {
+	return &TileIndex{path: 0}
 }
 
-func NewQuadtreePathFromLevelAndRowCol(level uint32, row uint32, col uint32) *QuadtreePath {
-	p := &QuadtreePath{path: 0}
+func NewTileIndexFromLevelAndRowCol(level uint32, row uint32, col uint32) *TileIndex {
+	p := &TileIndex{path: 0}
 	for j := 0; j < int(level); j++ {
 		right := int(0x01 & (col >> (level - uint32(j) - 1)))
 		top := int(0x01 & (row >> (level - uint32(j) - 1)))
@@ -64,32 +64,32 @@ func NewQuadtreePathFromLevelAndRowCol(level uint32, row uint32, col uint32) *Qu
 	return p
 }
 
-func NewQuadtreePathFromLevelAndBitList(level uint32, blist []byte) *QuadtreePath {
-	p := &QuadtreePath{path: 0}
+func NewTileIndexFromLevelAndBitList(level uint32, blist []byte) *TileIndex {
+	p := &TileIndex{path: 0}
 	p.from_branchlist(level, blist)
 	return p
 }
 
-func NewQuadtreePathFromBitList(blist string) *QuadtreePath {
-	p := &QuadtreePath{path: 0}
+func NewTileIndexFromBitList(blist string) *TileIndex {
+	p := &TileIndex{path: 0}
 	p.from_branchlist(uint32(len(blist)), []byte(blist))
 	return p
 }
 
-func NewQuadtreePathFromBitListAndLevel(other *QuadtreePath, level uint32) *QuadtreePath {
+func NewTileIndexFromBitListAndLevel(other *TileIndex, level uint32) *TileIndex {
 	lev := Min(level, other.GetLevel())
-	p := &QuadtreePath{path: 0}
+	p := &TileIndex{path: 0}
 	p.path = other.path_bits_level(lev) | uint64(lev)
 	return p
 }
 
-func geodeticToTile(lon float64, lat float64, zoom uint8) *QuadtreePath {
+func geodeticToTile(lon float64, lat float64, zoom uint8) *TileIndex {
 	x := math.Floor((lon + 180.0) / 360.0 * math.Pow(2.0, float64(zoom)))
 	y := math.Floor((1.0 + math.Log(math.Tan(lat*math.Pi/180.0)+
 		1.0/math.Cos(lat*math.Pi/180.0))/
 		math.Pi) /
 		2.0 * math.Pow(2.0, float64(zoom)))
-	return NewQuadtreePathFromLevelAndRowCol(uint32(zoom), uint32(y), uint32(x))
+	return NewTileIndexFromLevelAndRowCol(uint32(zoom), uint32(y), uint32(x))
 }
 
 const (
@@ -142,7 +142,7 @@ func merc2lonlat(x []float64, y []float64, pointCount int) bool {
 	return true
 }
 
-func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64) *QuadtreePath {
+func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64) *TileIndex {
 	x := [2]float64{minx, miny}
 	y := [2]float64{maxx, maxy}
 	lonlat2merc(x[:], y[:], 2)
@@ -160,17 +160,17 @@ func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64) *Qua
 	return geodeticToTile((minx+maxx)/2.0, (miny+maxy)/2.0, _zoom)
 }
 
-func NewQuadtreePathFromBox(box BBox2d) *QuadtreePath {
+func NewTileIndexFromBox(box BBox2d) *TileIndex {
 	p := getTileFromBox(box[0], box[1], box[2], box[3])
 	return p
 }
 
-func (q *QuadtreePath) Valid() bool {
+func (q *TileIndex) Valid() bool {
 	return q.GetLevel() <= QT_DEFAULT_MAX_LEVEL &&
 		(0 == (q.path & ^(q.path_mask(q.GetLevel()) | QT_LEVEL_MASK)))
 }
 
-func (q *QuadtreePath) Less(other *QuadtreePath) bool {
+func (q *TileIndex) Less(other *TileIndex) bool {
 	minlev := other.GetLevel()
 	if q.GetLevel() < other.GetLevel() {
 		minlev = q.GetLevel()
@@ -183,19 +183,19 @@ func (q *QuadtreePath) Less(other *QuadtreePath) bool {
 	}
 }
 
-func (q *QuadtreePath) Greater(other *QuadtreePath) bool {
+func (q *TileIndex) Greater(other *TileIndex) bool {
 	return other.Less(q)
 }
 
-func (q *QuadtreePath) Equal(other *QuadtreePath) bool {
+func (q *TileIndex) Equal(other *TileIndex) bool {
 	return other.path == q.path
 }
 
-func (q *QuadtreePath) Path() uint64 {
+func (q *TileIndex) Path() uint64 {
 	return q.path
 }
 
-func (q *QuadtreePath) ToString() string {
+func (q *TileIndex) ToString() string {
 	result := make([]byte, int(q.GetLevel()))
 
 	for i := 0; i < int(q.GetLevel()); i++ {
@@ -204,7 +204,7 @@ func (q *QuadtreePath) ToString() string {
 	return string(result)
 }
 
-func (q *QuadtreePath) GetGenerationSequence() uint64 {
+func (q *TileIndex) GetGenerationSequence() uint64 {
 	level_ := q.GetLevel()
 	sequence := q.path
 	check_for_2_or_3_mask := (uint64(0x1)) << (QT_TOTAL_BITS - 1)
@@ -220,22 +220,22 @@ func (q *QuadtreePath) GetGenerationSequence() uint64 {
 	return sequence
 }
 
-func (q *QuadtreePath) Parent() *QuadtreePath {
+func (q *TileIndex) Parent() *TileIndex {
 	new_level := q.GetLevel() - 1
 
-	return &QuadtreePath{path: (q.path & (uint64(C.fix_numeric_overflow(C.ulong(QT_PATH_MASK), C.ulong(QT_LEVEL_BITS))) * uint64(QT_DEFAULT_MAX_LEVEL-new_level))) | uint64(new_level)}
+	return &TileIndex{path: (q.path & (uint64(C.fix_numeric_overflow(C.ulong(QT_PATH_MASK), C.ulong(QT_LEVEL_BITS))) * uint64(QT_DEFAULT_MAX_LEVEL-new_level))) | uint64(new_level)}
 }
 
-func (q *QuadtreePath) Child(child uint32) *QuadtreePath {
+func (q *TileIndex) Child(child uint32) *TileIndex {
 	new_level := q.GetLevel() + 1
-	return &QuadtreePath{path: q.path_bits() | uint64(child)<<(QT_TOTAL_BITS-new_level*QT_LEVEL_BITS) | uint64(new_level)}
+	return &TileIndex{path: q.path_bits() | uint64(child)<<(QT_TOTAL_BITS-new_level*QT_LEVEL_BITS) | uint64(new_level)}
 }
 
-func (q *QuadtreePath) WhichChild() uint32 {
+func (q *TileIndex) WhichChild() uint32 {
 	return uint32((q.path >> (QT_TOTAL_BITS - q.GetLevel()*QT_LEVEL_BITS)) & QT_LEVEL_BIT_MASK)
 }
 
-func (q *QuadtreePath) AdvanceInLevel() bool {
+func (q *TileIndex) AdvanceInLevel() bool {
 	path_bits_ := q.path_bits()
 	path_mask_ := q.path_mask(q.GetLevel())
 	if path_bits_ != path_mask_ {
@@ -246,7 +246,7 @@ func (q *QuadtreePath) AdvanceInLevel() bool {
 	}
 }
 
-func (q *QuadtreePath) Advance(max_level uint32) bool {
+func (q *TileIndex) Advance(max_level uint32) bool {
 	if q.GetLevel() < max_level {
 		q.path = q.Child(0).path
 		return true
@@ -258,19 +258,19 @@ func (q *QuadtreePath) Advance(max_level uint32) bool {
 	}
 }
 
-func (q *QuadtreePath) IsAncestorOf(other *QuadtreePath) bool {
+func (q *TileIndex) IsAncestorOf(other *TileIndex) bool {
 	if q.GetLevel() <= other.GetLevel() {
 		return q.path_bits_level(q.GetLevel()) == other.path_bits_level(q.GetLevel())
 	}
 	return false
 }
 
-func IsPostOrder(path1 *QuadtreePath, path2 *QuadtreePath) bool {
+func IsPostOrder(path1 *TileIndex, path2 *TileIndex) bool {
 	return !path1.IsAncestorOf(path2) &&
 		(path2.IsAncestorOf(path1) || path2.Greater(path1))
 }
 
-func (q *QuadtreePath) GetLevelRowCol() (level uint32, row uint32, col uint32) {
+func (q *TileIndex) GetLevelRowCol() (level uint32, row uint32, col uint32) {
 	rowbits := []uint32{0x00, 0x00, 0x01, 0x01}
 	colbits := []uint32{0x00, 0x01, 0x01, 0x00}
 
@@ -289,11 +289,11 @@ func (q *QuadtreePath) GetLevelRowCol() (level uint32, row uint32, col uint32) {
 	return
 }
 
-func (q *QuadtreePath) GetLevel() uint32 {
+func (q *TileIndex) GetLevel() uint32 {
 	return uint32(q.path & QT_LEVEL_MASK)
 }
 
-func (q *QuadtreePath) ChildTileCoordinates(tile_width uint32, child *QuadtreePath) (success bool, level uint32, row uint32, col uint32) {
+func (q *TileIndex) ChildTileCoordinates(tile_width uint32, child *TileIndex) (success bool, level uint32, row uint32, col uint32) {
 	if !q.IsAncestorOf(child) {
 		success = false
 		return
@@ -319,45 +319,45 @@ func (q *QuadtreePath) ChildTileCoordinates(tile_width uint32, child *QuadtreePa
 	return
 }
 
-func (q *QuadtreePath) Concatenate(sub_path *QuadtreePath) *QuadtreePath {
+func (q *TileIndex) Concatenate(sub_path *TileIndex) *TileIndex {
 	level_ := q.GetLevel() + sub_path.GetLevel()
-	return &QuadtreePath{path: (q.path & QT_PATH_MASK) |
+	return &TileIndex{path: (q.path & QT_PATH_MASK) |
 		((sub_path.path & QT_PATH_MASK) >> q.GetLevel() * uint64(QT_LEVEL_BITS)) | uint64(level_)}
 }
 
-func (q *QuadtreePath) ToIndex(level uint32) uint64 {
+func (q *TileIndex) ToIndex(level uint32) uint64 {
 	return (q.path >> (QT_TOTAL_BITS - level*QT_LEVEL_BITS))
 }
 
-func (q *QuadtreePath) Get(position uint32) uint32 {
+func (q *TileIndex) Get(position uint32) uint32 {
 	return q.level_bits_at_pos(position)
 }
 
-func (q *QuadtreePath) path_bits() uint64 { return q.path & QT_PATH_MASK }
+func (q *TileIndex) path_bits() uint64 { return q.path & QT_PATH_MASK }
 
-func (q *QuadtreePath) path_mask(level uint32) uint64 {
+func (q *TileIndex) path_mask(level uint32) uint64 {
 	return QT_PATH_MASK << ((QT_DEFAULT_MAX_LEVEL - level) * QT_LEVEL_BITS)
 }
 
-func (q *QuadtreePath) path_bits_level(level uint32) uint64 {
+func (q *TileIndex) path_bits_level(level uint32) uint64 {
 	return q.path & q.path_mask(level)
 }
 
-func (q *QuadtreePath) level_bits_at_pos(position uint32) uint32 {
+func (q *TileIndex) level_bits_at_pos(position uint32) uint32 {
 	return uint32((q.path >> (QT_TOTAL_BITS - (position+1)*QT_LEVEL_BITS)) &
 		QT_LEVEL_BIT_MASK)
 }
 
-func (q *QuadtreePath) from_branchlist(level uint32, blist []byte) {
+func (q *TileIndex) from_branchlist(level uint32, blist []byte) {
 	for j := 0; j < int(level); j++ {
 		q.path |= (uint64(blist[j]) & QT_LEVEL_BIT_MASK) << (QT_TOTAL_BITS - (uint32(j+1) * QT_LEVEL_BITS))
 	}
 	q.path |= uint64(level)
 }
 
-func RelativePath(parent *QuadtreePath, child *QuadtreePath) *QuadtreePath {
+func RelativePath(parent *TileIndex, child *TileIndex) *TileIndex {
 	levelDiff := child.GetLevel() - parent.GetLevel()
-	return &QuadtreePath{path: (child.path_bits() << (parent.GetLevel() * QT_LEVEL_BITS)) |
+	return &TileIndex{path: (child.path_bits() << (parent.GetLevel() * QT_LEVEL_BITS)) |
 		uint64(levelDiff)}
 }
 

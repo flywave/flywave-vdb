@@ -5,34 +5,35 @@ const (
 )
 
 type Tile struct {
-	id   *QuadtreePath
+	id   *TileIndex
 	bbox BBox2d
 }
 
-func NewTile(id *QuadtreePath, bbox BBox2d) *Tile {
+func NewTile(id *TileIndex, bbox BBox2d) *Tile {
 	return &Tile{id: id, bbox: bbox}
 }
 
-func (t *Tile) Pos() (x, y float64) {
+func (t *Tile) Center() (x, y float64) {
 	x = (t.bbox[0] + t.bbox[1]) / 2
 	y = (t.bbox[2] + t.bbox[3]) / 2
 	return
 }
 
-func (t *Tile) ID() *QuadtreePath {
+func (t *Tile) Index() *TileIndex {
 	return t.id
 }
 
-func (t *Tile) BBox() BBox2d {
+func (t *Tile) Bounds() BBox2d {
 	return t.bbox
 }
 
-func (t *Tile) ZYX() (z, y, x uint32) {
-	return t.id.GetLevelRowCol()
+func (t *Tile) XYZ() (uint32, uint32, uint32) {
+	z, y, x := t.id.GetLevelRowCol()
+	return x, y, z
 }
 
 func (t *Tile) IsBlack() bool {
-	_, x, y := t.ZYX()
+	x, y, _ := t.XYZ()
 	return ((x + y) % 2) > 0
 }
 

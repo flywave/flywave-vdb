@@ -372,6 +372,15 @@ func (m *FloatGrid) LinearGet(pos []float32) (error, float32) {
 	return nil, ret
 }
 
+func (m *FloatGrid) EvalActiveBoundingBox() (error, []float64) {
+	if m == nil || m.m == nil {
+		return errors.New("Rebuild error "), []float64{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
+	}
+	ret := make([]float64, 6)
+	C.vdb_float_grid_eval_active_bounding_box(m.m, (*C.double)((unsafe.Pointer)(&ret[0])))
+	return nil, ret
+}
+
 type PixelGrid struct {
 	m *C.struct__vdb_pixel_grid_t
 }

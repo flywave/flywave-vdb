@@ -55,6 +55,7 @@ extern FLYWAVE_VDB_API void voxel_pixel_set_voxel_grid(voxel_pixel_t *vox,
 extern FLYWAVE_VDB_API void voxel_pixel_set_pixel_grid(voxel_pixel_t *vox,
                                                        vdb_pixel_grid_t *vg);
 extern FLYWAVE_VDB_API _Bool voxel_pixel_is_empty(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API int64_t voxel_pixel_get_memory_size(voxel_pixel_t *vox);
 
 extern FLYWAVE_VDB_API voxel_pixel_materials_t *
 voxel_pixel_get_materials(voxel_pixel_t *vox);

@@ -8,3 +8,9 @@ func TestBBox(t *testing.T) {
 
 	print(bbox.GetMin())
 }
+
+func TestRegex(t *testing.T) {
+	zxystr := _parsr_file_reg.FindStringSubmatch("1_2_3.vtile")
+
+	print(len(zxystr))
+}

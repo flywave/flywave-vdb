@@ -295,6 +295,18 @@ FLYWAVE_VDB_API float vdb_float_grid_linear_get(vdb_float_grid_t *grid, float x,
   return (*grid->ptr)(x, y, z);
 }
 
+extern FLYWAVE_VDB_API void
+vdb_float_grid_eval_active_bounding_box(vdb_float_grid_t *grid, double *box) {
+  auto vbox = grid->ptr->grid()->evalActiveVoxelBoundingBox();
+  box[0] = vbox.min().x();
+  box[1] = vbox.min().y();
+  box[2] = vbox.min().z();
+
+  box[3] = vbox.max().x();
+  box[4] = vbox.max().y();
+  box[5] = vbox.max().z();
+}
+
 FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create() {
   vdb_pixel_grid_t *ret =
       new vdb_pixel_grid_t{std::make_shared<vdb_pixel_grid>()};

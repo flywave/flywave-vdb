@@ -1,47 +1,57 @@
 package vdb
 
 type TileGrid struct {
-	Level       uint16
-	PixelWidth  float64
-	PixelHeight float64
-	Bounds      BBox2d
-	Global      Space
+	level      uint16
+	tileWidth  float64
+	tileHeight float64
+	bounds     BBox2d
+	global     Space
 }
 
 func NewTileGrid(g Space, bbox BBox2d, level uint16) *TileGrid {
-	t := &TileGrid{Global: g, Bounds: bbox, Level: level}
+	t := &TileGrid{global: g, bounds: bbox, level: level}
 	count := t.allWordGridCount()
-	t.PixelWidth = (bbox[2] - bbox[0]) / float64(count)
-	t.PixelHeight = (bbox[3] - bbox[1]) / float64(count)
+	t.tileWidth = (bbox[2] - bbox[0]) / float64(count)
+	t.tileHeight = (bbox[3] - bbox[1]) / float64(count)
 	return t
 }
 
+func (t *TileGrid) GetLevel() uint16 {
+	return t.level
+}
+
+func (t *TileGrid) GetBounds() BBox2d {
+	return t.bounds
+}
+
+func (t *TileGrid) GetSpace() Space {
+	return t.global
+}
+
 func (t *TileGrid) allWordGridCount() int {
-	return int(1 << t.Level)
+	return int(1 << t.level)
 }
 
 func (t *TileGrid) ToTileCoord(xyz []float64) []uint32 {
-	return t.ToTileCoord2d(t.Global.ToGridWord(xyz))
+	return t.ToTileCoord2d(t.global.ToGridWord(xyz))
 }
 
 func (t *TileGrid) ToTileCoord2d(xy []float64) []uint32 {
 	pos := make([]uint32, 2)
-	pos[0] += uint32((t.Bounds[2] - t.Bounds[0]) / 2.0)
-	pos[1] += uint32((t.Bounds[3] - t.Bounds[1]) / 2.0)
-	pos[0] /= uint32(t.PixelWidth)
-	pos[1] /= uint32(t.PixelHeight)
+	pos[0] += uint32((t.bounds[2] - t.bounds[0]) / 2.0)
+	pos[1] += uint32((t.bounds[3] - t.bounds[1]) / 2.0)
+	pos[0] /= uint32(t.tileWidth)
+	pos[1] /= uint32(t.tileHeight)
 	return pos
 }
 
 func (t *TileGrid) CreateTile(x, y uint32) *Tile {
-	hw := float64((t.Bounds[2] - t.Bounds[0]) / 2.0)
-	hh := float64((t.Bounds[3] - t.Bounds[1]) / 2.0)
-	box := BBox2d{float64(x)*t.PixelWidth - hw, float64(x+1)*t.PixelWidth - hw, float64(y+1)*t.PixelHeight - hh, float64(y)*t.PixelHeight - hh}
-	return NewTile(NewQuadtreePathFromLevelAndRowCol(uint32(t.Level), y, x), box)
+	hw := float64((t.bounds[2] - t.bounds[0]) / 2.0)
+	hh := float64((t.bounds[3] - t.bounds[1]) / 2.0)
+	box := BBox2d{float64(x)*t.tileWidth - hw, float64(x+1)*t.tileWidth - hw, float64(y+1)*t.tileHeight - hh, float64(y)*t.tileHeight - hh}
+	return NewTile(NewTileIndexFromLevelAndRowCol(uint32(t.level), y, x), box)
 }
 
-func (t *TileGrid) CellSize() (width, height float64) {
-	width = t.PixelWidth
-	height = t.PixelHeight
-	return
+func (t *TileGrid) CellSize() []float64 {
+	return []float64{t.tileWidth, t.tileHeight}
 }

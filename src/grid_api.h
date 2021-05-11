@@ -94,6 +94,9 @@ extern FLYWAVE_VDB_API float vdb_float_grid_get(vdb_float_grid_t *grid, int x,
 extern FLYWAVE_VDB_API float
 vdb_float_grid_linear_get(vdb_float_grid_t *grid, float x, float y, float z);
 
+extern FLYWAVE_VDB_API void
+vdb_float_grid_eval_active_bounding_box(vdb_float_grid_t *grid, double *box);
+
 typedef struct _vdb_pixel_grid_t vdb_pixel_grid_t;
 
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create();

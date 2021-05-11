@@ -214,7 +214,7 @@ func (t *VoxelMesh) Free() {
 	t.m = nil
 }
 
-func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type int32, matrix []float64) *VoxelPixel {
+func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type SamplerType, matrix []float64) *VoxelPixel {
 	ccreator := NewClipBoxCreateorAdapter(creator)
 	defer ccreator.Free()
 	return &VoxelPixel{m: C.voxel_mesh_to_voxel_pixel(t.m, mtls.m, C.ushort(local_feature), C.float(precision), ccreator.m, C.int(_type), (*C.double)((unsafe.Pointer)(&matrix[0])))}

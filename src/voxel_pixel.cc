@@ -246,8 +246,12 @@ void voxel_pixel::composite(voxel_pixel &pot, const composite_type &type) {
   _vertex->setTransform(_resolution);
 }
 
+int64_t voxel_pixel::get_memory_size() const {
+  return _vertex->memUsage() + _pixel->memUsage();
+}
+
 inline void
-write_materials(std::ofstream &os,
+write_materials(std::ostream &os,
                 std::vector<std::shared_ptr<material_data>> &materials) {
   uint32_t si = materials.size();
   os.write(reinterpret_cast<const char *>(&si), sizeof(uint32_t));
@@ -280,7 +284,7 @@ bool voxel_pixel::write(const std::string &file) {
 }
 
 inline void
-read_materials(std::ifstream &is,
+read_materials(std::istream &is,
                std::vector<std::shared_ptr<material_data>> &materials) {
   uint32_t si;
   is.read(reinterpret_cast<char *>(&si), sizeof(uint32_t));

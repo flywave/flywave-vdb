@@ -10,3 +10,10 @@ const (
 	CT_INTERSECTION = CompositeType(1)
 	CT_DIFFERENCE   = CompositeType(2)
 )
+
+type SamplerType int32
+
+const (
+	ST_LEVEL_SET = SamplerType(0)
+	ST_SURFACE   = SamplerType(1)
+)

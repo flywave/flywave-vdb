@@ -39,12 +39,26 @@ func (b *BBox) SetMax(max []float64) {
 	}
 }
 
+func (a *BBox) Contains(b *BBox) bool {
+	return (b.GetMin()[0]-EPS) > a.GetMin()[0] && (b.GetMax()[0]+EPS) < a.GetMax()[0] &&
+		(b.GetMin()[1]-EPS) > a.GetMin()[1] && (b.GetMax()[1]+EPS) < a.GetMax()[1] &&
+		(b.GetMin()[2]-EPS) > a.GetMin()[2] && (b.GetMax()[2]+EPS) < a.GetMax()[2]
+}
+
+func (b *BBox) Intersect(a *BBox) []float64 {
+	return []float64{math.Max(a.GetMin()[0], b.GetMin()[0]), math.Max(a.GetMin()[1], b.GetMin()[1]), math.Max(a.GetMin()[2], b.GetMin()[2]), math.Min(a.GetMax()[0], b.GetMax()[0]), math.Min(a.GetMax()[1], b.GetMax()[1]), math.Min(a.GetMax()[2], b.GetMax()[2])}
+}
+
 func (b *BBox) GetMin() []float64 {
 	return []float64{float64(b.m[0]), float64(b.m[1]), float64(b.m[2])}
 }
 
 func (b *BBox) GetMax() []float64 {
 	return []float64{float64(b.m[3]), float64(b.m[4]), float64(b.m[5])}
+}
+
+func (b *BBox) GetSlice() []float64 {
+	return []float64{float64(b.m[0]), float64(b.m[1]), float64(b.m[2]), float64(b.m[3]), float64(b.m[4]), float64(b.m[5])}
 }
 
 type CoordBox struct {
@@ -82,6 +96,10 @@ func (b *CoordBox) GetMin() []int32 {
 
 func (b *CoordBox) GetMax() []int32 {
 	return []int32{int32(b.m[3]), int32(b.m[4]), int32(b.m[5])}
+}
+
+func (b *CoordBox) GetSlice() []int32 {
+	return []int32{int32(b.m[3]), int32(b.m[4]), int32(b.m[5]), int32(b.m[3]), int32(b.m[4]), int32(b.m[5])}
 }
 
 type BBox2d [4]float64

@@ -41,6 +41,8 @@ public:
 
   pixel_grid::Ptr get_pixel_grid() const { return _pixel; }
 
+  int64_t get_memory_size() const;
+
   void set_voxel_grid(vertex_grid::Ptr ptr) {
     _vertex = ptr;
     _vertex->setTransform(_resolution);

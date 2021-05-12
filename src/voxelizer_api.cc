@@ -1066,7 +1066,8 @@ voxel_pixel_feature_data_get(voxel_pixel_feature_data_t *vox) {
   ret.global = vox->data->_feature_id;
   ret.local = vox->data->_local_feature_id;
   ret.size = static_cast<int>(vox->data->data.size());
-  ret.data = reinterpret_cast<uint8_t *>(vox->data->data.data());
+  ret.data = const_cast<uint8_t *>(
+      reinterpret_cast<const uint8_t *>(vox->data->data.data()));
   return ret;
 }
 

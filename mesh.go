@@ -60,7 +60,6 @@ func NewMeshData(m *MeshModel) *MeshData {
 
 		trisSlice[i].normals = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Normals[0]))
 		trisSlice[i].n_count = C.size_t(len(m.Materials[i].Normals) / 3)
-
 	}
 
 	return &MeshData{m: C.voxel_pixel_mesh_data_create(cmeshData)}
@@ -134,7 +133,6 @@ func (t *MeshData) Get() *MeshModel {
 			for j := 0; j < int(mtlSlice[i].f_count*3); j++ {
 				m.Materials[i].Faces[j] = uint32(facesSlice[j])
 			}
-
 		}
 
 		if int(mtlSlice[i].n_count) > 0 {
@@ -202,6 +200,7 @@ func (t *MeshData) Set(m *MeshModel) {
 		trisSlice[i].normals = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Normals[0]))
 		trisSlice[i].n_count = C.size_t(len(m.Materials[i].Normals) / 3)
 	}
+
 	C.voxel_pixel_mesh_data_set(t.m, cmeshData)
 }
 

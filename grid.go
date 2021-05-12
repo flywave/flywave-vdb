@@ -181,19 +181,11 @@ func (m *FloatGrid) ToMeshSettings(isovalue float64, adaptivity float64) ([]floa
 	return points, faces, nil
 }
 
-func (m *FloatGrid) Transform(matrix []float64) (bool, error) {
-	if m == nil || m.m == nil {
-		return false, errors.New("FloatGrid error ")
-	}
-	ret := C.vdb_float_grid_transform(m.m, (*C.double)(unsafe.Pointer(&matrix[0])), C.int(len(matrix)))
-	return bool(ret), nil
-}
-
 func (m *FloatGrid) GetTransform() *Transform {
 	return &Transform{m: C.vdb_float_grid_get_transform(m.m)}
 }
 
-func (m *FloatGrid) SetTransform(tran *Transform)  {
+func (m *FloatGrid) SetTransform(tran *Transform) {
 	C.vdb_float_grid_set_transform(m.m, tran.m)
 }
 
@@ -414,7 +406,7 @@ func (m *PixelGrid) GetTransform() *Transform {
 	return &Transform{m: C.vdb_pixel_grid_get_transform(m.m)}
 }
 
-func (m *PixelGrid) SetTransform(tran *Transform)  {
+func (m *PixelGrid) SetTransform(tran *Transform) {
 	C.vdb_pixel_grid_set_transform(m.m, tran.m)
 }
 
@@ -440,14 +432,6 @@ func (m *PixelGrid) Write(file string) error {
 	C.vdb_pixel_grid_write(m.m, fname)
 
 	return nil
-}
-
-func (m *PixelGrid) Transform(matrix []float64) (bool, error) {
-	if m == nil || m.m == nil {
-		return false, errors.New("PixelGrid error ")
-	}
-	ret := C.vdb_pixel_grid_transform(m.m, (*C.double)(unsafe.Pointer(&matrix[0])), C.int(len(matrix)))
-	return bool(ret), nil
 }
 
 type PixelType uint8

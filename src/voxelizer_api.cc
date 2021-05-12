@@ -3,7 +3,9 @@
 #include "texture_mesh.hh"
 #include "voxelizer_api_impl.hh"
 
+#include "feature_meta_data.hh"
 #include "grid_api_impl.hh"
+#include "material_meta_data.hh"
 #include "repacker.hh"
 #include "voxel_mesh.hh"
 #include "voxel_pixel_sampler.hh"
@@ -13,6 +15,14 @@ using namespace flywave;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+FLYWAVE_VDB_API void voxel_pixel_initialize() {
+  register_feature_metadata_type();
+  register_material_metadata_type();
+  openvdb::initialize();
+}
+
+FLYWAVE_VDB_API void voxel_pixel_uninitialize() { openvdb::uninitialize(); }
 
 FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_create() {
   return new voxel_pixel_t{voxel_pixel::create_voxel_pixel()};
@@ -40,6 +50,22 @@ FLYWAVE_VDB_API void voxel_pixel_composite(voxel_pixel_t *vox,
 
 FLYWAVE_VDB_API void voxel_pixel_clear(voxel_pixel_t *vox) {
   vox->ptr->clear();
+}
+
+FLYWAVE_VDB_API void voxel_pixel_clear_unuse_materials(voxel_pixel_t *vox) {
+  vox->ptr->clear_unuse_materials();
+}
+
+FLYWAVE_VDB_API void voxel_pixel_clear_unuse_features(voxel_pixel_t *vox) {
+  vox->ptr->clear_unuse_features();
+}
+
+FLYWAVE_VDB_API void voxel_pixel_clear_materials(voxel_pixel_t *vox) {
+  vox->ptr->clear_materials();
+}
+
+FLYWAVE_VDB_API void voxel_pixel_clear_features(voxel_pixel_t *vox) {
+  vox->ptr->clear_features();
 }
 
 FLYWAVE_VDB_API _Bool voxel_pixel_ray_test(voxel_pixel_t *vox,
@@ -113,7 +139,7 @@ FLYWAVE_VDB_API _Bool voxel_pixel_is_empty(voxel_pixel_t *vox) {
 
 FLYWAVE_VDB_API voxel_pixel_materials_t *
 voxel_pixel_get_materials(voxel_pixel_t *vox) {
-  return new voxel_pixel_materials_t{vox->ptr->materials()};
+  return new voxel_pixel_materials_t{vox->ptr->get_materials()};
 }
 
 FLYWAVE_VDB_API void voxel_pixel_set_materials(voxel_pixel_t *vox,
@@ -1016,6 +1042,44 @@ voxel_filter_triangle_create(void *ctx) {
 
 FLYWAVE_VDB_API void voxel_filter_triangle_free(voxel_filter_triangle_t *vox) {
   delete vox;
+}
+
+FLYWAVE_VDB_API voxel_pixel_feature_data_t *
+voxel_pixel_feature_data_create(c_feature_data_t t) {
+  auto data = std::make_shared<feature_data>();
+  data->_feature_id = t.local;
+  data->_local_feature_id = t.global;
+  size_t si = t.size;
+  data->data.resize(si);
+  memcpy(&data->data[0], t.data, si);
+  return new voxel_pixel_feature_data_t{data};
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_feature_data_free(voxel_pixel_feature_data_t *vox) {
+  delete vox;
+}
+
+FLYWAVE_VDB_API c_feature_data_t
+voxel_pixel_feature_data_get(voxel_pixel_feature_data_t *vox) {
+  c_feature_data_t ret;
+  ret.global = vox->data->_feature_id;
+  ret.local = vox->data->_local_feature_id;
+  ret.size = static_cast<int>(vox->data->data.size());
+  ret.data = reinterpret_cast<uint8_t *>(vox->data->data.data());
+  return ret;
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_feature_data_set(voxel_pixel_feature_data_t *vox,
+                             c_feature_data_t cdata) {
+  auto data = std::make_shared<feature_data>();
+  data->_feature_id = cdata.global;
+  data->_local_feature_id = cdata.local;
+  size_t si = cdata.size;
+  data->data.resize(si);
+  memcpy(&data->data[0], cdata.data, si);
+  vox->data = data;
 }
 
 #ifdef __cplusplus

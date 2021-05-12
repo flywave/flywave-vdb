@@ -5,6 +5,7 @@
 
 #include "color_extract.hh"
 #include "material_data.hh"
+#include "feature_data.hh"
 #include "st_policy.hh"
 #include "types.hh"
 

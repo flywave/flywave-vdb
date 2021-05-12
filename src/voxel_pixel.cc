@@ -1,6 +1,8 @@
 
 #include "voxel_pixel.hh"
 #include "bbox.hh"
+#include "feature_meta_data.hh"
+#include "material_meta_data.hh"
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -207,20 +209,38 @@ bool voxel_pixel::ray_test(const std::vector<vdb::math::Ray<double>> &rays,
 }
 
 void voxel_pixel::clear_unuse_materials() {
-  std::map<material_id_t, bool> mapping;
-  for (auto pt : _materials) {
-    mapping.emplace(pt->_material_id, true);
+  std::map<std::string, bool> mapping;
+  for (auto m = _materials->beginMeta(); m != _materials->endMeta(); m++) {
+    mapping.emplace(m->first, true);
   }
 
   auto iter = get_pixel_grid()->tree().beginValueOn();
   while (iter) {
-    mapping[iter.getValue()._data._material_id] = false;
+    mapping[std::to_string(iter.getValue()._data._material_id)] = false;
     ++iter;
   }
 
   for (auto pt : mapping) {
     if (pt.second == false)
-      _materials.erase(_materials.begin() + pt.first);
+      _materials->removeMeta(pt.first);
+  }
+}
+
+void voxel_pixel::clear_unuse_features() {
+  std::map<std::string, bool> mapping;
+  for (auto m = _features->beginMeta(); m != _features->endMeta(); m++) {
+    mapping.emplace(m->first, true);
+  }
+
+  auto iter = get_pixel_grid()->tree().beginValueOn();
+  while (iter) {
+    mapping[std::to_string(iter.getValue()._data._feature_id)] = false;
+    ++iter;
+  }
+
+  for (auto pt : mapping) {
+    if (pt.second == false)
+      _features->removeMeta(pt.first);
   }
 }
 
@@ -279,16 +299,6 @@ int64_t voxel_pixel::get_memory_size() const {
   return _vertex->memUsage() + _pixel->memUsage();
 }
 
-inline void
-write_materials(std::ostream &os,
-                std::vector<std::shared_ptr<material_data>> &materials) {
-  uint32_t si = materials.size();
-  os.write(reinterpret_cast<const char *>(&si), sizeof(uint32_t));
-  for (int i = 0; i < si; i++) {
-    materials[i]->write(os);
-  }
-}
-
 bool voxel_pixel::write(const std::string &file) {
   std::ofstream os;
 
@@ -297,30 +307,21 @@ bool voxel_pixel::write(const std::string &file) {
   if (os.is_open()) {
     _resolution->baseMap()->write(os);
 
-    write_materials(os, _materials);
-
     _vertex->writeTopology(os);
     _vertex->writeBuffers(os);
 
     _pixel->writeTopology(os);
     _pixel->writeBuffers(os);
+
+    _materials->writeMeta(os);
+    _features->writeMeta(os);
+
     os.close();
     return true;
   }
 
   os.close();
   return false;
-}
-
-inline void
-read_materials(std::istream &is,
-               std::vector<std::shared_ptr<material_data>> &materials) {
-  uint32_t si;
-  is.read(reinterpret_cast<char *>(&si), sizeof(uint32_t));
-  materials.resize(si);
-  for (int i = 0; i < si; i++) {
-    materials[i]->read(is);
-  }
 }
 
 bool voxel_pixel::read(const std::string &file) {
@@ -331,13 +332,14 @@ bool voxel_pixel::read(const std::string &file) {
   if (is.is_open()) {
     _resolution->baseMap()->read(is);
 
-    read_materials(is, _materials);
-
     _vertex->readTopology(is);
     _vertex->readBuffers(is);
 
     _pixel->readTopology(is);
     _pixel->readBuffers(is);
+
+    _materials->readMeta(is);
+    _features->readMeta(is);
 
     _vertex->setTransform(_resolution);
     _vertex->setGridClass(vdb::GRID_LEVEL_SET);
@@ -470,6 +472,112 @@ vdb::BBoxd voxel_pixel::eval_max_min_elevation(vdb::BBoxd _in) {
                         vdb::Vec3d(_min, _in.min().y(), _in.min().z())),
                     voxel_resolution()->indexToWorld(
                         vdb::Vec3d(_max, _in.max().y(), _in.max().z())));
+}
+
+std::vector<std::shared_ptr<material_data>> voxel_pixel::get_materials() {
+  std::vector<std::shared_ptr<material_data>> results;
+  results.reserve(_materials->metaCount());
+  for (auto m = _materials->beginMeta(); m != _materials->endMeta(); m++) {
+    auto mtl = dynamic_cast<openvdb::MaterialMetadata *>(m->second.get());
+    results.emplace_back(std::make_shared<material_data>(mtl->value()));
+  }
+  return results;
+}
+
+void voxel_pixel::set_materials(
+    std::vector<std::shared_ptr<material_data>> mtls) {
+  _materials->clearMetadata();
+  for (auto m : mtls) {
+    _materials->insertMeta(std::to_string(m->_material_id),
+                           openvdb::MaterialMetadata(*m));
+  }
+}
+
+size_t voxel_pixel::materials_count() const { return _materials->metaCount(); }
+
+void voxel_pixel::clear_materials() const { _materials->clearMetadata(); }
+
+void voxel_pixel::remove_material(material_id_t id) {
+  if (has_material(id)) {
+    _materials->removeMeta(std::to_string(id));
+  }
+}
+
+bool voxel_pixel::has_material(material_id_t id) const {
+  return (*_materials)[std::to_string(id)] != nullptr;
+}
+
+void voxel_pixel::add_material(std::shared_ptr<material_data> mtl) {
+  auto id = mtl->_material_id;
+  if (has_material(id)) {
+    _materials->removeMeta(std::to_string(id));
+  }
+  _materials->insertMeta(std::to_string(id), openvdb::MaterialMetadata(*mtl));
+}
+
+std::shared_ptr<material_data> voxel_pixel::get_material(material_id_t id) {
+  auto mtl = dynamic_cast<openvdb::MaterialMetadata *>(
+      (*_materials)[std::to_string(id)].get());
+  if (mtl != nullptr)
+    return std::make_shared<material_data>(mtl->value());
+  return nullptr;
+}
+
+std::vector<std::shared_ptr<feature_data>> voxel_pixel::get_features() {
+  std::vector<std::shared_ptr<feature_data>> results;
+  results.reserve(_features->metaCount());
+  for (auto m = _features->beginMeta(); m != _features->endMeta(); m++) {
+    auto feat = dynamic_cast<openvdb::FeatureMetadata *>(m->second.get());
+    results.emplace_back(std::make_shared<feature_data>(feat->value()));
+  }
+  return results;
+}
+
+void voxel_pixel::set_features(
+    std::vector<std::shared_ptr<feature_data>> feats) {
+  _features->clearMetadata();
+  for (auto m : feats) {
+    _features->insertMeta(std::to_string(m->_feature_id),
+                          openvdb::FeatureMetadata(*m));
+  }
+}
+
+std::shared_ptr<feature_data> voxel_pixel::get_feature(local_feature_id_t id) {
+  auto mtl = dynamic_cast<openvdb::FeatureMetadata *>(
+      (*_features)[std::to_string(id)].get());
+  if (mtl != nullptr)
+    return std::make_shared<feature_data>(mtl->value());
+  return nullptr;
+}
+
+size_t voxel_pixel::features_count() const { return _features->metaCount(); }
+
+void voxel_pixel::clear_features() const { _features->clearMetadata(); }
+
+void voxel_pixel::add_features(std::shared_ptr<feature_data> feat) {
+  auto id = feat->_local_feature_id;
+  if (has_material(id)) {
+    _features->removeMeta(std::to_string(id));
+  }
+  _features->insertMeta(std::to_string(id), openvdb::FeatureMetadata(*feat));
+}
+
+void voxel_pixel::remove_feature(local_feature_id_t id) {
+  if (has_feature(id)) {
+    _features->removeMeta(std::to_string(id));
+  }
+}
+
+bool voxel_pixel::has_feature(local_feature_id_t id) const {
+  return (*_features)[std::to_string(id)] != nullptr;
+}
+
+void voxel_pixel::clear() {
+  clear_materials();
+  clear_features();
+  _pixel->clear();
+  _vertex->clear();
+  _resolution = vdb::math::Transform::createLinearTransform();
 }
 
 } // namespace flywave

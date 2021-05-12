@@ -189,6 +189,14 @@ func (m *FloatGrid) Transform(matrix []float64) (bool, error) {
 	return bool(ret), nil
 }
 
+func (m *FloatGrid) GetTransform() *Transform {
+	return &Transform{m: C.vdb_float_grid_get_transform(m.m)}
+}
+
+func (m *FloatGrid) SetTransform(tran *Transform)  {
+	C.vdb_float_grid_set_transform(m.m, tran.m)
+}
+
 func (m *FloatGrid) BooleanUnion(csg *FloatGrid) error {
 	if m == nil || m.m == nil {
 		return errors.New("Union error ")
@@ -400,6 +408,14 @@ func (m *PixelGrid) Clone() *PixelGrid {
 	return &PixelGrid{
 		m: C.vdb_pixel_grid_duplicate(m.m),
 	}
+}
+
+func (m *PixelGrid) GetTransform() *Transform {
+	return &Transform{m: C.vdb_pixel_grid_get_transform(m.m)}
+}
+
+func (m *PixelGrid) SetTransform(tran *Transform)  {
+	C.vdb_pixel_grid_set_transform(m.m, tran.m)
 }
 
 func (m *PixelGrid) Read(file string) error {

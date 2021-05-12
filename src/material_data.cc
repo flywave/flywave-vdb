@@ -56,3 +56,21 @@ void material_data::write(std::ostream &os) const {
      << anisotropy_rotation;
 }
 } // namespace flywave
+
+std::ostream &operator<<(std::ostream &os, const flywave::material_data &m) {
+  os << "Material{ id : " << m._material_id << ", type :" << m.type
+     << ", mode :" << m.mode << ", color :[" << m.color.x() << ","
+     << m.color.y() << "," << m.color.z() << "]"
+     << ", ambient :[" << m.ambient.x() << "," << m.ambient.y() << ","
+     << m.ambient.z() << "], emissive :[" << m.emissive.x() << ","
+     << m.emissive.y() << m.emissive.z() << ", specular :[" << m.specular.x()
+     << "," << m.specular.y() << "," << m.specular.z()
+     << ", opacity :" << m.opacity << ", shininess :" << m.shininess
+     << ", metallic :" << m.metallic << ", roughness :" << m.roughness
+     << ", reflectance :" << m.reflectance
+     << ", clearcoat_thickness :" << m.clearcoat_thickness
+     << ", clearcoat_roughness :" << m.clearcoat_roughness
+     << ", anisotropy :" << m.anisotropy
+     << ", anisotropy_rotation :" << m.anisotropy_rotation << "}";
+  return os;
+}

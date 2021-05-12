@@ -51,6 +51,10 @@ struct _voxel_pixel_texture_data_t {
   std::shared_ptr<flywave::texture_data> data;
 };
 
+struct _voxel_pixel_feature_data_t {
+  std::shared_ptr<flywave::feature_data> data;
+};
+
 struct _voxel_pixel_mesh_data_t {
   std::shared_ptr<flywave::mesh_data> data;
 };

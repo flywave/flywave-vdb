@@ -1,5 +1,6 @@
 #include "grid_api.h"
 #include "grid_api_impl.hh"
+#include "voxelizer_api_impl.hh"
 
 #include "float_grid.hh"
 #include "mesh_data.hh"
@@ -8,6 +9,7 @@
 #include <openvdb/tools/Dense.h>
 #include <openvdb/util/Util.h>
 
+#include <sstream>
 #include <vector>
 
 using namespace flywave;
@@ -131,6 +133,52 @@ FLYWAVE_VDB_API void vdb_float_grid_to_mesh_settings(vdb_float_grid_t *grid,
   grid->ptr->update_display(isovalue, adaptivity);
 }
 
+FLYWAVE_VDB_API _Bool vdb_float_grid_empty(vdb_float_grid_t *grid) {
+  return grid->ptr->grid()->empty();
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_clear(vdb_float_grid_t *grid) {
+  grid->ptr->grid()->clear();
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_prune(vdb_float_grid_t *grid,
+                                          float tolerance) {
+  grid->ptr->grid()->pruneGrid(tolerance);
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_clip(vdb_float_grid_t *grid, double *bbox) {
+  auto cbox = vdb::BBoxd(vdb::Vec3d{bbox[0], bbox[1], bbox[2]},
+                         vdb::Vec3d{bbox[3], bbox[4], bbox[5]});
+  grid->ptr->grid()->clipGrid(cbox);
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_clip_from_coordbox(vdb_float_grid_t *grid,
+                                                       int32_t *cbox) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{cbox[0], cbox[1], cbox[2]},
+                              vdb::Coord{cbox[3], cbox[4], cbox[5]});
+  grid->ptr->grid()->clip(ccbox);
+}
+
+FLYWAVE_VDB_API void
+vdb_float_grid_active_voxel_bounding_box(vdb_float_grid_t *grid, int32_t *box) {
+  auto bbox = grid->ptr->grid()->evalActiveVoxelBoundingBox();
+  box[0] = bbox.min().x();
+  box[1] = bbox.min().y();
+  box[2] = bbox.min().z();
+
+  box[3] = bbox.max().x();
+  box[4] = bbox.max().y();
+  box[5] = bbox.max().z();
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_active_voxel_dim(vdb_float_grid_t *grid,
+                                                     int32_t *dims) {
+  auto dim = grid->ptr->grid()->evalActiveVoxelDim();
+  dims[0] = dim.x();
+  dims[1] = dim.y();
+  dims[2] = dim.z();
+}
+
 FLYWAVE_VDB_API float *vdb_float_grid_vertex_buffer(vdb_float_grid_t *grid,
                                                     int *size) {
   float *verticeArray = grid->ptr->get_mesh_vertices();
@@ -145,20 +193,29 @@ FLYWAVE_VDB_API int *vdb_float_grid_face_buffer(vdb_float_grid_t *grid,
   return faceArray;
 }
 
-FLYWAVE_VDB_API _Bool vdb_float_grid_transform(vdb_float_grid_t *grid,
-                                               double *matrix, int mCount) {
-  if (mCount != 16) {
-    return false;
-  }
+FLYWAVE_VDB_API voxel_transform_t *
+vdb_float_grid_get_transform(vdb_float_grid_t *grid) {
+  return new voxel_transform_t{grid->ptr->grid()->transformPtr()};
+}
 
-  vdb::math::Mat4d xform = vdb::math::Mat4d(
-      matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5],
-      matrix[6], matrix[7], matrix[8], matrix[9], matrix[10], matrix[11],
-      matrix[12], matrix[13], matrix[14], matrix[15]);
+FLYWAVE_VDB_API void vdb_float_grid_set_transform(vdb_float_grid_t *grid,
+                                                  voxel_transform_t *tran) {
+  grid->ptr->grid()->setTransform(tran->ptr);
+}
 
-  grid->ptr->transform(xform);
+FLYWAVE_VDB_API _Bool
+vdb_float_grid_save_float_as_half(vdb_float_grid_t *grid) {
+  return grid->ptr->grid()->saveFloatAsHalf();
+}
 
-  return true;
+FLYWAVE_VDB_API void
+vdb_float_grid_set_save_float_as_half(vdb_float_grid_t *grid, _Bool v) {
+  grid->ptr->grid()->setSaveFloatAsHalf(v);
+}
+
+FLYWAVE_VDB_API uint64_t
+vdb_float_grid_active_voxel_count(vdb_float_grid_t *grid) {
+  return grid->ptr->grid()->activeVoxelCount();
 }
 
 FLYWAVE_VDB_API void vdb_float_grid_union(vdb_float_grid_t *grid,
@@ -336,20 +393,83 @@ FLYWAVE_VDB_API _Bool vdb_pixel_grid_write(vdb_pixel_grid_t *grid,
   return grid->ptr->write(filename);
 }
 
-FLYWAVE_VDB_API _Bool vdb_pixel_grid_transform(vdb_pixel_grid_t *grid,
-                                               double *matrix, int mCount) {
-  if (mCount != 16) {
-    return false;
-  }
+FLYWAVE_VDB_API _Bool vdb_pixel_grid_empty(vdb_pixel_grid_t *grid) {
+  return grid->ptr->grid()->empty();
+}
 
-  vdb::math::Mat4d xform = vdb::math::Mat4d(
-      matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5],
-      matrix[6], matrix[7], matrix[8], matrix[9], matrix[10], matrix[11],
-      matrix[12], matrix[13], matrix[14], matrix[15]);
+FLYWAVE_VDB_API void vdb_pixel_grid_clear(vdb_pixel_grid_t *grid) {
+  grid->ptr->grid()->clear();
+}
 
-  grid->ptr->transform(xform);
+FLYWAVE_VDB_API voxel_transform_t *
+vdb_pixel_grid_get_transform(vdb_pixel_grid_t *grid) {
+  return new voxel_transform_t{grid->ptr->grid()->transformPtr()};
+}
 
-  return true;
+FLYWAVE_VDB_API void vdb_pixel_grid_set_transform(vdb_pixel_grid_t *grid,
+                                                  voxel_transform_t *tran) {
+  grid->ptr->grid()->setTransform(tran->ptr);
+}
+
+FLYWAVE_VDB_API char *vdb_float_grid_print_info(vdb_float_grid_t *grid) {
+  std::stringstream os;
+  grid->ptr->grid()->print(os);
+  char *ret = (char *)malloc(sizeof(char) * os.str().size() + 1);
+  memcpy(ret, os.str().c_str(), os.str().size());
+  ret[os.str().size()] = '\0';
+  return ret;
+}
+
+FLYWAVE_VDB_API void vdb_pixel_grid_prune(vdb_pixel_grid_t *grid,
+                                          float tolerance) {
+  grid->ptr->grid()->pruneGrid(tolerance);
+}
+
+FLYWAVE_VDB_API void vdb_pixel_grid_clip(vdb_pixel_grid_t *grid, double *bbox) {
+  auto cbox = vdb::BBoxd(vdb::Vec3d{bbox[0], bbox[1], bbox[2]},
+                         vdb::Vec3d{bbox[3], bbox[4], bbox[5]});
+  grid->ptr->grid()->clipGrid(cbox);
+}
+
+FLYWAVE_VDB_API void vdb_pixel_grid_clip_from_coordbox(vdb_pixel_grid_t *grid,
+                                                       int32_t *cbox) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{cbox[0], cbox[1], cbox[2]},
+                              vdb::Coord{cbox[3], cbox[4], cbox[5]});
+  grid->ptr->grid()->clip(ccbox);
+}
+
+FLYWAVE_VDB_API void
+vdb_pixel_grid_active_voxel_bounding_box(vdb_pixel_grid_t *grid, int32_t *box) {
+  auto bbox = grid->ptr->grid()->evalActiveVoxelBoundingBox();
+  box[0] = bbox.min().x();
+  box[1] = bbox.min().y();
+  box[2] = bbox.min().z();
+
+  box[3] = bbox.max().x();
+  box[4] = bbox.max().y();
+  box[5] = bbox.max().z();
+}
+
+FLYWAVE_VDB_API void vdb_pixel_grid_active_voxel_dim(vdb_pixel_grid_t *grid,
+                                                     int32_t *dims) {
+  auto dim = grid->ptr->grid()->evalActiveVoxelDim();
+  dims[0] = dim.x();
+  dims[1] = dim.y();
+  dims[2] = dim.z();
+}
+
+FLYWAVE_VDB_API uint64_t
+vdb_pixel_grid_active_voxel_count(vdb_pixel_grid_t *grid) {
+  return grid->ptr->grid()->activeVoxelCount();
+}
+
+FLYWAVE_VDB_API char *vdb_pixel_grid_print_info(vdb_pixel_grid_t *grid) {
+  std::stringstream os;
+  grid->ptr->grid()->print(os);
+  char *ret = (char *)malloc(sizeof(char) * os.str().size() + 1);
+  memcpy(ret, os.str().c_str(), os.str().size());
+  ret[os.str().size()] = '\0';
+  return ret;
 }
 
 FLYWAVE_VDB_API void vdb_pixel_grid_set(vdb_pixel_grid_t *grid, int x, int y,

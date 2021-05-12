@@ -52,13 +52,37 @@ public:
 
   bool is_empty() { return _vertex == nullptr; }
 
-  std::vector<std::shared_ptr<material_data>> materials() {
-    return std::move(_materials);
-  }
+  std::vector<std::shared_ptr<material_data>> get_materials();
 
-  void set_materials(std::vector<std::shared_ptr<material_data>> mtls) {
-    _materials = std::move(mtls);
-  }
+  void set_materials(std::vector<std::shared_ptr<material_data>> mtls);
+
+  void add_material(std::shared_ptr<material_data> mtl);
+
+  void remove_material(material_id_t id);
+
+  std::shared_ptr<material_data> get_material(material_id_t id);
+
+  bool has_material(material_id_t id) const;
+
+  size_t materials_count() const;
+
+  void clear_materials() const;
+
+  std::vector<std::shared_ptr<feature_data>> get_features();
+
+  void set_features(std::vector<std::shared_ptr<feature_data>> feats);
+
+  void add_features(std::shared_ptr<feature_data> feat);
+
+  std::shared_ptr<feature_data> get_feature(local_feature_id_t id);
+
+  void remove_feature(local_feature_id_t id);
+
+  bool has_feature(local_feature_id_t id) const;
+
+  size_t features_count() const;
+
+  void clear_features() const;
 
 public:
   bool write(const std::string &file);
@@ -82,7 +106,7 @@ public:
   bool ray_test(const std::vector<vdb::math::Ray<double>> &rays,
                 std::vector<openvdb::Vec3d> &ps);
 
-  void clear() { return clear_unuse_materials(); }
+  void clear();
 
   pixel_grid::Ptr extract_color(voxel_pixel &spot);
 
@@ -90,16 +114,19 @@ public:
 
   vdb::BBoxd eval_max_min_elevation(vdb::BBoxd _in);
 
+  void clear_unuse_materials();
+
+  void clear_unuse_features();
+
 private:
   void merge_materials(voxel_pixel &tpot);
-
-  void clear_unuse_materials();
 
 private:
   vdb::math::Transform::Ptr _resolution;
   vertex_grid::Ptr _vertex;
   pixel_grid::Ptr _pixel;
-  std::vector<std::shared_ptr<material_data>> _materials;
+  material_meta_map::Ptr _materials;
+  feature_meta_map::Ptr _features;
 };
 
 } // namespace flywave

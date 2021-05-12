@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 typedef struct _vdb_float_grid_t vdb_float_grid_t;
+typedef struct _voxel_transform_t voxel_transform_t;
 
 extern FLYWAVE_VDB_API vdb_float_grid_t *vdb_float_grid_create();
 extern FLYWAVE_VDB_API void vdb_float_grid_free(vdb_float_grid_t *grid);
@@ -24,6 +25,30 @@ extern FLYWAVE_VDB_API _Bool vdb_float_grid_read(vdb_float_grid_t *grid,
                                                  const char *filename);
 extern FLYWAVE_VDB_API _Bool vdb_float_grid_write(vdb_float_grid_t *grid,
                                                   const char *filename);
+
+extern FLYWAVE_VDB_API _Bool vdb_float_grid_empty(vdb_float_grid_t *grid);
+extern FLYWAVE_VDB_API void vdb_float_grid_clear(vdb_float_grid_t *grid);
+
+extern FLYWAVE_VDB_API _Bool
+vdb_float_grid_save_float_as_half(vdb_float_grid_t *grid);
+extern FLYWAVE_VDB_API void
+vdb_float_grid_set_save_float_as_half(vdb_float_grid_t *grid, _Bool v);
+
+extern FLYWAVE_VDB_API uint64_t
+vdb_float_grid_active_voxel_count(vdb_float_grid_t *grid);
+
+extern FLYWAVE_VDB_API void vdb_float_grid_prune(vdb_float_grid_t *grid,
+                                                 float tolerance);
+extern FLYWAVE_VDB_API void vdb_float_grid_clip(vdb_float_grid_t *grid,
+                                                double *bbox);
+extern FLYWAVE_VDB_API void
+vdb_float_grid_clip_from_coordbox(vdb_float_grid_t *grid, int32_t *cbox);
+
+extern FLYWAVE_VDB_API void
+vdb_float_grid_active_voxel_bounding_box(vdb_float_grid_t *grid, int32_t *box);
+
+extern FLYWAVE_VDB_API void
+vdb_float_grid_active_voxel_dim(vdb_float_grid_t *grid, int32_t *dims);
 
 extern FLYWAVE_VDB_API _Bool vdb_float_grid_from_points(
     vdb_float_grid_t *grid, double *vPoints, int pCount, double *vRadius,
@@ -42,9 +67,14 @@ vdb_float_grid_vertex_buffer(vdb_float_grid_t *grid, int *size);
 extern FLYWAVE_VDB_API int *vdb_float_grid_face_buffer(vdb_float_grid_t *grid,
                                                        int *size);
 
-extern FLYWAVE_VDB_API _Bool vdb_float_grid_transform(vdb_float_grid_t *grid,
-                                                      double *matrix,
-                                                      int mCount);
+extern FLYWAVE_VDB_API voxel_transform_t *
+vdb_float_grid_get_transform(vdb_float_grid_t *grid);
+
+extern FLYWAVE_VDB_API char *
+vdb_float_grid_print_info(vdb_float_grid_t *grid);
+
+extern FLYWAVE_VDB_API void
+vdb_float_grid_set_transform(vdb_float_grid_t *grid, voxel_transform_t *tran);
 
 extern FLYWAVE_VDB_API void vdb_float_grid_union(vdb_float_grid_t *grid,
                                                  vdb_float_grid_t *csgGrid);
@@ -104,14 +134,39 @@ extern FLYWAVE_VDB_API void vdb_pixel_grid_free(vdb_pixel_grid_t *grid);
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *
 vdb_pixel_grid_duplicate(vdb_pixel_grid_t *grid);
 
+extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_empty(vdb_pixel_grid_t *grid);
+extern FLYWAVE_VDB_API void vdb_pixel_grid_clear(vdb_pixel_grid_t *grid);
+
 extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_read(vdb_pixel_grid_t *grid,
                                                  const char *filename);
 extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_write(vdb_pixel_grid_t *grid,
                                                   const char *filename);
 
-extern FLYWAVE_VDB_API _Bool vdb_pixel_grid_transform(vdb_pixel_grid_t *grid,
-                                                      double *matrix,
-                                                      int mCount);
+extern FLYWAVE_VDB_API voxel_transform_t *
+vdb_pixel_grid_get_transform(vdb_pixel_grid_t *grid);
+
+extern FLYWAVE_VDB_API void
+vdb_pixel_grid_set_transform(vdb_pixel_grid_t *grid, voxel_transform_t *tran);
+
+extern FLYWAVE_VDB_API void
+vdb_pixel_grid_active_voxel_bounding_box(vdb_pixel_grid_t *grid, int32_t *box);
+
+extern FLYWAVE_VDB_API void
+vdb_pixel_grid_active_voxel_dim(vdb_pixel_grid_t *grid, int32_t *dims);
+
+extern FLYWAVE_VDB_API void vdb_pixel_grid_prune(vdb_pixel_grid_t *grid,
+                                                 float tolerance);
+extern FLYWAVE_VDB_API void vdb_pixel_grid_clip(vdb_pixel_grid_t *grid,
+                                                double *bbox);
+extern FLYWAVE_VDB_API void
+vdb_pixel_grid_clip_from_coordbox(vdb_pixel_grid_t *grid, int32_t *cbox);
+
+extern FLYWAVE_VDB_API uint64_t
+vdb_pixel_grid_active_voxel_count(vdb_pixel_grid_t *grid);
+
+extern FLYWAVE_VDB_API char *
+vdb_pixel_grid_print_info(vdb_pixel_grid_t *grid);
+
 enum vdb_pixel_type_t { color, material, material_and_color, invalid };
 
 typedef struct _vdb_pixel_t {

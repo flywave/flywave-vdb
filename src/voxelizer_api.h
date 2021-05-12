@@ -22,6 +22,7 @@ typedef struct _voxel_pixel_material_data_t voxel_pixel_material_data_t;
 typedef struct _voxel_pixel_materials_t voxel_pixel_materials_t;
 typedef struct _voxel_pixel_texture_data_t voxel_pixel_texture_data_t;
 typedef struct _voxel_pixel_mesh_data_t voxel_pixel_mesh_data_t;
+typedef struct _voxel_pixel_feature_data_t voxel_pixel_feature_data_t;
 typedef struct _voxel_mesh_builder_t voxel_mesh_builder_t;
 typedef struct _voxel_border_lock_t voxel_border_lock_t;
 typedef struct _voxel_filter_triangle_t voxel_filter_triangle_t;
@@ -29,6 +30,9 @@ typedef struct _voxel_transform_t voxel_transform_t;
 typedef struct _voxel_texture_mesh_t voxel_texture_mesh_t;
 typedef struct _voxel_texture2d_t voxel_texture2d_t;
 typedef struct _voxel_clip_box_createor_t voxel_clip_box_createor_t;
+
+extern FLYWAVE_VDB_API void voxel_pixel_initialize();
+extern FLYWAVE_VDB_API void voxel_pixel_uninitialize();
 
 extern FLYWAVE_VDB_API voxel_pixel_t *voxel_pixel_create();
 extern FLYWAVE_VDB_API void voxel_pixel_free(voxel_pixel_t *vox);
@@ -40,6 +44,12 @@ extern FLYWAVE_VDB_API _Bool voxel_pixel_write(voxel_pixel_t *vox,
 extern FLYWAVE_VDB_API void
 voxel_pixel_composite(voxel_pixel_t *vox, voxel_pixel_t *tg, uint32_t type);
 extern FLYWAVE_VDB_API void voxel_pixel_clear(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API void
+voxel_pixel_clear_unuse_materials(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API void
+voxel_pixel_clear_unuse_features(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API void voxel_pixel_clear_materials(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API void voxel_pixel_clear_features(voxel_pixel_t *vox);
 extern FLYWAVE_VDB_API _Bool voxel_pixel_ray_test(voxel_pixel_t *vox,
                                                   double *ray_origin,
                                                   double *ray_direction,
@@ -410,6 +420,23 @@ extern FLYWAVE_VDB_API voxel_clip_box_createor_t *
 voxel_clip_box_createor_create(void *ctx);
 extern FLYWAVE_VDB_API void
 voxel_clip_box_createor_free(voxel_clip_box_createor_t *vox);
+
+typedef struct _c_feature_data_t {
+  uint8_t local;
+  uint64_t global;
+  size_t size;
+  uint8_t *data;
+} c_feature_data_t;
+
+extern FLYWAVE_VDB_API voxel_pixel_feature_data_t *
+voxel_pixel_feature_data_create(c_feature_data_t t);
+extern FLYWAVE_VDB_API void
+voxel_pixel_feature_data_free(voxel_pixel_feature_data_t *vox);
+extern FLYWAVE_VDB_API c_feature_data_t
+voxel_pixel_feature_data_get(voxel_pixel_feature_data_t *vox);
+extern FLYWAVE_VDB_API void
+voxel_pixel_feature_data_set(voxel_pixel_feature_data_t *vox,
+                             c_feature_data_t data);
 
 #ifdef __cplusplus
 }

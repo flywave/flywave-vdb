@@ -11,6 +11,10 @@ import (
 	"unsafe"
 )
 
+func init() {
+	C.voxel_pixel_initialize()
+}
+
 type VoxelPixel struct {
 	m *C.struct__voxel_pixel_t
 }
@@ -70,6 +74,22 @@ func (m *VoxelPixel) Composite(t *VoxelPixel, tp CompositeType) {
 
 func (m *VoxelPixel) Clear() {
 	C.voxel_pixel_clear(m.m)
+}
+
+func (m *VoxelPixel) ClearUnuseMaterials() {
+	C.voxel_pixel_clear_unuse_materials(m.m)
+}
+
+func (m *VoxelPixel) ClearUnuseFeatures() {
+	C.voxel_pixel_clear_unuse_features(m.m)
+}
+
+func (m *VoxelPixel) ClearMaterials() {
+	C.voxel_pixel_clear_materials(m.m)
+}
+
+func (m *VoxelPixel) ClearFeatures() {
+	C.voxel_pixel_clear_features(m.m)
 }
 
 func (m *VoxelPixel) RayTest(r *Ray) (bool, []float64) {

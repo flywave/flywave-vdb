@@ -39,11 +39,9 @@ struct material_data {
   float anisotropy{0.f};
   float anisotropy_rotation{0.0f};
 
-  material_data(const material_data &) = default;
-  material_data() = default;
-  material_data(material_data &&) = default;
-
   bool operator==(const material_data &p) const;
+
+  explicit operator bool() const { return _material_id != material_id_t(-1); }
 
   void read(std::istream &is);
 
@@ -51,3 +49,18 @@ struct material_data {
 };
 
 } // namespace flywave
+
+std::ostream &operator<<(std::ostream &, const flywave::material_data &);
+
+namespace openvdb {
+namespace OPENVDB_VERSION_NAME {
+
+template <> inline const char *typeNameAsString<flywave::material_data>() {
+  return "material";
+}
+
+template <> inline flywave::material_data zeroVal<flywave::material_data>() {
+  return flywave::material_data();
+}
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb

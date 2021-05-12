@@ -52,7 +52,6 @@ func (t *VoxelTile) SurfaceQuery(points [][]float64, space Space) [][]float64 {
 		rays[i] = *rt
 	}
 	res := t.vpixel.RayTests(rays)
-
 	return res
 }
 

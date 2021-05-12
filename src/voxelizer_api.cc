@@ -56,6 +56,26 @@ FLYWAVE_VDB_API _Bool voxel_pixel_ray_test(voxel_pixel_t *vox,
   return f;
 }
 
+FLYWAVE_VDB_API _Bool voxel_pixel_ray_tests(voxel_pixel_t *vox,
+                                            double *ray_origin,
+                                            double *ray_direction, double *p,
+                                            size_t count) {
+  std::vector<vdb::math::Ray<double>> rays;
+  rays.resize(count);
+  for (int i = 0; i < count; i++) {
+    rays[i] = vdb::math::Ray<double>(
+        vdb::Vec3d(ray_origin[(i * 3) + 0], ray_origin[(i * 3) + 1],
+                   ray_origin[(i * 3) + 2]),
+        vdb::Vec3d(ray_direction[(i * 3) + 0], ray_direction[(i * 3) + 1],
+                   ray_direction[(i * 3) + 2]));
+  }
+  std::vector<vdb::Vec3d> query;
+  query.resize(count);
+  auto f = vox->ptr->ray_test(rays, query);
+  memcpy(p, &query[0], count * sizeof(double) * 3);
+  return f;
+}
+
 FLYWAVE_VDB_API voxel_transform_t *
 voxel_pixel_voxel_resolution(voxel_pixel_t *vox) {
   return new voxel_transform_t{vox->ptr->voxel_resolution()};
@@ -73,8 +93,8 @@ voxel_pixel_get_pixel_grid(voxel_pixel_t *vox) {
       std::make_shared<vdb_pixel_grid>(vox->ptr->get_pixel_grid())};
 }
 
- FLYWAVE_VDB_API int64_t voxel_pixel_get_memory_size(voxel_pixel_t *vox){
-   return vox->ptr->get_memory_size();
+FLYWAVE_VDB_API int64_t voxel_pixel_get_memory_size(voxel_pixel_t *vox) {
+  return vox->ptr->get_memory_size();
 }
 
 FLYWAVE_VDB_API void voxel_pixel_set_voxel_grid(voxel_pixel_t *vox,

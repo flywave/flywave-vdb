@@ -44,6 +44,10 @@ extern FLYWAVE_VDB_API _Bool voxel_pixel_ray_test(voxel_pixel_t *vox,
                                                   double *ray_origin,
                                                   double *ray_direction,
                                                   double *p);
+extern FLYWAVE_VDB_API _Bool voxel_pixel_ray_tests(voxel_pixel_t *vox,
+                                                   double *ray_origin,
+                                                   double *ray_direction,
+                                                   double *p, size_t count);
 extern FLYWAVE_VDB_API voxel_transform_t *
 voxel_pixel_voxel_resolution(voxel_pixel_t *vox);
 extern FLYWAVE_VDB_API vdb_float_grid_t *

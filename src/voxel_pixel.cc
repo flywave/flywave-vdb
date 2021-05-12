@@ -177,6 +177,38 @@ bool voxel_pixel::ray_test(const vdb::math::Ray<double> &ray,
   return vray.intersectsWS(ray, p);
 }
 
+class ray_tracer_op {
+public:
+  using index_tree = vdb::tree::Tree4<int32_t, 5, 4, 3>::Type;
+
+public:
+  ray_tracer_op(vertex_grid::Ptr grid,
+                const std::vector<vdb::math::Ray<double>> &rays,
+                std::vector<openvdb::Vec3d> &ps)
+      : _rays(rays), _ps(ps), _vray(*grid) {}
+
+  void operator()(const tbb::blocked_range<size_t> &range) {
+    for (size_t j = range.begin(), je = range.end(); j < je; ++j) {
+      _vray.intersectsWS(_rays[j], _ps[j]);
+    }
+  }
+
+private:
+  const std::vector<vdb::math::Ray<double>> &_rays;
+  std::vector<openvdb::Vec3d> &_ps;
+  openvdb::tools::LevelSetRayIntersector<vertex_grid> _vray;
+};
+
+bool voxel_pixel::ray_test(const std::vector<vdb::math::Ray<double>> &rays,
+                           std::vector<openvdb::Vec3d> &ps) {
+  if (_vertex->empty())
+    return false;
+  ray_tracer_op op(_vertex, rays, ps);
+  tbb::blocked_range<size_t> range(0, rays.size());
+  tbb::parallel_for(range, op);
+  return true;
+}
+
 void voxel_pixel::clear_unuse_materials() {
   std::map<material_id_t, bool> mapping;
   for (auto pt : _materials) {

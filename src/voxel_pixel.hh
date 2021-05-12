@@ -79,6 +79,9 @@ public:
 
   bool ray_test(const vdb::math::Ray<double> &ray, openvdb::Vec3d &p);
 
+  bool ray_test(const std::vector<vdb::math::Ray<double>> &rays,
+                std::vector<openvdb::Vec3d> &ps);
+
   void clear() { return clear_unuse_materials(); }
 
   pixel_grid::Ptr extract_color(voxel_pixel &spot);

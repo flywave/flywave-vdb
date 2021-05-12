@@ -79,24 +79,27 @@ func (m *VoxelPixel) RayTest(r *Ray) (bool, []float64) {
 }
 
 func (m *VoxelPixel) RayTests(rs []Ray) [][]float64 {
-	origin := make([]float64, 3 * len(rs))
-	dir := make([]float64, 3 * len(rs))
-	for i, r := range rs {
+	origin := make([]float64, 3*len(rs))
+	dir := make([]float64, 3*len(rs))
+	for i, _ := range rs {
 		origin[(i * 3)] = rs[i].origin[0]
-		origin[(i * 3) + 1] = rs[i].origin[1]
-		origin[(i * 3) + 2] = rs[i].origin[2]
+		origin[(i*3)+1] = rs[i].origin[1]
+		origin[(i*3)+2] = rs[i].origin[2]
 
-		dir[(i * 3)] =  rs[i].dir[0]
-		dir[(i * 3) + 1] = rs[i].dir[1]
-		dir[(i * 3) + 2] = rs[i].dir[2]
+		dir[(i * 3)] = rs[i].dir[0]
+		dir[(i*3)+1] = rs[i].dir[1]
+		dir[(i*3)+2] = rs[i].dir[2]
 	}
-	p := make([]float64, 3 * len(rs))
-	ret := bool(C.voxel_pixel_ray_tests(m.m, (*C.double)((unsafe.Pointer)(&origin[0])), (*C.double)((unsafe.Pointer)(&dir[0])), (*C.double)((unsafe.Pointer)(&p[0])), C.size_t(len(rs))))
+	p := make([]float64, 3*len(rs))
+	ok := bool(C.voxel_pixel_ray_tests(m.m, (*C.double)((unsafe.Pointer)(&origin[0])), (*C.double)((unsafe.Pointer)(&dir[0])), (*C.double)((unsafe.Pointer)(&p[0])), C.size_t(len(rs))))
+	if !ok {
+		return nil
+	}
 	pos := make([][]float64, len(rs))
-	for i := range len(rs) {
-		pos[i] = p[i * 3 : (i * 3) + 2]
+	for i := 0; i < len(rs); i++ {
+		pos[i] = p[i*3 : (i*3)+2]
 	}
-	return nil
+	return pos
 }
 
 func (m *VoxelPixel) VoxelResolution() *Transform {

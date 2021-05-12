@@ -179,15 +179,12 @@ bool voxel_pixel::ray_test(const vdb::math::Ray<double> &ray,
 
 class ray_tracer_op {
 public:
-  using index_tree = vdb::tree::Tree4<int32_t, 5, 4, 3>::Type;
-
-public:
   ray_tracer_op(vertex_grid::Ptr grid,
                 const std::vector<vdb::math::Ray<double>> &rays,
                 std::vector<openvdb::Vec3d> &ps)
       : _rays(rays), _ps(ps), _vray(*grid) {}
 
-  void operator()(const tbb::blocked_range<size_t> &range) {
+  void operator()(const tbb::blocked_range<size_t> &range) const {
     for (size_t j = range.begin(), je = range.end(); j < je; ++j) {
       _vray.intersectsWS(_rays[j], _ps[j]);
     }

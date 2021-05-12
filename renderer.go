@@ -6,6 +6,7 @@ package vdb
 // #cgo CXXFLAGS: -I ./lib
 import "C"
 import (
+	"image"
 	"reflect"
 	"unsafe"
 )
@@ -57,15 +58,15 @@ func (m *Renderer) RenderScene() {
 	C.voxel_renderer_render_scene(m.m)
 }
 
-func (m *Renderer) FrameBuffer(resolution []int32) []byte {
+func (m *Renderer) GetFrameBuffer(resolution []int32) []uint8 {
 	var buf *C.uchar
 	C.voxel_renderer_frame_buffer(m.m, (*C.int)((unsafe.Pointer)(&resolution[0])), &buf)
 
 	si := uint32(resolution[0] * resolution[1] * 3)
 
-	raw := make([]byte, si)
+	raw := make([]uint8, si)
 
-	var src []byte
+	var src []uint8
 	aHeader := (*reflect.SliceHeader)((unsafe.Pointer(&src)))
 	aHeader.Cap = int(si)
 	aHeader.Len = int(si)
@@ -74,6 +75,17 @@ func (m *Renderer) FrameBuffer(resolution []int32) []byte {
 	copy(raw, src)
 
 	return raw
+}
+
+func (m *Renderer) GetFrameBufferImage(resolution []int32) *image.NRGBA {
+	pix := m.GetFrameBuffer(resolution)
+	rect := image.Rectangle{Min: image.Pt(0, 0), Max: image.Pt(int(resolution[0]), int(resolution[1]))}
+
+	return &image.NRGBA{
+		Pix:    pix,
+		Stride: 4 * rect.Dx(),
+		Rect:   rect,
+	}
 }
 
 func (m *Renderer) Relocate(path string, copyRelocate bool) {

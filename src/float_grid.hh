@@ -49,6 +49,8 @@ public:
   void closest_point(std::vector<openvdb::Vec3R> &points,
                      std::vector<float> &distances);
 
+  openvdb::Vec3d bary_center();
+
   mesh_data display();
 
   void update_display();

@@ -31,7 +31,7 @@ func TestMeshBuilder(t *testing.T) {
 
 	clip := &NoneClipBoxCreateor{}
 	mat := []float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
-	precision := float32(0.1)
+	precision := float32(10)
 
 	vpixel := vmesh.SampleVoxelPixel(nil, 1, precision, clip, ST_LEVEL_SET, mat)
 

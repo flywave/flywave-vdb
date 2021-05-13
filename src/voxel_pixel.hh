@@ -41,6 +41,12 @@ public:
 
   pixel_grid::Ptr get_pixel_grid() const { return _pixel; }
 
+  bool is_sdf() const;
+
+  double get_volume() const;
+
+  double get_area() const;
+
   int64_t get_memory_size() const;
 
   void set_voxel_grid(vertex_grid::Ptr ptr) {
@@ -117,6 +123,14 @@ public:
   void clear_unuse_materials();
 
   void clear_unuse_features();
+
+  openvdb::Vec3d get_gradient(const openvdb::Vec3d &pos) const;
+
+  bool eval_gradients(openvdb::Vec3d *gradients, int stride,
+                      const openvdb::Vec3d *pos, int num_pos,
+                      bool normalize) const;
+
+  double calc_positive_density() const;
 
 private:
   void merge_materials(voxel_pixel &tpot);

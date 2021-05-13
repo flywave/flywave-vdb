@@ -4,10 +4,10 @@
 #include <iostream>
 
 #include "color_extract.hh"
-#include "material_data.hh"
 #include "feature_data.hh"
-#include "uv_policy.hh"
+#include "material_data.hh"
 #include "types.hh"
+#include "uv_policy.hh"
 
 #include <openvdb/Types.h>
 
@@ -125,10 +125,8 @@ public:
   const material_group &find_material(material_id_t index) {
     return _materials[index];
   }
-    
-    bool has_materials() const {
-        return _materials.size() > 0;
-    }
+
+  bool has_materials() const { return _materials.size() > 0; }
 
   std::unique_ptr<triangles_stream> _stream;
   std::map<material_id_t, material_group> _materials;

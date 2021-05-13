@@ -28,6 +28,8 @@ public:
 
   void transform(openvdb::Mat4d xform);
 
+  openvdb::Vec3d bary_center();
+
   void set(const int i, const int j, const int k, const pixel &v);
 
   pixel operator()(const int i, const int j, const int k) const;

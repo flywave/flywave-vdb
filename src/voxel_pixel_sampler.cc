@@ -31,9 +31,9 @@ voxel_pixel_sampler::apply(float precision, clip_box_createor &creator,
 
   pixel_grid::Ptr pixel = pixel_grid::create();
   if (_adapter.has_materials()) {
-   coloring(vgrid, pixel, fgrid, transform, tmtl, _adapter, _local_feature_id);
+    coloring(vgrid, pixel, fgrid, transform, tmtl, _adapter, _local_feature_id);
   }
-    
+
   return std::make_shared<voxel_pixel>(vgrid, pixel, transform);
 }
 

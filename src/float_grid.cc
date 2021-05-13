@@ -299,6 +299,14 @@ void vdb_float_grid::closest_point(std::vector<openvdb::Vec3R> &points,
   csp->searchAndReplace(points, distances);
 }
 
+openvdb::Vec3d vdb_float_grid::bary_center() {
+  if (grid() == nullptr)
+    return openvdb::Vec3d(0, 0, 0);
+
+  openvdb::CoordBBox bbox = grid()->evalActiveVoxelBoundingBox();
+  return bbox.getCenter();
+}
+
 mesh_data vdb_float_grid::display() { return _display; }
 
 void vdb_float_grid::update_display() {

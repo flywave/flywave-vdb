@@ -710,11 +710,13 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
                           double *matrix) {
   std::unique_ptr<voxel_mesh_adapter> stream =
       std::make_unique<voxel_mesh_adapter>(m->ptr, m->mtl_maps, m->tex_maps);
+  auto stream_ptr = stream.get();
 
   mesh_adapter _mesh_adapter{std::move(stream)};
 
-  stream->fill_meterial(_mesh_adapter);
-  
+  stream_ptr->fill_meterial(_mesh_adapter);
+  stream_ptr->set_matrix(openvdb::Mat4d(matrix));
+
   material_merge_transfrom tmtl(
       mtls == nullptr ? std::vector<std::shared_ptr<material_data>>{}
                       : mtls->mtls);
@@ -722,8 +724,6 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
   std::shared_ptr<flywave::voxel_pixel> stff_pot =
       sampler.apply(precision, *creator->ptr, static_cast<sampler_type>(type),
                     tmtl, openvdb::Mat4d(matrix));
-
-  stream->set_matrix(openvdb::Mat4d(matrix));
 
   if (mtls != nullptr)
     mtls->mtls = tmtl.materials();

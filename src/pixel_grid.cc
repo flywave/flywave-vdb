@@ -77,6 +77,14 @@ pixel vdb_pixel_grid::operator()(const float i, const float j,
   return accessor.getValue(ijk);
 }
 
+openvdb::Vec3d vdb_pixel_grid::bary_center() {
+  if (grid() == nullptr)
+    return openvdb::Vec3d(0, 0, 0);
+
+  openvdb::CoordBBox bbox = grid()->evalActiveVoxelBoundingBox();
+  return bbox.getCenter();
+}
+
 struct paint_texture_on_surface {
 
   paint_texture_on_surface(

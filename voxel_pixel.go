@@ -154,12 +154,44 @@ func (m *VoxelPixel) SetMaterials(mtl *Materials) {
 	C.voxel_pixel_set_materials(m.m, mtl.m)
 }
 
+func (m *VoxelPixel) AddMaterial(mtl *MaterialData) {
+	C.voxel_pixel_add_material(m.m, mtl.m)
+}
+
+func (m *VoxelPixel) RemoveMaterial(id uint8) {
+	C.voxel_pixel_remove_material(m.m, C.uchar(id))
+}
+
+func (m *VoxelPixel) HasMaterial(id uint8) bool {
+	return C.voxel_pixel_has_material(m.m, C.uchar(id))
+}
+
+func (m *VoxelPixel) MaterialCount() int {
+	return int(C.voxel_pixel_materials_count(m.m))
+}
+
 func (m *VoxelPixel) GetFeatures() *Features {
 	return &Features{m: C.voxel_pixel_get_features(m.m)}
 }
 
-func (m *VoxelPixel) SetFeatures(mtl *Features) {
-	C.voxel_pixel_set_features(m.m, mtl.m)
+func (m *VoxelPixel) SetFeatures(feats *Features) {
+	C.voxel_pixel_set_features(m.m, feats.m)
+}
+
+func (m *VoxelPixel) AddFeature(feat *MaterialData) {
+	C.voxel_pixel_add_feature(m.m, feat.m)
+}
+
+func (m *VoxelPixel) RemoveFeature(id uint16) {
+	C.voxel_pixel_remove_feature(m.m, C.ushort(id))
+}
+
+func (m *VoxelPixel) HasFeature(id uint16) bool {
+	return C.voxel_pixel_has_feature(m.m, C.ushort(id))
+}
+
+func (m *VoxelPixel) FeatureCount() int {
+	return int(C.voxel_pixel_features_count(m.m))
 }
 
 func (m *VoxelPixel) ExtractColor(src *VoxelPixel) *PixelGrid {

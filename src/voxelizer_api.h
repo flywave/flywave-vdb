@@ -76,11 +76,25 @@ extern FLYWAVE_VDB_API voxel_pixel_materials_t *
 voxel_pixel_get_materials(voxel_pixel_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_set_materials(voxel_pixel_t *vox, voxel_pixel_materials_t *mtls);
+extern FLYWAVE_VDB_API void
+voxel_pixel_add_material(voxel_pixel_t *vox, voxel_pixel_material_data_t *mtls);
+extern FLYWAVE_VDB_API void voxel_pixel_remove_material(voxel_pixel_t *vox,
+                                                        uint8_t id);
+extern FLYWAVE_VDB_API bool voxel_pixel_has_material(voxel_pixel_t *vox,
+                                                     uint8_t id);
+extern FLYWAVE_VDB_API size_t voxel_pixel_materials_count(voxel_pixel_t *vox);
 
 extern FLYWAVE_VDB_API voxel_pixel_features_t *
 voxel_pixel_get_features(voxel_pixel_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_set_features(voxel_pixel_t *vox, voxel_pixel_features_t *mtls);
+extern FLYWAVE_VDB_API void
+voxel_pixel_add_feature(voxel_pixel_t *vox, voxel_pixel_feature_data_t *mtls);
+extern FLYWAVE_VDB_API void voxel_pixel_remove_feature(voxel_pixel_t *vox,
+                                                       uint16_t id);
+extern FLYWAVE_VDB_API bool voxel_pixel_has_feature(voxel_pixel_t *vox,
+                                                    uint16_t id);
+extern FLYWAVE_VDB_API size_t voxel_pixel_features_count(voxel_pixel_t *vox);
 
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *
 voxel_pixel_extract_color(voxel_pixel_t *vox, voxel_pixel_t *svox);

@@ -152,8 +152,8 @@ voxel_pixel_get_features(voxel_pixel_t *vox) {
   return new voxel_pixel_features_t{vox->ptr->get_features()};
 }
 
-FLYWAVE_VDB_API void
-voxel_pixel_set_features(voxel_pixel_t *vox, voxel_pixel_features_t *feats) {
+FLYWAVE_VDB_API void voxel_pixel_set_features(voxel_pixel_t *vox,
+                                              voxel_pixel_features_t *feats) {
   vox->ptr->set_features(feats->feats);
 }
 
@@ -747,6 +747,43 @@ voxel_pixel_material_data_set(voxel_pixel_material_data_t *vox,
       *(reinterpret_cast<material_data *>(&data)));
 }
 
+FLYWAVE_VDB_API void
+voxel_pixel_add_material(voxel_pixel_t *vox,
+                         voxel_pixel_material_data_t *mtls) {
+  vox->ptr->add_material(mtls->data);
+}
+
+FLYWAVE_VDB_API void voxel_pixel_remove_material(voxel_pixel_t *vox,
+                                                 uint8_t id) {
+  vox->ptr->remove_material(static_cast<material_id_t>(id));
+}
+
+FLYWAVE_VDB_API bool voxel_pixel_has_material(voxel_pixel_t *vox, uint8_t id) {
+  return vox->ptr->has_material(static_cast<material_id_t>(id));
+}
+
+FLYWAVE_VDB_API size_t voxel_pixel_materials_count(voxel_pixel_t *vox) {
+  return vox->ptr->features_count();
+}
+
+FLYWAVE_VDB_API void voxel_pixel_add_feature(voxel_pixel_t *vox,
+                                             voxel_pixel_feature_data_t *mtls) {
+  vox->ptr->add_features(mtls->data);
+}
+
+FLYWAVE_VDB_API void voxel_pixel_remove_feature(voxel_pixel_t *vox,
+                                                uint16_t id) {
+  vox->ptr->remove_feature(static_cast<local_feature_id_t>(id));
+}
+
+FLYWAVE_VDB_API bool voxel_pixel_has_feature(voxel_pixel_t *vox, uint16_t id) {
+  return vox->ptr->has_feature(static_cast<local_feature_id_t>(id));
+}
+
+FLYWAVE_VDB_API size_t voxel_pixel_features_count(voxel_pixel_t *vox) {
+  return vox->ptr->materials_count();
+}
+
 FLYWAVE_VDB_API voxel_pixel_texture_data_t *
 voxel_pixel_texture_data_create(c_texture_data_t t) {
   auto data = std::make_shared<texture_data>();
@@ -773,7 +810,8 @@ FLYWAVE_VDB_API void voxel_pixel_materials_free(voxel_pixel_materials_t *mtls) {
   delete mtls;
 }
 
-FLYWAVE_VDB_API void voxel_pixel_features_free(voxel_pixel_feature_data_t *feats) {
+FLYWAVE_VDB_API void
+voxel_pixel_features_free(voxel_pixel_feature_data_t *feats) {
   delete feats;
 }
 

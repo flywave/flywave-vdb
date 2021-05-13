@@ -10,6 +10,15 @@ import (
 	"unsafe"
 )
 
+type Features struct {
+	m *C.struct__voxel_pixel_features_t
+}
+
+func (t *Features) Free() {
+	C.voxel_pixel_features_free(t.m)
+	t.m = nil
+}
+
 type FeatureModel struct {
 	LocalID  uint8
 	GlobalID uint64

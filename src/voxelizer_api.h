@@ -30,6 +30,7 @@ typedef struct _voxel_transform_t voxel_transform_t;
 typedef struct _voxel_texture_mesh_t voxel_texture_mesh_t;
 typedef struct _voxel_texture2d_t voxel_texture2d_t;
 typedef struct _voxel_clip_box_createor_t voxel_clip_box_createor_t;
+typedef struct _voxel_pixel_features_t voxel_pixel_features_t;
 
 extern FLYWAVE_VDB_API void voxel_pixel_initialize();
 extern FLYWAVE_VDB_API void voxel_pixel_uninitialize();
@@ -76,6 +77,11 @@ voxel_pixel_get_materials(voxel_pixel_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_set_materials(voxel_pixel_t *vox, voxel_pixel_materials_t *mtls);
 
+extern FLYWAVE_VDB_API voxel_pixel_features_t *
+voxel_pixel_get_features(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API void
+voxel_pixel_set_features(voxel_pixel_t *vox, voxel_pixel_features_t *mtls);
+
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *
 voxel_pixel_extract_color(voxel_pixel_t *vox, voxel_pixel_t *svox);
 
@@ -89,6 +95,9 @@ voxel_pixel_eval_max_min_elevation(voxel_pixel_t *vox, double *bboxin,
 
 extern FLYWAVE_VDB_API void
 voxel_pixel_materials_free(voxel_pixel_materials_t *mtls);
+
+extern FLYWAVE_VDB_API void
+voxel_pixel_features_free(voxel_pixel_feature_data_t *feats);
 
 typedef struct _voxel_io_vertex_t {
   float v_x;

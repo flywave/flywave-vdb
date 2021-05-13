@@ -154,6 +154,14 @@ func (m *VoxelPixel) SetMaterials(mtl *Materials) {
 	C.voxel_pixel_set_materials(m.m, mtl.m)
 }
 
+func (m *VoxelPixel) GetFeatures() *Features {
+	return &Features{m: C.voxel_pixel_get_features(m.m)}
+}
+
+func (m *VoxelPixel) SetFeatures(mtl *Features) {
+	C.voxel_pixel_set_features(m.m, mtl.m)
+}
+
 func (m *VoxelPixel) ExtractColor(src *VoxelPixel) *PixelGrid {
 	return &PixelGrid{m: C.voxel_pixel_extract_color(m.m, src.m)}
 }

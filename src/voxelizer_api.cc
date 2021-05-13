@@ -147,6 +147,16 @@ FLYWAVE_VDB_API void voxel_pixel_set_materials(voxel_pixel_t *vox,
   vox->ptr->set_materials(mtls->mtls);
 }
 
+FLYWAVE_VDB_API voxel_pixel_features_t *
+voxel_pixel_get_features(voxel_pixel_t *vox) {
+  return new voxel_pixel_features_t{vox->ptr->get_features()};
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_set_features(voxel_pixel_t *vox, voxel_pixel_features_t *feats) {
+  vox->ptr->set_features(feats->feats);
+}
+
 FLYWAVE_VDB_API vdb_pixel_grid_t *
 voxel_pixel_extract_color(voxel_pixel_t *vox, voxel_pixel_t *svox) {
   return new vdb_pixel_grid_t{
@@ -761,6 +771,10 @@ voxel_pixel_texture_data_create(c_texture_data_t t) {
 
 FLYWAVE_VDB_API void voxel_pixel_materials_free(voxel_pixel_materials_t *mtls) {
   delete mtls;
+}
+
+FLYWAVE_VDB_API void voxel_pixel_features_free(voxel_pixel_feature_data_t *feats) {
+  delete feats;
 }
 
 FLYWAVE_VDB_API void

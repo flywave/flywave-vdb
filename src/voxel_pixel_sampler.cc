@@ -55,7 +55,7 @@ struct paint_color_on_surface {
     int32_t _triangle_index = -1;
     data_triangle _data_triangle;
     material_group const *_material_group;
-    std::unique_ptr<st_policy> uv_policy;
+    std::unique_ptr<uv_policy> uv_policy;
 
     openvdb::tree::ValueAccessor<const vertex_grid::TreeType> vaccess(_vertex);
     openvdb::tree::ValueAccessor<pixel_grid::TreeType> paccess(*_pixel);

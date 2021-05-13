@@ -63,6 +63,7 @@ public:
 
   virtual void fromJson(Tungsten::JsonPtr value,
                         const Tungsten::Scene &scene) override;
+
   virtual rapidjson::Value toJson(Allocator &allocator) const override;
 
   virtual void loadResources() override;

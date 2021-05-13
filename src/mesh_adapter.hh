@@ -6,7 +6,7 @@
 #include "color_extract.hh"
 #include "material_data.hh"
 #include "feature_data.hh"
-#include "st_policy.hh"
+#include "uv_policy.hh"
 #include "types.hh"
 
 #include <openvdb/Types.h>
@@ -16,7 +16,7 @@ namespace flywave {
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 struct texture_sampler {
-  std::shared_ptr<st_policy> _policy;
+  std::shared_ptr<uv_policy> _policy;
   std::shared_ptr<color_extract> _extract;
 };
 

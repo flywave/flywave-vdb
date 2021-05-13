@@ -44,16 +44,9 @@ func NewVoxelizeOperator() *VoxelizeOperator {
 }
 
 type CSGOperator struct {
-	Operator
-	mesh         *VoxelMesh
-	base         *VoxelPixel
-	target       *VoxelPixel
-	ctp          CompositeType
-	localFeature uint16
-	precision    float32
-	creator      ClipBoxCreateor
-	tp           SamplerType
-	matrix       []float64
+	VoxelizeOperator
+	target *VoxelPixel
+	ctp    CompositeType
 }
 
 func (f *CSGOperator) Apply() error {
@@ -78,7 +71,7 @@ func (f *CSGOperator) composite() error {
 }
 
 type MergeOperator struct {
-	Operator
+	CSGOperator
 }
 
 func NewMergeOperator() *MergeOperator {
@@ -86,7 +79,7 @@ func NewMergeOperator() *MergeOperator {
 }
 
 type MaskOperator struct {
-	Operator
+	CSGOperator
 }
 
 func NewMaskOperator() *MergeOperator {
@@ -95,15 +88,7 @@ func NewMaskOperator() *MergeOperator {
 
 type SurfaceOperator struct {
 	Operator
-	mesh         *VoxelMesh
-	base         *VoxelPixel
-	target       *VoxelPixel
-	ctp          CompositeType
-	localFeature uint16
-	precision    float32
-	creator      ClipBoxCreateor
-	tp           SamplerType
-	matrix       []float64
+	CSGOperator
 }
 
 func (f *SurfaceOperator) Apply() error {

@@ -111,7 +111,7 @@ extern FLYWAVE_VDB_API void
 voxel_pixel_materials_free(voxel_pixel_materials_t *mtls);
 
 extern FLYWAVE_VDB_API void
-voxel_pixel_features_free(voxel_pixel_feature_data_t *feats);
+voxel_pixel_features_free(voxel_pixel_features_t *feats);
 
 typedef struct _voxel_io_vertex_t {
   float v_x;

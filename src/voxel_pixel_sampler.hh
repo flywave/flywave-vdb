@@ -4,7 +4,7 @@
 
 #include "mesh_adapter.hh"
 #include "resolution.hh"
-#include "st_policy.hh"
+#include "uv_policy.hh"
 #include "voxel_pixel.hh"
 
 namespace flywave {

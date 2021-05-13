@@ -384,6 +384,7 @@ FLYWAVE_VDB_API void voxel_transform_post_translate(voxel_transform_t *tran,
                                                     double *vec) {
   tran->ptr->postTranslate(vdb::Vec3d(vec));
 }
+
 FLYWAVE_VDB_API void voxel_transform_post_scale_vector(voxel_transform_t *tran,
                                                        double *vec) {
   tran->ptr->postScale(vdb::Vec3d(vec));
@@ -811,7 +812,7 @@ FLYWAVE_VDB_API void voxel_pixel_materials_free(voxel_pixel_materials_t *mtls) {
 }
 
 FLYWAVE_VDB_API void
-voxel_pixel_features_free(voxel_pixel_feature_data_t *feats) {
+voxel_pixel_features_free(voxel_pixel_features_t *feats) {
   delete feats;
 }
 

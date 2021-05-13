@@ -8,6 +8,10 @@ type TileClipBoxCreateor struct {
 	clipOffset float64
 }
 
+func NewTileClipBoxCreateor(tile *Tile, precision float64, mat []float64, clipOffset float64) *TileClipBoxCreateor {
+	return &TileClipBoxCreateor{tile: tile, precision: precision, mat: mat, clipOffset: clipOffset}
+}
+
 func (t *TileClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox *BBox, box *BBox) bool {
 	modelBBox := resolution.IndexToWorldFromBBox(sbox)
 

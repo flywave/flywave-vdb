@@ -1,5 +1,5 @@
 #include "voxel_mesh.hh"
-#include "st_policy.hh"
+#include "uv_policy.hh"
 
 namespace flywave {
 
@@ -19,7 +19,7 @@ void voxel_mesh_adapter::fill_meterial(mesh_adapter &ada) {
       material_group g{md};
       ada.add_material(g);
     } else {
-      auto st_p = std::make_shared<uv_st_policy>(
+      auto st_p = std::make_shared<default_uv_policy>(
           std::make_unique<uv_reader_impl>(*_mesh));
       auto &tx = _tex_map.find(mt->diffuse_texname)->second;
 

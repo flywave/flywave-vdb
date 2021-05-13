@@ -163,7 +163,7 @@ func (m *VoxelPixel) RemoveMaterial(id uint8) {
 }
 
 func (m *VoxelPixel) HasMaterial(id uint8) bool {
-	return C.voxel_pixel_has_material(m.m, C.uchar(id))
+	return bool(C.voxel_pixel_has_material(m.m, C.uchar(id)))
 }
 
 func (m *VoxelPixel) MaterialCount() int {
@@ -178,7 +178,7 @@ func (m *VoxelPixel) SetFeatures(feats *Features) {
 	C.voxel_pixel_set_features(m.m, feats.m)
 }
 
-func (m *VoxelPixel) AddFeature(feat *MaterialData) {
+func (m *VoxelPixel) AddFeature(feat *FeatureData) {
 	C.voxel_pixel_add_feature(m.m, feat.m)
 }
 
@@ -187,7 +187,7 @@ func (m *VoxelPixel) RemoveFeature(id uint16) {
 }
 
 func (m *VoxelPixel) HasFeature(id uint16) bool {
-	return C.voxel_pixel_has_feature(m.m, C.ushort(id))
+	return bool(C.voxel_pixel_has_feature(m.m, C.ushort(id)))
 }
 
 func (m *VoxelPixel) FeatureCount() int {

@@ -26,6 +26,7 @@ class textute_repacker {
 public:
   textute_repacker(vertex_grid::Ptr cgrid, pixel_grid::Ptr, vdb::Mat4d mat,
                    float tpad);
+  ~textute_repacker();
 
   texture2d<vdb::math::Vec4<uint8_t>>::Ptr
   extract(const fmesh_tri_patch &tri,
@@ -38,9 +39,6 @@ private:
   vertex_grid::Ptr _grid;
   float _pixel_pad;
   vdb::Mat4d _mat;
-
-public:
-  ~textute_repacker();
 };
 
 class border_lock {

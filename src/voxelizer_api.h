@@ -321,6 +321,9 @@ extern FLYWAVE_VDB_API voxel_texture_mesh_t *
 voxel_mesh_builder_build_texture_mesh(voxel_mesh_builder_t *vox);
 
 extern FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m);
+extern FLYWAVE_VDB_API _Bool voxel_mesh_empty(voxel_mesh_t *m);
+extern FLYWAVE_VDB_API void voxel_mesh_clear(voxel_mesh_t *m);
+
 extern FLYWAVE_VDB_API voxel_pixel_t *
 voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
                           uint16_t local_feature, float precision,
@@ -426,10 +429,6 @@ extern FLYWAVE_VDB_API c_mesh_data_t
 voxel_pixel_mesh_data_get(voxel_pixel_mesh_data_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_mesh_data_set(voxel_pixel_mesh_data_t *vox, c_mesh_data_t data);
-
-extern FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_alloc(c_mesh_data_t *cm,
-                                                          size_t mtlcount);
-extern FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_free(c_mesh_data_t *cm);
 
 extern FLYWAVE_VDB_API voxel_border_lock_t *voxel_border_lock_create(void *ctx);
 extern FLYWAVE_VDB_API void voxel_border_lock_free(voxel_border_lock_t *vox);

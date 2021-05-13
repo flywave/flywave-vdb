@@ -189,6 +189,56 @@ func (m *FloatGrid) SetTransform(tran *Transform) {
 	C.vdb_float_grid_set_transform(m.m, tran.m)
 }
 
+func (m *FloatGrid) Empty() bool {
+	return bool(C.vdb_float_grid_empty(m.m))
+}
+
+func (m *FloatGrid) Clear() {
+	C.vdb_float_grid_clear(m.m)
+}
+
+func (m *FloatGrid) IsSaveFloatAsHalf() bool {
+	return bool(C.vdb_float_grid_save_float_as_half(m.m))
+}
+
+func (m *FloatGrid) SetSaveFloatAsHalf(v bool) {
+	C.vdb_float_grid_set_save_float_as_half(m.m, C.bool(v))
+}
+
+func (m *FloatGrid) GetActiveVoxelCount() uint64 {
+	return uint64(C.vdb_float_grid_active_voxel_count(m.m))
+}
+
+func (m *FloatGrid) Prune(tolerance float32) {
+	C.vdb_float_grid_prune(m.m, C.float(tolerance))
+}
+
+func (m *FloatGrid) Clip(bbox []float64) {
+	C.vdb_float_grid_clip(m.m, (*C.double)((unsafe.Pointer)(&bbox[0])))
+}
+
+func (m *FloatGrid) ClipFromCoordbox(cbox []int32) {
+	C.vdb_float_grid_clip_from_coordbox(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
+}
+
+func (m *FloatGrid) GetActiveVoxelBoundingBox() []int32 {
+	cbox := make([]int32, 6)
+	C.vdb_float_grid_active_voxel_bounding_box(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
+	return cbox
+}
+
+func (m *FloatGrid) GetActiveVoxelDim() []int32 {
+	dim := make([]int32, 3)
+	C.vdb_float_grid_active_voxel_dim(m.m, (*C.int)((unsafe.Pointer)(&dim[0])))
+	return dim
+}
+
+func (m *FloatGrid) PrintInfo() string {
+	cstr := C.vdb_float_grid_print_info(m.m)
+	defer C.free((unsafe.Pointer)(cstr))
+	return C.GoString(cstr)
+}
+
 func (m *FloatGrid) BooleanUnion(csg *FloatGrid) error {
 	if m == nil || m.m == nil {
 		return errors.New("Union error ")
@@ -496,4 +546,46 @@ func (m *PixelGrid) LinearGet(pos []float32) (error, Pixel) {
 	}
 	cpixel := C.vdb_pixel_grid_linear_get(m.m, C.float(pos[0]), C.float(pos[1]), C.float(pos[2]))
 	return nil, cpixel_2_pixel(cpixel)
+}
+
+func (m *PixelGrid) Empty() bool {
+	return bool(C.vdb_pixel_grid_empty(m.m))
+}
+
+func (m *PixelGrid) Clear() {
+	C.vdb_pixel_grid_clear(m.m)
+}
+
+func (m *PixelGrid) GetActiveVoxelCount() uint64 {
+	return uint64(C.vdb_pixel_grid_active_voxel_count(m.m))
+}
+
+func (m *PixelGrid) Prune(tolerance float32) {
+	C.vdb_pixel_grid_prune(m.m, C.float(tolerance))
+}
+
+func (m *PixelGrid) Clip(bbox []float64) {
+	C.vdb_pixel_grid_clip(m.m, (*C.double)((unsafe.Pointer)(&bbox[0])))
+}
+
+func (m *PixelGrid) ClipFromCoordbox(cbox []int32) {
+	C.vdb_pixel_grid_clip_from_coordbox(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
+}
+
+func (m *PixelGrid) GetActiveVoxelBoundingBox() []int32 {
+	cbox := make([]int32, 6)
+	C.vdb_pixel_grid_active_voxel_bounding_box(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
+	return cbox
+}
+
+func (m *PixelGrid) GetActiveVoxelDim() []int32 {
+	dim := make([]int32, 3)
+	C.vdb_pixel_grid_active_voxel_dim(m.m, (*C.int)((unsafe.Pointer)(&dim[0])))
+	return dim
+}
+
+func (m *PixelGrid) PrintInfo() string {
+	cstr := C.vdb_pixel_grid_print_info(m.m)
+	defer C.free((unsafe.Pointer)(cstr))
+	return C.GoString(cstr)
 }

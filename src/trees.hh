@@ -25,6 +25,8 @@ using vertex_grid = float_grid;
 
 class clip_box_createor {
 public:
+  virtual ~clip_box_createor() = default;
+
   virtual bool operator()(vertex_grid::Ptr vertex,
                           vdb::math::Transform::Ptr resolution,
                           const vdb::BBoxd &sbox, vdb::BBoxd &cbox) = 0;

@@ -25,8 +25,10 @@ func (m *FilterTriangleAdapter) Free() {
 }
 
 func NewFilterTriangleAdapter(f FilterTriangle) *FilterTriangleAdapter {
-	ctx := &FilterTriangleAdapter{f: f}
-	ctx.m = C.voxel_filter_triangle_create(unsafe.Pointer(ctx))
+	ctx := new(FilterTriangleAdapter)
+	ctx.f = f
+	inptr := uintptr(unsafe.Pointer(ctx))
+	ctx.m = C.voxel_filter_triangle_create(unsafe.Pointer(&inptr))
 	return ctx
 }
 
@@ -50,5 +52,5 @@ func filterTriangleValid(ctx unsafe.Pointer, a *C.float, b *C.float, c *C.float)
 	cHeader.Len = int(3)
 	cHeader.Data = uintptr(unsafe.Pointer(c))
 
-	return C.bool((*FilterTriangleAdapter)(ctx).f.Vaild(aSlice, bSlice, cSlice))
+	return C.bool((*(**FilterTriangleAdapter)(ctx)).f.Vaild(aSlice, bSlice, cSlice))
 }

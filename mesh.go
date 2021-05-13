@@ -6,6 +6,7 @@ package vdb
 // #cgo CXXFLAGS: -I ./lib
 import "C"
 import (
+	"math"
 	"reflect"
 	"unsafe"
 )
@@ -19,9 +20,89 @@ type MeshMaterial struct {
 
 type MeshModel struct {
 	Vertices  []float32
-	Texcoords []float32
+	UVs       []float32
 	Normals   []float32
 	Materials []MeshMaterial
+}
+
+func crossAndNormalized(v1 []float32, v2 []float32) []float32 {
+	ret := []float32{0, 0, 0}
+	ret[0] += v1[1]*v2[2] + v1[2]*v2[1]
+	ret[1] += v1[2]*v2[0] + v1[0]*v2[2]
+	ret[2] += v1[0]*v2[1] + v1[1]*v2[0]
+	d := math.Sqrt(float64(ret[0]*ret[0] + ret[1]*ret[1] + ret[2]*ret[2]))
+	ret[0] *= float32(1 / d)
+	ret[1] *= float32(1 / d)
+	ret[2] *= float32(1 / d)
+	return ret
+}
+
+func addVec3(a []float32, b ...[]float32) []float32 {
+	ret := []float32{0, 0, 0}
+	for i := range b {
+		ret[0] += b[i][0]
+		ret[1] += b[i][1]
+		ret[2] += b[i][2]
+	}
+	return ret
+}
+
+func (m *MeshModel) appendTriangle(a uint32, b uint32, c uint32) {
+	if len(m.Materials) == 0 {
+		mtl := MeshMaterial{}
+		mtl.ID = -1
+		m.Materials = append(m.Materials, mtl)
+	}
+	mtl := &m.Materials[len(m.Materials)-1]
+	mtl.Faces = append(mtl.Faces, a, b, c)
+	mtl.Texcoords = append(mtl.Texcoords, a, b, c)
+	mtl.Normals = append(mtl.Normals, a, b, c)
+}
+
+func (m *MeshModel) buildQuad(offset []float32, widthDir []float32, lengthDir []float32) {
+	normal := crossAndNormalized(lengthDir, widthDir)
+
+	m.Vertices = append(m.Vertices, offset...)
+	m.UVs = append(m.UVs, 0.0, 0.0)
+	m.Normals = append(m.Normals, normal...)
+
+	m.Vertices = append(m.Vertices, addVec3(offset, lengthDir)...)
+	m.UVs = append(m.UVs, 0.0, 1.0)
+	m.Normals = append(m.Normals, normal...)
+
+	m.Vertices = append(m.Vertices, addVec3(offset, lengthDir, widthDir)...)
+	m.UVs = append(m.UVs, 1.0, 1.0)
+	m.Normals = append(m.Normals, normal...)
+
+	m.Vertices = append(m.Vertices, addVec3(offset, widthDir)...)
+	m.UVs = append(m.UVs, 1.0, 0.0)
+	m.Normals = append(m.Normals, normal...)
+
+	baseIndex := uint32(len(m.Vertices)/3 - 4)
+
+	m.appendTriangle(baseIndex, baseIndex+1, baseIndex+2)
+	m.appendTriangle(baseIndex, baseIndex+2, baseIndex+3)
+}
+
+func (m *MeshModel) buildBox(length float32, width float32) {
+	upDir := []float32{0, length, 0}
+	rightDir := []float32{width, 0, 0}
+	forwardDir := []float32{0, 0, length}
+
+	iupDir := []float32{0, -length, 0}
+	irightDir := []float32{-width, 0, 0}
+	iforwardDir := []float32{0, 0, -length}
+
+	nearCorner := []float32{0, 0, 0}
+	farCorner := addVec3(upDir, rightDir, forwardDir)
+
+	m.buildQuad(nearCorner, forwardDir, rightDir)
+	m.buildQuad(nearCorner, rightDir, upDir)
+	m.buildQuad(nearCorner, upDir, forwardDir)
+
+	m.buildQuad(farCorner, irightDir, iforwardDir)
+	m.buildQuad(farCorner, iupDir, irightDir)
+	m.buildQuad(farCorner, iforwardDir, iupDir)
 }
 
 type MeshData struct {
@@ -33,15 +114,16 @@ func NewMeshData(m *MeshModel) *MeshData {
 	cmeshData.vertices = (*C.float)((unsafe.Pointer)(&m.Vertices[0]))
 	cmeshData.v_count = C.size_t(len(m.Vertices) / 3)
 
-	cmeshData.texcoords = (*C.float)((unsafe.Pointer)(&m.Texcoords[0]))
-	cmeshData.t_count = C.size_t(len(m.Texcoords) / 2)
+	cmeshData.texcoords = (*C.float)((unsafe.Pointer)(&m.UVs[0]))
+	cmeshData.t_count = C.size_t(len(m.UVs) / 2)
 
 	cmeshData.normals = (*C.float)((unsafe.Pointer)(&m.Normals[0]))
 	cmeshData.n_count = C.size_t(len(m.Normals) / 3)
 
-	C.voxel_pixel_c_mesh_data_alloc(&cmeshData, C.size_t(len(m.Materials)))
+	cmeshData.mtl_map = (*C.struct__c_mesh_data_mtl_t)(C.malloc(C.sizeof_struct__c_mesh_data_mtl_t * C.ulong(len(m.Materials))))
+	cmeshData.mtl_count = C.size_t(len(m.Materials))
 
-	defer C.voxel_pixel_c_mesh_data_free(&cmeshData)
+	defer C.free(unsafe.Pointer(cmeshData.mtl_map))
 
 	var trisSlice []C.struct__c_mesh_data_mtl_t
 	trisHeader := (*reflect.SliceHeader)((unsafe.Pointer(&trisSlice)))
@@ -74,7 +156,8 @@ func (t *MeshData) Get() *MeshModel {
 	cmeshData := C.voxel_pixel_mesh_data_get(t.m)
 	m := &MeshModel{}
 	m.Vertices = make([]float32, int(cmeshData.v_count)*3)
-	defer C.voxel_pixel_c_mesh_data_free(&cmeshData)
+
+	defer C.free(unsafe.Pointer(cmeshData.mtl_map))
 
 	var verticesSlice []C.float
 	verticesHeader := (*reflect.SliceHeader)((unsafe.Pointer(&verticesSlice)))
@@ -86,16 +169,16 @@ func (t *MeshData) Get() *MeshModel {
 		m.Vertices[i] = float32(verticesSlice[i])
 	}
 
-	m.Texcoords = make([]float32, int(cmeshData.t_count)*2)
+	m.UVs = make([]float32, int(cmeshData.t_count)*2)
 
 	var texcoordsSlice []C.float
 	texcoordsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&texcoordsSlice)))
-	texcoordsHeader.Cap = int(len(m.Texcoords))
-	texcoordsHeader.Len = int(len(m.Texcoords))
+	texcoordsHeader.Cap = int(len(m.UVs))
+	texcoordsHeader.Len = int(len(m.UVs))
 	texcoordsHeader.Data = uintptr(unsafe.Pointer(cmeshData.texcoords))
 
-	for i := 0; i < len(m.Texcoords); i++ {
-		m.Texcoords[i] = float32(texcoordsSlice[i])
+	for i := 0; i < len(m.UVs); i++ {
+		m.UVs[i] = float32(texcoordsSlice[i])
 	}
 
 	m.Normals = make([]float32, int(cmeshData.n_count)*3)
@@ -172,15 +255,16 @@ func (t *MeshData) Set(m *MeshModel) {
 	cmeshData.vertices = (*C.float)((unsafe.Pointer)(&m.Vertices[0]))
 	cmeshData.v_count = C.size_t(len(m.Vertices) / 3)
 
-	cmeshData.texcoords = (*C.float)((unsafe.Pointer)(&m.Texcoords[0]))
-	cmeshData.t_count = C.size_t(len(m.Texcoords) / 2)
+	cmeshData.texcoords = (*C.float)((unsafe.Pointer)(&m.UVs[0]))
+	cmeshData.t_count = C.size_t(len(m.UVs) / 2)
 
 	cmeshData.normals = (*C.float)((unsafe.Pointer)(&m.Normals[0]))
 	cmeshData.n_count = C.size_t(len(m.Normals) / 3)
 
-	C.voxel_pixel_c_mesh_data_alloc(&cmeshData, C.size_t(len(m.Materials)))
+	cmeshData.mtl_map = (*C.struct__c_mesh_data_mtl_t)(C.malloc(C.sizeof_struct__c_mesh_data_mtl_t * C.ulong(len(m.Materials))))
+	cmeshData.mtl_count = C.size_t(len(m.Materials))
 
-	defer C.voxel_pixel_c_mesh_data_free(&cmeshData)
+	defer C.free(unsafe.Pointer(cmeshData.mtl_map))
 
 	var trisSlice []C.struct__c_mesh_data_mtl_t
 	trisHeader := (*reflect.SliceHeader)((unsafe.Pointer(&trisSlice)))
@@ -202,19 +286,4 @@ func (t *MeshData) Set(m *MeshModel) {
 	}
 
 	C.voxel_pixel_mesh_data_set(t.m, cmeshData)
-}
-
-type VoxelMesh struct {
-	m *C.struct__voxel_mesh_t
-}
-
-func (t *VoxelMesh) Free() {
-	C.voxel_mesh_free(t.m)
-	t.m = nil
-}
-
-func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type SamplerType, matrix []float64) *VoxelPixel {
-	ccreator := NewClipBoxCreateorAdapter(creator)
-	defer ccreator.Free()
-	return &VoxelPixel{m: C.voxel_mesh_to_voxel_pixel(t.m, mtls.m, C.ushort(local_feature), C.float(precision), ccreator.m, C.int(_type), (*C.double)((unsafe.Pointer)(&matrix[0])))}
 }

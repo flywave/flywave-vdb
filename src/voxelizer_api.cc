@@ -693,12 +693,21 @@ voxel_mesh_builder_build_texture_mesh(voxel_mesh_builder_t *vox) {
 
 FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m) { delete m; }
 
+FLYWAVE_VDB_API _Bool voxel_mesh_empty(voxel_mesh_t *m) {
+  return m->ptr->size() == 0;
+}
+
+FLYWAVE_VDB_API void voxel_mesh_clear(voxel_mesh_t *m) {
+  m->ptr->clear();
+  m->mtl_maps.clear();
+  m->tex_maps.clear();
+}
+
 FLYWAVE_VDB_API voxel_pixel_t *
 voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
                           uint16_t local_feature, float precision,
                           voxel_clip_box_createor_t *creator, int32_t type,
                           double *matrix) {
-
   std::unique_ptr<voxel_mesh_adapter> stream =
       std::make_unique<voxel_mesh_adapter>(m->ptr, m->mtl_maps, m->tex_maps);
 
@@ -707,7 +716,6 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
   material_merge_transfrom tmtl(
       mtls == nullptr ? std::vector<std::shared_ptr<material_data>>{}
                       : mtls->mtls);
-
   voxel_pixel_sampler sampler{_mesh_adapter, local_feature};
   std::shared_ptr<flywave::voxel_pixel> stff_pot =
       sampler.apply(precision, *creator->ptr, static_cast<sampler_type>(type),
@@ -811,8 +819,7 @@ FLYWAVE_VDB_API void voxel_pixel_materials_free(voxel_pixel_materials_t *mtls) {
   delete mtls;
 }
 
-FLYWAVE_VDB_API void
-voxel_pixel_features_free(voxel_pixel_features_t *feats) {
+FLYWAVE_VDB_API void voxel_pixel_features_free(voxel_pixel_features_t *feats) {
   delete feats;
 }
 
@@ -999,19 +1006,6 @@ FLYWAVE_VDB_API void voxel_pixel_mesh_data_set(voxel_pixel_mesh_data_t *vox,
     }
   }
   vox->data = mdata;
-}
-
-FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_alloc(c_mesh_data_t *cm,
-                                                   size_t mtlcount) {
-  cm->mtl_map = (struct _c_mesh_data_mtl_t *)malloc(
-      sizeof(struct _c_mesh_data_mtl_t) * mtlcount);
-  cm->mtl_count = mtlcount;
-}
-
-FLYWAVE_VDB_API void voxel_pixel_c_mesh_data_free(c_mesh_data_t *cm) {
-  if (cm->mtl_map != nullptr) {
-    ::free(cm->mtl_map);
-  }
 }
 
 extern _Bool clipBoxCreateor(void *ctx, vdb_float_grid_t *vertex,

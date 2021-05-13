@@ -22,19 +22,19 @@ func NewBBox(bbox []float64) (error, *BBox) {
 }
 
 func (b *BBox) Set(bbox []float64) {
-	for i := 0; i <= 6; i++ {
+	for i := 0; i < 6; i++ {
 		b.m[i] = C.double(bbox[i])
 	}
 }
 
 func (b *BBox) SetMin(min []float64) {
-	for i := 0; i <= 3; i++ {
+	for i := 0; i < 3; i++ {
 		b.m[i] = C.double(min[i])
 	}
 }
 
 func (b *BBox) SetMax(max []float64) {
-	for i := 0; i <= 3; i++ {
+	for i := 0; i < 3; i++ {
 		b.m[i+3] = C.double(max[i])
 	}
 }
@@ -73,19 +73,19 @@ func NewCoordBox(cbox []int32) (error, *CoordBox) {
 }
 
 func (b *CoordBox) Set(cbox []int32) {
-	for i := 0; i <= 6; i++ {
+	for i := 0; i < 6; i++ {
 		b.m[i] = C.int(cbox[i])
 	}
 }
 
 func (b *CoordBox) SetMin(min []int32) {
-	for i := 0; i <= 3; i++ {
+	for i := 0; i < 3; i++ {
 		b.m[i] = C.int(min[i])
 	}
 }
 
 func (b *CoordBox) SetMax(max []int32) {
-	for i := 0; i <= 3; i++ {
+	for i := 0; i < 3; i++ {
 		b.m[i+3] = C.int(max[i])
 	}
 }

@@ -15,10 +15,9 @@
 
 namespace flywave {
 
-vdb_pixel_grid::vdb_pixel_grid() { openvdb::initialize(); }
+vdb_pixel_grid::vdb_pixel_grid() {}
 
 vdb_pixel_grid::vdb_pixel_grid(vdb_pixel_grid *grid) {
-  openvdb::initialize();
   _grid = grid->grid()->deepCopy();
 }
 

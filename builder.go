@@ -30,15 +30,33 @@ func (t *VoxelMeshBuilder) GetName() string {
 	return C.GoString(C.voxel_mesh_builder_get_name(t.m))
 }
 
-func (t *VoxelMeshBuilder) AddMeshData(m *MeshData) {
+func (t *VoxelMeshBuilder) AddMesh(m *MeshModel) {
+	mdata := NewMeshData(m)
+	defer mdata.Free()
+	t.addMeshData(mdata)
+}
+
+func (t *VoxelMeshBuilder) addMeshData(m *MeshData) {
 	C.voxel_mesh_builder_add_mesh_data(t.m, m.m)
 }
 
-func (t *VoxelMeshBuilder) AddMaterialData(m *MaterialData, index int32) {
+func (t *VoxelMeshBuilder) AddMaterial(m MaterialModel, index int32) {
+	mdata := NewMaterialData(m)
+	defer mdata.Free()
+	t.addMaterialData(mdata, index)
+}
+
+func (t *VoxelMeshBuilder) addMaterialData(m *MaterialData, index int32) {
 	C.voxel_mesh_builder_add_material_data(t.m, m.m, C.int(index))
 }
 
-func (t *VoxelMeshBuilder) AddTextureData(m *TextureData, name string) {
+func (t *VoxelMeshBuilder) AddTexture(img interface{}, name string) {
+	tdata := NewTextureWithImage(img)
+	defer tdata.Free()
+	t.addTextureData(tdata, name)
+}
+
+func (t *VoxelMeshBuilder) addTextureData(m *TextureData, name string) {
 	cname := C.CString(name)
 	C.voxel_mesh_builder_add_texture_data(t.m, m.m, cname)
 	C.free(unsafe.Pointer(cname))

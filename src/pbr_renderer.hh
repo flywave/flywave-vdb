@@ -57,6 +57,7 @@ struct renderer_status {
     for (const Tungsten::Path &p : completedScenes)
       completedValue.PushBack(Tungsten::JsonUtils::toJson(p, allocator),
                               allocator);
+                              
     for (const Tungsten::Path &p : queuedScenes)
       queuedValue.PushBack(Tungsten::JsonUtils::toJson(p, allocator),
                            allocator);

@@ -25,8 +25,10 @@ func (m *BorderLockAdapter) Free() {
 }
 
 func NewBorderLockAdapter(f BorderLock) *BorderLockAdapter {
-	ctx := &BorderLockAdapter{f: f}
-	ctx.m = C.voxel_border_lock_create(unsafe.Pointer(ctx))
+	ctx := new(BorderLockAdapter)
+	ctx.f = f
+	inptr := uintptr(unsafe.Pointer(ctx))
+	ctx.m = C.voxel_border_lock_create(unsafe.Pointer(&inptr))
 	return ctx
 }
 
@@ -38,5 +40,5 @@ func borderLockCheck(ctx unsafe.Pointer, a *C.float) C.bool {
 	cpointsHeader.Len = int(3)
 	cpointsHeader.Data = uintptr(unsafe.Pointer(a))
 
-	return C.bool((*BorderLockAdapter)(ctx).f.Check(cpointsSlice))
+	return C.bool((*(**BorderLockAdapter)(ctx)).f.Check(cpointsSlice))
 }

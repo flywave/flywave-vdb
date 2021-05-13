@@ -172,8 +172,8 @@ public:
 class voxel_mesh_adapter : public triangles_stream {
 private:
   std::unordered_map<int, std::shared_ptr<material_data>> _mt_map;
-  std::unordered_map<int, std::shared_ptr<material>> &_map;
-  std::unordered_map<std::string, std::shared_ptr<texture>> &_tex_map;
+  std::unordered_map<int, std::shared_ptr<material>> _map;
+  std::unordered_map<std::string, std::shared_ptr<texture>> _tex_map;
   mutable std::shared_ptr<voxel_mesh> _mesh;
 
 public:

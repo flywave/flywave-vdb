@@ -125,6 +125,10 @@ public:
   const material_group &find_material(material_id_t index) {
     return _materials[index];
   }
+    
+    bool has_materials() const {
+        return _materials.size() > 0;
+    }
 
   std::unique_ptr<triangles_stream> _stream;
   std::map<material_id_t, material_group> _materials;

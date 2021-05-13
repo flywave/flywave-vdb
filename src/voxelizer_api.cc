@@ -713,6 +713,8 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
 
   mesh_adapter _mesh_adapter{std::move(stream)};
 
+  stream->fill_meterial(_mesh_adapter);
+  
   material_merge_transfrom tmtl(
       mtls == nullptr ? std::vector<std::shared_ptr<material_data>>{}
                       : mtls->mtls);
@@ -721,7 +723,6 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
       sampler.apply(precision, *creator->ptr, static_cast<sampler_type>(type),
                     tmtl, openvdb::Mat4d(matrix));
 
-  stream->fill_meterial(_mesh_adapter);
   stream->set_matrix(openvdb::Mat4d(matrix));
 
   if (mtls != nullptr)

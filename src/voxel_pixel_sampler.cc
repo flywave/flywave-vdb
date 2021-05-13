@@ -30,8 +30,10 @@ voxel_pixel_sampler::apply(float precision, clip_box_createor &creator,
   tmtl.merge(std::move(materials));
 
   pixel_grid::Ptr pixel = pixel_grid::create();
-  coloring(vgrid, pixel, fgrid, transform, tmtl, _adapter, _local_feature_id);
-
+  if (_adapter.has_materials()) {
+   coloring(vgrid, pixel, fgrid, transform, tmtl, _adapter, _local_feature_id);
+  }
+    
   return std::make_shared<voxel_pixel>(vgrid, pixel, transform);
 }
 

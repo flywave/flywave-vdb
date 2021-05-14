@@ -86,9 +86,9 @@ public:
     return _textures.find(name) != _textures.end();
   }
 
-  void close() { ; }
+  bool has_texture() const { return _textures.size(); }
 
-  bool has_texture() { return _textures.size(); }
+  bool has_material() const { return _mtls.size(); }
 };
 
 } // namespace flywave

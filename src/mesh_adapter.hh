@@ -113,13 +113,17 @@ protected:
 };
 
 class mesh_adapter {
+private:
+  void init_materials();
+
 public:
   mesh_adapter(std::unique_ptr<triangles_stream> stream)
-      : _stream(std::move(stream)) {}
+      : _stream(std::move(stream)) {
+    init_materials();
+  }
 
   void add_material(const material_group &group) {
-    auto gp = group;
-    _materials.emplace(gp.material_id(), gp);
+    _materials.emplace(group.material_id(), group);
   }
 
   const material_group &find_material(material_id_t index) {

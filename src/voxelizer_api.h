@@ -320,6 +320,12 @@ extern FLYWAVE_VDB_API voxel_mesh_t *
 voxel_mesh_builder_build_mesh(voxel_mesh_builder_t *vox);
 extern FLYWAVE_VDB_API voxel_texture_mesh_t *
 voxel_mesh_builder_build_texture_mesh(voxel_mesh_builder_t *vox);
+extern FLYWAVE_VDB_API size_t
+voxel_mesh_builder_get_material_size(voxel_mesh_builder_t *vox);
+extern FLYWAVE_VDB_API size_t
+voxel_mesh_builder_get_texture_size(voxel_mesh_builder_t *vox);
+extern FLYWAVE_VDB_API size_t
+voxel_mesh_builder_get_mesh_size(voxel_mesh_builder_t *vox);
 
 extern FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m);
 extern FLYWAVE_VDB_API _Bool voxel_mesh_empty(voxel_mesh_t *m);

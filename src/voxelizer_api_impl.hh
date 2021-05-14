@@ -84,7 +84,6 @@ struct _voxel_clip_box_createor_t {
   std::shared_ptr<flywave::clip_box_createor> ptr;
 };
 
-
 struct voxel_io_vertex {
   float v[3];
   uint8_t c[4];  // colors

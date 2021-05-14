@@ -1,5 +1,6 @@
 #include "io_png.hh"
 
+#include <cassert>
 #include <iostream>
 #include <string.h>
 #include <string>
@@ -7,7 +8,6 @@
 #include <utility>
 #include <vector>
 #include <zlib.h>
-#include <cassert>
 
 namespace flywave {
 

@@ -81,12 +81,12 @@ public:
     vdb_grid_ptr outGrid = _grid->copyGridWithNewTree();
 
     if (curOrder == 0) {
-      grid_resample_op<openvdb::tools::PointSampler, GridTransformer> op(outGrid,
-                                                                        trans);
+      grid_resample_op<openvdb::tools::PointSampler, GridTransformer> op(
+          outGrid, trans);
       op(*_grid);
     } else if (curOrder == 1) {
       grid_resample_op<openvdb::tools::BoxSampler, GridTransformer> op(outGrid,
-                                                                      trans);
+                                                                       trans);
       op(*_grid);
     } else if (curOrder == 2) {
       grid_resample_op<openvdb::tools::QuadraticSampler, GridTransformer> op(

@@ -115,8 +115,6 @@ int test_mesh_builder() {
   auto stream_pt = stream.get();
   mesh_adapter _mesh_adapter{std::move(stream)};
 
-  stream_pt->fill_meterial(_mesh_adapter);
-
   test_clip_box_createor createor;
 
   material_merge_transfrom tmtl({});

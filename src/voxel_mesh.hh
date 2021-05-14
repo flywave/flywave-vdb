@@ -169,20 +169,20 @@ public:
   explicit operator material_data() const;
 };
 
+class mesh_adapter;
+
 class voxel_mesh_adapter : public triangles_stream {
 private:
   std::unordered_map<int, std::shared_ptr<material_data>> _mt_map;
   std::unordered_map<int, std::shared_ptr<material>> _map;
   std::unordered_map<std::string, std::shared_ptr<texture>> _tex_map;
   mutable std::shared_ptr<voxel_mesh> _mesh;
-
+  
 public:
   voxel_mesh_adapter(
       std::shared_ptr<voxel_mesh> hm,
       std::unordered_map<int, std::shared_ptr<material>> &map,
       std::unordered_map<std::string, std::shared_ptr<texture>> &tex_map);
-
-  void fill_meterial(mesh_adapter &ada);
 
   size_t polygonCount() const override { return _mesh->size(); }
 
@@ -206,6 +206,8 @@ public:
                       static_cast<uint16_t>(tri.mtl_id)};
     return mdt;
   }
+
+  friend class mesh_adapter;
 };
 
 class color_extract_impl : public color_extract {

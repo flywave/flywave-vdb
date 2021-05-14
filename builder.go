@@ -79,3 +79,15 @@ func (t *VoxelMeshBuilder) BuildMesh() *VoxelMesh {
 func (t *VoxelMeshBuilder) BuildTextureMesh() *TextureMesh {
 	return &TextureMesh{m: C.voxel_mesh_builder_build_texture_mesh(t.m)}
 }
+
+func (t *VoxelMeshBuilder) GetMaterialCount() int {
+	return int(C.voxel_mesh_builder_get_material_size(t.m))
+}
+
+func (t *VoxelMeshBuilder) GetTextureCount() int {
+	return int(C.voxel_mesh_builder_get_texture_size(t.m))
+}
+
+func (t *VoxelMeshBuilder) GetMeshCount() int {
+	return int(C.voxel_mesh_builder_get_mesh_size(t.m))
+}

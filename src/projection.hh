@@ -82,7 +82,6 @@ private:
   approx_value<double> app_value;
   bbox2<double> box2;
   fmesh_tri_patch _tri;
-
   std::unique_ptr<bary_convert> _convert;
 };
 

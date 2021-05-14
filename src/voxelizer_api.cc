@@ -692,6 +692,21 @@ voxel_mesh_builder_build_texture_mesh(voxel_mesh_builder_t *vox) {
   return new voxel_texture_mesh_t{vox->ptr->build_texture_mesh()};
 }
 
+FLYWAVE_VDB_API size_t
+voxel_mesh_builder_get_material_size(voxel_mesh_builder_t *vox) {
+  return vox->ptr->get_materials().size();
+}
+
+FLYWAVE_VDB_API size_t
+voxel_mesh_builder_get_texture_size(voxel_mesh_builder_t *vox) {
+  return vox->ptr->get_textures().size();
+}
+
+FLYWAVE_VDB_API size_t
+voxel_mesh_builder_get_mesh_size(voxel_mesh_builder_t *vox) {
+  return vox->ptr->get_mesh_datas().size();
+}
+
 FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m) { delete m; }
 
 FLYWAVE_VDB_API _Bool voxel_mesh_empty(voxel_mesh_t *m) {
@@ -715,7 +730,6 @@ voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
 
   mesh_adapter _mesh_adapter{std::move(stream)};
 
-  stream_ptr->fill_meterial(_mesh_adapter);
   stream_ptr->set_matrix(openvdb::Mat4d(matrix));
 
   material_merge_transfrom tmtl(

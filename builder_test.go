@@ -2,6 +2,8 @@ package vdb
 
 import (
 	"testing"
+
+	_ "github.com/flywave/go-obj"
 )
 
 func TestMeshBuilder(t *testing.T) {
@@ -38,4 +40,8 @@ func TestMeshBuilder(t *testing.T) {
 	if vpixel.Empty() {
 		t.FailNow()
 	}
+
+	str := vpixel.GetVoxelGrid().PrintInfo()
+
+	print(str)
 }

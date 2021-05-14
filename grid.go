@@ -432,20 +432,20 @@ func (m *FloatGrid) EvalActiveBoundingBox() (error, []float64) {
 }
 
 func (m *FloatGrid) ResampleWithRef(ref *FloatGrid, voxelSize float32,
-	 curOrder int32,  tolerance float32,  prune bool) *FloatGrid {
-		refm :=  *C.struct__vdb_float_grid_t(nil)
-		 if ref != nil {
-			refm = ref.m
-		 }
+	curOrder int32, tolerance float32, prune bool) *FloatGrid {
+	refm := (*C.struct__vdb_float_grid_t)(nil)
+	if ref != nil {
+		refm = ref.m
+	}
 
 	return &FloatGrid{m: C.vdb_float_grid_resample_with_ref(m.m, refm, C.float(voxelSize), C.int(curOrder), C.float(tolerance), C.bool(prune))}
 }
 
-func (m *FloatGrid) vdb_float_grid_resample_with_grid_transform(tran GridTransform, 
-	curOrder int32,  tolerance float32,  prune bool) *FloatGrid {
-	trana :=  NewGridTransformAdapter(tran)
+func (m *FloatGrid) ResampleWithTransform(tran GridTransform,
+	curOrder int32, tolerance float32, prune bool) *FloatGrid {
+	trana := NewGridTransformAdapter(tran)
 	defer trana.Free()
-   return &FloatGrid{m: C.vdb_float_grid_resample_with_grid_transform(m.m, trana.m, C.int(curOrder), C.float(tolerance), C.bool(prune))}
+	return &FloatGrid{m: C.vdb_float_grid_resample_with_grid_transform(m.m, trana.m, C.int(curOrder), C.float(tolerance), C.bool(prune))}
 }
 
 type PixelGrid struct {

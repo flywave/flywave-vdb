@@ -1,9 +1,19 @@
 package vdb
 
+// #include <stdlib.h>
+// #include "voxelizer_api.h"
+// #cgo CFLAGS: -I ./lib
+// #cgo CXXFLAGS: -I ./lib
+import "C"
+import (
+	"reflect"
+	"unsafe"
+)
+
 type GridTransform interface {
 	IsAffine() bool
 	IsIdentity() bool
-	Transform(pt, out []float64) 
+	Transform(pt, out []float64)
 	InvTransform(pt, out []float64)
 }
 

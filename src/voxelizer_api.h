@@ -31,6 +31,7 @@ typedef struct _voxel_texture_mesh_t voxel_texture_mesh_t;
 typedef struct _voxel_texture2d_t voxel_texture2d_t;
 typedef struct _voxel_clip_box_createor_t voxel_clip_box_createor_t;
 typedef struct _voxel_pixel_features_t voxel_pixel_features_t;
+typedef struct _voxel_grid_transform_t voxel_grid_transform_t;
 
 extern FLYWAVE_VDB_API void voxel_pixel_initialize();
 extern FLYWAVE_VDB_API void voxel_pixel_uninitialize();
@@ -459,6 +460,11 @@ voxel_pixel_feature_data_get(voxel_pixel_feature_data_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_feature_data_set(voxel_pixel_feature_data_t *vox,
                              c_feature_data_t data);
+
+extern FLYWAVE_VDB_API voxel_grid_transform_t *
+voxel_grid_transform_create(void *ctx);
+extern FLYWAVE_VDB_API void
+voxel_grid_transform_free(voxel_grid_transform_t *vox);
 
 #ifdef __cplusplus
 }

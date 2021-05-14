@@ -1,6 +1,7 @@
 #include "voxelizer_api.h"
 #include "texture_atlas.hh"
 #include "texture_mesh.hh"
+#include "transformer.hh"
 #include "voxelizer_api_impl.hh"
 
 #include "feature_meta_data.hh"
@@ -1129,6 +1130,46 @@ voxel_pixel_feature_data_set(voxel_pixel_feature_data_t *vox,
   data->data.resize(si);
   memcpy(&data->data[0], cdata.data, si);
   vox->data = data;
+}
+
+extern _Bool isAffine(void *ctx);
+
+extern _Bool isIdentity(void *ctx);
+
+extern void gridTransform(void *ctx, double *pt, double *out);
+
+extern void gridInvTransform(void *ctx, double *pt, double *out);
+
+struct cgo_grid_transform : public grid_transform {
+  cgo_grid_transform(void *_ctx) : ctx(_ctx) {}
+
+  bool isAffine() const override { return ::isAffine(ctx); }
+
+  bool isIdentity() const override { return ::isIdentity(ctx); }
+
+  openvdb::Vec3R transform(const openvdb::Vec3R &pos) const override {
+    openvdb::Vec3R out;
+    ::gridTransform(ctx, const_cast<double *>(pos.asPointer()),
+                    out.asPointer());
+    return out;
+  }
+
+  openvdb::Vec3R invTransform(const openvdb::Vec3R &pos) const override {
+    openvdb::Vec3R out;
+    ::gridInvTransform(ctx, const_cast<double *>(pos.asPointer()),
+                       out.asPointer());
+    return out;
+  }
+
+  void *ctx;
+};
+
+FLYWAVE_VDB_API voxel_grid_transform_t *voxel_grid_transform_create(void *ctx) {
+  return new voxel_grid_transform_t{std::make_shared<cgo_grid_transform>(ctx)};
+}
+
+FLYWAVE_VDB_API void voxel_grid_transform_free(voxel_grid_transform_t *vox) {
+  delete vox;
 }
 
 #ifdef __cplusplus

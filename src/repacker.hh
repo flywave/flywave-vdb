@@ -57,7 +57,7 @@ class triangle_repacker {
 public:
   triangle_repacker(vertex_grid::Ptr vgrid) : _grid(vgrid) {}
 
-  void make_mesh_mark_seam(std::vector<vertext_type> &points,
+  void build_poly(std::vector<vertext_type> &points,
                            std::vector<triangle_type> &tri,
                            std::vector<quad_type> &a, double isovalue = 0.0,
                            double adapter = 0.01);

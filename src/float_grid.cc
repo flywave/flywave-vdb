@@ -1,4 +1,5 @@
 #include "float_grid.hh"
+#include "vdb_utils.hh"
 
 #include <openvdb/Types.h>
 #include <openvdb/tools/Composite.h>
@@ -26,6 +27,8 @@ vdb_float_grid::vdb_float_grid(float_grid::Ptr grid) : _grid(grid) {}
 vdb_float_grid::~vdb_float_grid() {}
 
 openvdb::FloatGrid::Ptr vdb_float_grid::grid() { return _grid; }
+
+bool vdb_float_grid::has_grid() const { return _grid != nullptr; }
 
 bool vdb_float_grid::read(const char *vFile) {
   openvdb::io::File file(vFile);
@@ -409,6 +412,42 @@ float vdb_float_grid::operator()(const float i, const float j,
   typename openvdb::FloatGrid::Accessor accessor = _grid->getAccessor();
   openvdb::Coord ijk(i, j, k);
   return accessor.getValue(ijk);
+}
+
+double vdb_float_grid::calc_positive_density() const {
+  double density = 0;
+
+  vdb_sum_pos_density(*_grid, density);
+
+  int numvoxel = _grid->activeVoxelCount();
+  if (numvoxel)
+    density /= numvoxel;
+
+  openvdb::Vec3d zero(0, 0, 0);
+  density *= get_volume();
+
+  return density;
+}
+
+double vdb_float_grid::get_volume() const {
+  double volume = 0;
+  vdb_calc_volume(*_grid, volume);
+  return volume;
+}
+
+double vdb_float_grid::get_area() const {
+  double area = 0;
+  vdb_calc_area(*_grid, area);
+  return area;
+}
+
+int64_t vdb_float_grid::get_memory_size() const { return _grid->memUsage(); }
+
+bool vdb_float_grid::is_sdf() const {
+  if (_grid->getGridClass() == openvdb::GRID_LEVEL_SET)
+    return true;
+
+  return false;
 }
 
 } // namespace flywave

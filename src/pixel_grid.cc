@@ -1,5 +1,6 @@
 #include "pixel_grid.hh"
 #include "bbox.hh"
+#include "vdb_utils.hh"
 
 #include <openvdb/Types.h>
 #include <openvdb/tools/Composite.h>
@@ -26,6 +27,8 @@ vdb_pixel_grid::vdb_pixel_grid(pixel_grid::Ptr grid) : _grid(grid) {}
 vdb_pixel_grid::~vdb_pixel_grid() {}
 
 pixel_grid::Ptr vdb_pixel_grid::grid() { return _grid; }
+
+bool vdb_pixel_grid::has_grid() const { return _grid != nullptr; }
 
 bool vdb_pixel_grid::read(const char *vFile) {
   openvdb::io::File file(vFile);
@@ -149,6 +152,42 @@ void vdb_pixel_grid::paint_texture(pixel_grid::Ptr texvol) {
 
   // op(nodeRange);
   tbb::parallel_for(nodeRange, op);
+}
+
+double vdb_pixel_grid::calc_positive_density() const {
+  double density = 0;
+
+  vdb_sum_pos_density(*_grid, density);
+
+  int numvoxel = _grid->activeVoxelCount();
+  if (numvoxel)
+    density /= numvoxel;
+
+  openvdb::Vec3d zero(0, 0, 0);
+  density *= get_volume();
+
+  return density;
+}
+
+double vdb_pixel_grid::get_volume() const {
+  double volume = 0;
+  vdb_calc_volume(*_grid, volume);
+  return volume;
+}
+
+double vdb_pixel_grid::get_area() const {
+  double area = 0;
+  vdb_calc_area(*_grid, area);
+  return area;
+}
+
+int64_t vdb_pixel_grid::get_memory_size() const { return _grid->memUsage(); }
+
+bool vdb_pixel_grid::is_sdf() const {
+  if (_grid->getGridClass() == openvdb::GRID_LEVEL_SET)
+    return true;
+
+  return false;
 }
 
 } // namespace flywave

@@ -7,6 +7,7 @@
 #include "voxel_mesh.hh"
 #include "voxel_mesh_builder.hh"
 #include "voxel_pixel.hh"
+#include "transformer.hh"
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,6 +82,10 @@ struct _voxel_texture2d_t {
 
 struct _voxel_clip_box_createor_t {
   std::shared_ptr<flywave::clip_box_createor> ptr;
+};
+
+struct _voxel_grid_transform_t {
+  std::shared_ptr<flywave::grid_transform> ptr;
 };
 
 struct voxel_io_vertex {

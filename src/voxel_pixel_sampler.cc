@@ -142,6 +142,7 @@ void coloring(vertex_grid::Ptr vertex, pixel_grid::Ptr pixel,
   const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
   paint_color_on_surface op(nodes, vertex->tree(), pixel->tree(), *transform,
                             tmtl, _adapter, _local_feature_id);
+  
   // op(nodeRange);
   tbb::parallel_reduce(nodeRange, op);
 }

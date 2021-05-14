@@ -92,11 +92,51 @@ textute_repacker::impl::project_to_image(
   return img;
 }
 
-void triangle_repacker::make_mesh_mark_seam(std::vector<vertext_type> &points,
-                                            std::vector<triangle_type> &tri,
-                                            std::vector<quad_type> &quads,
-                                            double isovalue, double adapter) {
-  vdb::tools::volumeToMesh(*_grid, points, tri, quads, isovalue, adapter, true);
+void triangle_repacker::build_poly(std::vector<vertext_type> &points,
+                                   std::vector<triangle_type> &triangles,
+                                   std::vector<quad_type> &quads,
+                                   double isovalue, double adapter) {
+  vdb::tools::VolumeToMesh mesher(isovalue, adapter, true);
+  mesher(*_grid);
+
+  points.clear();
+  points.resize(mesher.pointListSize());
+
+  {
+    vdb::tools::volume_to_mesh_internal::PointListCopy ptnCpy(
+        mesher.pointList(), points);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, points.size()), ptnCpy);
+    mesher.pointList().reset(nullptr);
+  }
+
+  vdb::tools::PolygonPoolList &polygonPoolList = mesher.polygonPoolList();
+
+  {
+    size_t numQuads = 0, numTriangles = 0;
+    for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+      openvdb::tools::PolygonPool &polygons = polygonPoolList[n];
+      numTriangles += polygons.numTriangles();
+      numQuads += polygons.numQuads();
+    }
+
+    triangles.clear();
+    triangles.resize(numTriangles);
+    quads.clear();
+    quads.resize(numQuads);
+  }
+
+  size_t qIdx = 0, tIdx = 0;
+  for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+    openvdb::tools::PolygonPool &polygons = polygonPoolList[n];
+
+    for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
+      quads[qIdx++] = polygons.quad(i);
+    }
+
+    for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
+      triangles[tIdx++] = polygons.triangle(i);
+    }
+  }
 }
 
 void make_triangles(std::vector<struct voxel_io_triangle> &rettriangles,
@@ -104,7 +144,7 @@ void make_triangles(std::vector<struct voxel_io_triangle> &rettriangles,
                     size_t mtl_offset, std::shared_ptr<border_lock> lock,
                     std::shared_ptr<filter_triangle> filter, double fquality,
                     double isovalue, double adapter) {
-  std::shared_ptr<triangle_repacker> vfoundry =
+  std::shared_ptr<triangle_repacker> repacker =
       std::make_shared<triangle_repacker>(pot.get_voxel_grid());
 
   std::unique_ptr<std::vector<vertext_type>> points_ptr =
@@ -118,9 +158,10 @@ void make_triangles(std::vector<struct voxel_io_triangle> &rettriangles,
   auto &triangles = *triangles_ptr;
   auto &quads = *quads_ptr;
 
-  vfoundry->make_mesh_mark_seam(points, triangles, quads, isovalue, adapter);
+  repacker->build_poly(points, triangles, quads, isovalue, adapter);
 
-  std::unique_ptr<std::unordered_map<int, std::vector<struct voxel_io_triangle>>>
+  std::unique_ptr<
+      std::unordered_map<int, std::vector<struct voxel_io_triangle>>>
       group_triangles_ptr = std::make_unique<
           std::unordered_map<int, std::vector<struct voxel_io_triangle>>>();
 

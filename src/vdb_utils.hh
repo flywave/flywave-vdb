@@ -1,10 +1,13 @@
 #pragma once
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/Interpolation.h>
-#include <openvdb/tools/Statistics.h>
+#include "types.hh"
 
 #include <memory>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/GridTransformer.h>
+#include <openvdb/tools/Interpolation.h>
+#include <openvdb/tools/LevelSetMeasure.h>
+#include <openvdb/tools/Statistics.h>
 
 namespace flywave {
 
@@ -391,6 +394,275 @@ static void vdb_sum_pos_density(const GridType &grid, double &sum) {
         sum += value;
     }
   }
+}
+
+template <typename GridType>
+static void vdb_calc_volume(const GridType &grid, double &volume) {
+  bool calculated = false;
+  if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
+    try {
+      volume = openvdb::tools::levelSetVolume(grid);
+      calculated = true;
+    } catch (std::exception & /*e*/) {
+      // do nothing
+    }
+  }
+
+  if (!calculated) {
+    const openvdb::Vec3d size = grid.voxelSize();
+    volume = size[0] * size[1] * size[2] * grid.activeVoxelCount();
+  }
+}
+
+template <typename GridType>
+static void vdb_calc_area(const GridType &grid, double &area) {
+  bool calculated = false;
+  if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
+    try {
+      area = openvdb::tools::levelSetArea(grid);
+      calculated = true;
+    } catch (std::exception & /*e*/) {
+      // do nothing
+    }
+  }
+
+  if (!calculated) {
+    using LeafIter = typename GridType::TreeType::LeafCIter;
+    using VoxelIter = typename GridType::TreeType::LeafNodeType::ValueOnCIter;
+    using openvdb::Coord;
+    const Coord normals[] = {Coord(0, 0, -1), Coord(0, 0, 1),  Coord(-1, 0, 0),
+                             Coord(1, 0, 0),  Coord(0, -1, 0), Coord(0, 1, 0)};
+
+    openvdb::Vec3d voxel_size = grid.voxelSize();
+    const double areas[] = {double(voxel_size.x() * voxel_size.y()),
+                            double(voxel_size.x() * voxel_size.y()),
+                            double(voxel_size.y() * voxel_size.z()),
+                            double(voxel_size.y() * voxel_size.z()),
+                            double(voxel_size.z() * voxel_size.x()),
+                            double(voxel_size.z() * voxel_size.x())};
+    area = 0;
+    for (LeafIter leaf = grid.tree().cbeginLeaf(); leaf; ++leaf) {
+      for (VoxelIter iter = leaf->cbeginValueOn(); iter; ++iter) {
+        for (int i = 0; i < 6; i++)
+          if (!grid.tree().isValueOn(iter.getCoord() + normals[i]))
+            area += areas[i];
+      }
+    }
+  }
+}
+
+namespace {
+
+template <typename ValueType>
+inline typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec,
+                               ValueType>::type
+convert_value(const openvdb::Vec3R &val) {
+  return ValueType(val[0]);
+}
+
+template <typename ValueType>
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec &&
+                                   openvdb::VecTraits<ValueType>::Size == 2,
+                               ValueType>::type
+convert_value(const openvdb::Vec3R &val) {
+  using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
+  return ValueType(ElemType(val[0]), ElemType(val[1]));
+}
+
+template <typename ValueType>
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec &&
+                                   openvdb::VecTraits<ValueType>::Size == 3,
+                               ValueType>::type
+convert_value(const openvdb::Vec3R &val) {
+  using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
+  return ValueType(ElemType(val[0]), ElemType(val[1]), ElemType(val[2]));
+}
+
+template <typename ValueType>
+inline typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec &&
+                                   openvdb::VecTraits<ValueType>::Size == 4,
+                               ValueType>::type
+convert_value(const openvdb::Vec3R &val) {
+  using ElemType = typename openvdb::VecTraits<ValueType>::ElementType;
+  return ValueType(ElemType(val[0]), ElemType(val[1]), ElemType(val[2]),
+                   ElemType(1.0));
+}
+
+} // namespace
+
+struct vdb_fill_op {
+  const openvdb::CoordBBox indexBBox;
+  const openvdb::BBoxd worldBBox;
+  const openvdb::Vec3R value;
+  const bool active, sparse;
+
+  vdb_fill_op(const openvdb::CoordBBox &b, const openvdb::Vec3R &val, bool on,
+              bool sparse_)
+      : indexBBox(b), value(val), active(on), sparse(sparse_) {}
+
+  vdb_fill_op(const openvdb::BBoxd &b, const openvdb::Vec3R &val, bool on,
+              bool sparse_)
+      : worldBBox(b), value(val), active(on), sparse(sparse_) {}
+
+  template <typename GridT> void operator()(GridT &grid) const {
+    openvdb::CoordBBox bbox = indexBBox;
+    if (worldBBox) {
+      openvdb::math::Vec3d imin, imax;
+      openvdb::math::calculateBounds(grid.constTransform(), worldBBox.min(),
+                                     worldBBox.max(), imin, imax);
+      bbox.reset(openvdb::Coord::floor(imin), openvdb::Coord::ceil(imax));
+    }
+    using ValueT = typename GridT::ValueType;
+    if (sparse) {
+      grid.sparseFill(bbox, convert_value<ValueT>(value), active);
+    } else {
+      grid.denseFill(bbox, convert_value<ValueT>(value), active);
+    }
+  }
+};
+
+template <typename Sampler> class grid_transform_op {
+public:
+  grid_transform_op(vdb_grid_ptr &outGrid,
+                    const openvdb::tools::GridTransformer &t)
+      : mOutGrid(outGrid), mTransformer(t) {}
+
+  template <typename GridType> void operator()(const GridType &inGrid) {
+    typename GridType::Ptr outGrid = openvdb::gridPtrCast<GridType>(mOutGrid);
+    mTransformer.transformGrid<Sampler, GridType>(inGrid, *outGrid);
+  }
+
+private:
+  vdb_grid_ptr mOutGrid;
+  openvdb::tools::GridTransformer mTransformer;
+};
+
+template <typename Sampler, typename TransformerType> class grid_resample_op {
+public:
+  grid_resample_op(vdb_grid_ptr &outGrid, const TransformerType &t)
+      : mOutGrid(outGrid), mTransformer(t) {}
+
+  template <typename GridType> void operator()(const GridType &inGrid) {
+    typename GridType::Ptr outGrid = openvdb::gridPtrCast<GridType>(mOutGrid);
+
+    openvdb::tools::GridResampler resampler;
+
+    resampler.transformGrid<Sampler>(mTransformer, inGrid, *outGrid);
+  }
+
+private:
+  vdb_grid_ptr mOutGrid;
+  const TransformerType mTransformer;
+};
+
+template <typename Sampler> class grid_resample_to_match_op {
+public:
+  grid_resample_to_match_op(vdb_grid_ptr outGrid) : mOutGrid(outGrid) {}
+
+  template <typename GridType> void operator()(const GridType &inGrid) {
+    typename GridType::Ptr outGrid = openvdb::gridPtrCast<GridType>(mOutGrid);
+    openvdb::util::NullInterrupter interrupter;
+    openvdb::tools::resampleToMatch<Sampler>(inGrid, *outGrid, interrupter);
+  }
+
+private:
+  vdb_grid_ptr mOutGrid;
+};
+
+template <typename GridT>
+bool eval_grid_bbox(GridT grid, openvdb::Vec3R corners[8],
+                    bool expandHalfVoxel) {
+  if (grid.activeVoxelCount() == 0)
+    return false;
+
+  openvdb::CoordBBox activeBBox = grid.evalActiveVoxelBoundingBox();
+  if (!activeBBox)
+    return false;
+
+  openvdb::BBoxd voxelBBox(activeBBox.min().asVec3d(),
+                           activeBBox.max().asVec3d());
+  if (expandHalfVoxel) {
+    voxelBBox.min() -= openvdb::Vec3d(0.5);
+    voxelBBox.max() += openvdb::Vec3d(0.5);
+  }
+
+  openvdb::Vec3R bbox[8];
+  bbox[0] = voxelBBox.min();
+  bbox[1].init(voxelBBox.min()[0], voxelBBox.min()[1], voxelBBox.max()[2]);
+  bbox[2].init(voxelBBox.max()[0], voxelBBox.min()[1], voxelBBox.max()[2]);
+  bbox[3].init(voxelBBox.max()[0], voxelBBox.min()[1], voxelBBox.min()[2]);
+  bbox[4].init(voxelBBox.min()[0], voxelBBox.max()[1], voxelBBox.min()[2]);
+  bbox[5].init(voxelBBox.min()[0], voxelBBox.max()[1], voxelBBox.max()[2]);
+  bbox[6] = voxelBBox.max();
+  bbox[7].init(voxelBBox.max()[0], voxelBBox.max()[1], voxelBBox.min()[2]);
+
+  const openvdb::math::Transform &xform = grid.transform();
+  bbox[0] = xform.indexToWorld(bbox[0]);
+  bbox[1] = xform.indexToWorld(bbox[1]);
+  bbox[2] = xform.indexToWorld(bbox[2]);
+  bbox[3] = xform.indexToWorld(bbox[3]);
+  bbox[4] = xform.indexToWorld(bbox[4]);
+  bbox[5] = xform.indexToWorld(bbox[5]);
+  bbox[6] = xform.indexToWorld(bbox[6]);
+  bbox[7] = xform.indexToWorld(bbox[7]);
+
+  for (size_t i = 0; i < 8; ++i) {
+    corners[i] = bbox[i];
+  }
+
+  return true;
+}
+
+inline openvdb::CoordBBox make_coord_bbox(const openvdb::BBoxd &b,
+                                          const openvdb::math::Transform &t) {
+  openvdb::Vec3d minWS, maxWS, minIS, maxIS;
+
+  minWS[0] = double(b.min().x());
+  minWS[1] = double(b.min().y());
+  minWS[2] = double(b.min().z());
+
+  maxWS[0] = double(b.max().x());
+  maxWS[1] = double(b.max().y());
+  maxWS[2] = double(b.max().z());
+
+  openvdb::math::calculateBounds(t, minWS, maxWS, minIS, maxIS);
+
+  openvdb::CoordBBox box;
+  box.min() = openvdb::Coord::floor(minIS);
+  box.max() = openvdb::Coord::ceil(maxIS);
+
+  return box;
+}
+
+template <typename GridType>
+inline const GridType *vdb_grid_cast(const openvdb::GridBase *grid) {
+  return dynamic_cast<const GridType *>(grid);
+}
+
+template <typename GridType>
+inline GridType *vdb_grid_cast(openvdb::GridBase *grid) {
+  return dynamic_cast<GridType *>(grid);
+}
+
+template <typename GridType>
+inline const GridType &vdb_grid_cast(const openvdb::GridBase &grid) {
+  return *dynamic_cast<const GridType *>(&grid);
+}
+
+template <typename GridType>
+inline GridType &vdb_grid_cast(openvdb::GridBase &grid) {
+  return *dynamic_cast<GridType *>(&grid);
+}
+
+template <typename GridType>
+inline typename GridType::ConstPtr
+vdb_grid_cast(openvdb::GridBase::ConstPtr grid) {
+  return openvdb::gridConstPtrCast<GridType>(grid);
+}
+
+template <typename GridType>
+inline typename GridType::Ptr vdb_grid_cast(openvdb::GridBase::Ptr grid) {
+  return openvdb::gridPtrCast<GridType>(grid);
 }
 
 } // namespace flywave

@@ -20,6 +20,16 @@ public:
   ~vdb_pixel_grid();
 
   pixel_grid::Ptr grid();
+  bool has_grid() const;
+
+  int64_t get_memory_size() const;
+
+  double get_volume() const;
+  double get_area() const;
+
+  bool is_sdf() const;
+
+  bool is_empty() { return _grid == nullptr; }
 
   void paint_texture(pixel_grid::Ptr texvol);
 
@@ -35,6 +45,12 @@ public:
   pixel operator()(const int i, const int j, const int k) const;
 
   pixel operator()(const float i, const float j, const float k) const;
+
+  double calc_positive_density() const;
+
+  template <typename GridTypeListT, typename OpT> bool apply(OpT &op) const {
+    return has_grid() ? _grid->apply<GridTypeListT>(op) : false;
+  }
 
 private:
   pixel_grid::Ptr _grid;

@@ -1,12 +1,38 @@
 #pragma once
 
-#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 
 #include "tolerance.hh"
 
 namespace flywave {
 
 namespace vdb = openvdb::OPENVDB_VERSION_NAME;
+
+using vdb_grid = openvdb::GridBase;
+using vdb_grid_ptr = openvdb::GridBase::Ptr;
+using vdb_grid_const_ptr = openvdb::GridBase::ConstPtr;
+using vdb_grid_ref = openvdb::GridBase &;
+using vdb_grid_const_ref = const openvdb::GridBase &;
+
+using scalar_grid_types =
+    vdb::TypeList<openvdb::BoolGrid, openvdb::FloatGrid, openvdb::DoubleGrid,
+                  openvdb::Int32Grid, openvdb::Int64Grid>;
+
+using numeric_grid_types =
+    vdb::TypeList<openvdb::FloatGrid, openvdb::DoubleGrid, openvdb::Int32Grid,
+                  openvdb::Int64Grid>;
+
+using real_grid_types = vdb::TypeList<openvdb::FloatGrid, openvdb::DoubleGrid>;
+
+using vec3_grid_types =
+    vdb::TypeList<openvdb::Vec3SGrid, openvdb::Vec3DGrid, openvdb::Vec3IGrid>;
+
+using point_grid_types = vdb::TypeList<vdb::points::PointDataGrid>;
+
+using volume_grid_types = scalar_grid_types::Append<vec3_grid_types>;
+
+using all_grid_types = volume_grid_types::Append<point_grid_types>;
 
 using index_type = vdb::math::Vec3<uint32_t>;
 

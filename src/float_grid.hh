@@ -20,6 +20,17 @@ public:
   ~vdb_float_grid();
 
   float_grid::Ptr grid();
+  bool has_grid() const;
+
+  int64_t get_memory_size() const;
+
+  double get_volume() const;
+
+  double get_area() const;
+
+  bool is_sdf() const;
+
+  bool is_empty() { return _grid == nullptr; }
 
   bool read(const char *vFile);
   bool write(const char *vFile);
@@ -71,6 +82,12 @@ public:
   int get_vertex_count();
 
   int get_face_count();
+
+  double calc_positive_density() const;
+
+  template <typename GridTypeListT, typename OpT> bool apply(OpT &op) const {
+    return has_grid() ? _grid->apply<GridTypeListT>(op) : false;
+  }
 
 private:
   float_grid::Ptr _grid;

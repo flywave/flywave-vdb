@@ -197,6 +197,10 @@ func (m *FloatGrid) Clear() {
 	C.vdb_float_grid_clear(m.m)
 }
 
+func (m *FloatGrid) GetBackground() float32 {
+	return float32(C.vdb_float_grid_get_background(m.m))
+}
+
 func (m *FloatGrid) IsSaveFloatAsHalf() bool {
 	return bool(C.vdb_float_grid_save_float_as_half(m.m))
 }
@@ -448,6 +452,41 @@ func (m *FloatGrid) ResampleWithTransform(tran GridTransform,
 	return &FloatGrid{m: C.vdb_float_grid_resample_with_grid_transform(m.m, trana.m, C.int(curOrder), C.float(tolerance), C.bool(prune))}
 }
 
+//export vdbFloatGridVisiton
+func vdbFloatGridVisiton(ctx unsafe.Pointer, coord *C.int, val C.float) C.bool {
+	var aSlice []int32
+	aHeader := (*reflect.SliceHeader)((unsafe.Pointer(&aSlice)))
+	aHeader.Cap = int(3)
+	aHeader.Len = int(3)
+	aHeader.Data = uintptr(unsafe.Pointer(coord))
+
+	return C.bool((*(*func(coord []int32, v float32) bool)(ctx))(aSlice, float32(val)))
+}
+
+func (m *FloatGrid) VisitOn(v func(coord []int32, v float32) bool) {
+	inptr := uintptr(unsafe.Pointer(&v))
+	C.vdb_float_grid_visit_on(m.m, (unsafe.Pointer)(inptr))
+}
+
+func (m *FloatGrid) VisitOff(v func(coord []int32, v float32) bool) {
+	inptr := uintptr(unsafe.Pointer(&v))
+	C.vdb_float_grid_visit_off(m.m, (unsafe.Pointer)(inptr))
+}
+
+func (m *FloatGrid) VisitAll(v func(coord []int32, v float32) bool) {
+	inptr := uintptr(unsafe.Pointer(&v))
+	C.vdb_float_grid_visit_all(m.m, (unsafe.Pointer)(inptr))
+}
+
+type FloatGridIterator struct {
+	iter *C.struct__vdb_float_grid_iterator_t
+}
+
+//export vdbFloatGridVisitonIterator
+func vdbFloatGridVisitonIterator(ctx unsafe.Pointer, iter *C.struct__vdb_float_grid_iterator_t) C.bool {
+	return C.bool((*(*func(iter FloatGridIterator) bool)(ctx))(FloatGridIterator{iter: iter}))
+}
+
 type PixelGrid struct {
 	m *C.struct__vdb_pixel_grid_t
 }
@@ -605,4 +644,39 @@ func (m *PixelGrid) PrintInfo() string {
 	cstr := C.vdb_pixel_grid_print_info(m.m)
 	defer C.free((unsafe.Pointer)(cstr))
 	return C.GoString(cstr)
+}
+
+//export vdbPixelGridVisiton
+func vdbPixelGridVisiton(ctx unsafe.Pointer, coord *C.int, val C.struct__vdb_pixel_t) C.bool {
+	var aSlice []int32
+	aHeader := (*reflect.SliceHeader)((unsafe.Pointer(&aSlice)))
+	aHeader.Cap = int(3)
+	aHeader.Len = int(3)
+	aHeader.Data = uintptr(unsafe.Pointer(coord))
+
+	return C.bool((*(*func(coord []int32, v Pixel) bool)(ctx))(aSlice, cpixel_2_pixel(val)))
+}
+
+func (m *PixelGrid) VisitOn(v func(coord []int32, v Pixel) bool) {
+	inptr := uintptr(unsafe.Pointer(&v))
+	C.vdb_pixel_grid_visit_on(m.m, (unsafe.Pointer)(inptr))
+}
+
+func (m *PixelGrid) VisitOff(v func(coord []int32, v Pixel) bool) {
+	inptr := uintptr(unsafe.Pointer(&v))
+	C.vdb_pixel_grid_visit_off(m.m, (unsafe.Pointer)(inptr))
+}
+
+func (m *PixelGrid) VisitAll(v func(coord []int32, v Pixel) bool) {
+	inptr := uintptr(unsafe.Pointer(&v))
+	C.vdb_pixel_grid_visit_all(m.m, (unsafe.Pointer)(inptr))
+}
+
+type PixelGridIterator struct {
+	iter *C.struct__vdb_pixel_grid_iterator_t
+}
+
+//export vdbPixelGridVisitonIterator
+func vdbPixelGridVisitonIterator(ctx unsafe.Pointer, iter *C.struct__vdb_pixel_grid_iterator_t) C.bool {
+	return C.bool((*(*func(iter PixelGridIterator) bool)(ctx))(PixelGridIterator{iter: iter}))
 }

@@ -15,6 +15,14 @@ using vdb_grid_const_ptr = openvdb::GridBase::ConstPtr;
 using vdb_grid_ref = openvdb::GridBase &;
 using vdb_grid_const_ref = const openvdb::GridBase &;
 
+using vdb_grid_ptr_vec = openvdb::GridPtrVec;
+using vdb_grid_ptr_vec_iterator = openvdb::GridPtrVec::iterator;
+using vdb_grid_ptr_vec_const_iterator = openvdb::GridPtrVec::const_iterator;
+
+using vdb_grid_const_ptr_vec = openvdb::GridCPtrVec;
+using vdb_grid_const_ptr_vec_iterator = openvdb::GridCPtrVec::iterator;
+using vdb_grid_const_ptr_vec_const_iterator = openvdb::GridCPtrVec::const_iterator;
+
 using scalar_grid_types =
     vdb::TypeList<openvdb::BoolGrid, openvdb::FloatGrid, openvdb::DoubleGrid,
                   openvdb::Int32Grid, openvdb::Int64Grid>;

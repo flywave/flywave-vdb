@@ -2,7 +2,9 @@
 
 #include "mesh_data.hh"
 #include "particle.hh"
+#include "transformer.hh"
 #include "trees.hh"
+#include "vdb_utils.hh"
 
 #include <openvdb/openvdb.h>
 
@@ -68,6 +70,35 @@ public:
   void update_display(double isovalue, double adaptivity);
 
   void rebuild(float iso, float exWidth, float inWidth);
+
+  std::shared_ptr<vdb_float_grid> resample(float_grid::Ptr refGrid,
+                                           float voxelSize, int curOrder,
+                                           float tolerance, bool prune);
+
+  template <typename GridTransformer>
+  std::shared_ptr<vdb_float_grid> resample(GridTransformer &trans, int curOrder,
+                                           float tolerance, bool prune) {
+    vdb_grid_ptr outGrid = _grid->copyGridWithNewTree();
+
+    if (curOrder == 0) {
+      grid_resample_op<openvdb::tools::PointSampler, GridTransformer> op(outGrid,
+                                                                        trans);
+      op(*_grid);
+    } else if (curOrder == 1) {
+      grid_resample_op<openvdb::tools::BoxSampler, GridTransformer> op(outGrid,
+                                                                      trans);
+      op(*_grid);
+    } else if (curOrder == 2) {
+      grid_resample_op<openvdb::tools::QuadraticSampler, GridTransformer> op(
+          outGrid, trans);
+      op(*_grid);
+    }
+
+    if (prune)
+      outGrid->pruneGrid(tolerance);
+
+    return std::make_shared<vdb_float_grid>(vdb_grid_cast<float_grid>(outGrid));
+  }
 
   void set(const int i, const int j, const int k, const float &v);
 

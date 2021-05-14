@@ -26,7 +26,7 @@ func (t *VoxelMesh) Clear() {
 	C.voxel_mesh_clear(t.m)
 }
 
-func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type SamplerType, matrix []float64) *VoxelPixel {
+func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type GridClass, matrix []float64) *VoxelPixel {
 	ccreator := NewClipBoxCreateorAdapter(creator)
 	defer ccreator.Free()
 	mpt := (*C.struct__voxel_pixel_materials_t)(nil)

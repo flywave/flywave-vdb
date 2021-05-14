@@ -11,9 +11,17 @@ const (
 	CT_DIFFERENCE   = CompositeType(2)
 )
 
+type GridClass int32
+
+const (
+	GC_LEVEL_SET = GridClass(0)
+	GC_SURFACE   = GridClass(1)
+)
+
 type SamplerType int32
 
 const (
-	ST_LEVEL_SET = SamplerType(0)
-	ST_SURFACE   = SamplerType(1)
+	ST_POINT = SamplerType(0)
+	ST_BOX   = SamplerType(1)
+	ST_QUADRATIC   = SamplerType(2)
 )

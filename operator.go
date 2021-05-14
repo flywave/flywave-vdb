@@ -22,7 +22,7 @@ type VoxelizeOperator struct {
 	localFeature uint16
 	precision    float32
 	creator      ClipBoxCreateor
-	tp           SamplerType
+	tp           GridClass
 	matrix       []float64
 }
 
@@ -39,7 +39,7 @@ func (f *VoxelizeOperator) Apply() error {
 	return nil
 }
 
-func NewVoxelizeOperator(base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature uint16, tp SamplerType, matrix []float64) *VoxelizeOperator {
+func NewVoxelizeOperator(base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *VoxelizeOperator {
 	return nil
 }
 
@@ -74,7 +74,7 @@ type MergeOperator struct {
 	CSGOperator
 }
 
-func NewMergeOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp SamplerType, matrix []float64) *MergeOperator {
+func NewMergeOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *MergeOperator {
 	return nil
 }
 
@@ -82,7 +82,7 @@ type MaskOperator struct {
 	CSGOperator
 }
 
-func NewMaskOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp SamplerType, matrix []float64) *MergeOperator {
+func NewMaskOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *MergeOperator {
 	return nil
 }
 
@@ -106,6 +106,6 @@ func (f *SurfaceOperator) Apply() error {
 	return nil
 }
 
-func NewSurfaceOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp SamplerType, matrix []float64) *SurfaceOperator {
+func NewSurfaceOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *SurfaceOperator {
 	return nil
 }

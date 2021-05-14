@@ -23,6 +23,7 @@ namespace vdb = openvdb::OPENVDB_VERSION_NAME;
 
 class textute_repacker {
   class impl;
+
 public:
   textute_repacker(vertex_grid::Ptr cgrid, pixel_grid::Ptr, vdb::Mat4d mat,
                    float tpad);
@@ -58,9 +59,8 @@ public:
   triangle_repacker(vertex_grid::Ptr vgrid) : _grid(vgrid) {}
 
   void build_poly(std::vector<vertext_type> &points,
-                           std::vector<triangle_type> &tri,
-                           std::vector<quad_type> &a, double isovalue = 0.0,
-                           double adapter = 0.01);
+                  std::vector<triangle_type> &tri, std::vector<quad_type> &a,
+                  double isovalue = 0.0, double adapter = 0.01);
 
 private:
   vertex_grid::Ptr _grid;

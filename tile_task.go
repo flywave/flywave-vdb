@@ -12,7 +12,7 @@ type TileTask struct {
 	matToWord    []float64
 	boundsInWord *BBox
 	precision    float64
-	tp           SamplerType
+	tp           GridClass
 }
 
 func NewTileTask(tiles []*VoxelTile, op OperatorType, src *VoxelMesh, matToWord []float64, boundsInWord *BBox) *TileTask {

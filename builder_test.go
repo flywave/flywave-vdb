@@ -33,7 +33,7 @@ func TestMeshBuilder(t *testing.T) {
 	mat := []float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 	precision := float32(10)
 
-	vpixel := vmesh.SampleVoxelPixel(nil, 1, precision, clip, ST_LEVEL_SET, mat)
+	vpixel := vmesh.SampleVoxelPixel(nil, 1, precision, clip, GC_LEVEL_SET, mat)
 
 	if vpixel.Empty() {
 		t.FailNow()

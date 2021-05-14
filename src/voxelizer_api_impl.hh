@@ -4,10 +4,10 @@
 #include "mesh_data.hh"
 #include "repacker.hh"
 #include "texture_data.hh"
+#include "transformer.hh"
 #include "voxel_mesh.hh"
 #include "voxel_mesh_builder.hh"
 #include "voxel_pixel.hh"
-#include "transformer.hh"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,9 +84,6 @@ struct _voxel_clip_box_createor_t {
   std::shared_ptr<flywave::clip_box_createor> ptr;
 };
 
-struct _voxel_grid_transform_t {
-  std::shared_ptr<flywave::grid_transform> ptr;
-};
 
 struct voxel_io_vertex {
   float v[3];
@@ -114,6 +111,23 @@ struct voxel_io_triangle {
   }
 };
 
+struct cgo_grid_transform : public flywave::grid_transform {
+  cgo_grid_transform(void *_ctx) : ctx(_ctx) {}
+
+  bool isAffine() const override;
+
+  bool isIdentity() const override;
+
+  openvdb::Vec3R transform(const openvdb::Vec3R &pos) const override;
+
+  openvdb::Vec3R invTransform(const openvdb::Vec3R &pos) const override;
+
+  void *ctx;
+};
+
+struct _voxel_grid_transform_t {
+  std::shared_ptr<cgo_grid_transform> ptr;
+};
 #ifdef __cplusplus
 }
 #endif

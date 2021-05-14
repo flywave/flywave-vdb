@@ -1140,29 +1140,23 @@ extern void gridTransform(void *ctx, double *pt, double *out);
 
 extern void gridInvTransform(void *ctx, double *pt, double *out);
 
-struct cgo_grid_transform : public grid_transform {
-  cgo_grid_transform(void *_ctx) : ctx(_ctx) {}
+bool cgo_grid_transform::isAffine() const { return ::isAffine(ctx); }
 
-  bool isAffine() const override { return ::isAffine(ctx); }
+bool cgo_grid_transform::isIdentity() const { return ::isIdentity(ctx); }
 
-  bool isIdentity() const override { return ::isIdentity(ctx); }
+openvdb::Vec3R cgo_grid_transform::transform(const openvdb::Vec3R &pos) const {
+  openvdb::Vec3R out;
+  ::gridTransform(ctx, const_cast<double *>(pos.asPointer()), out.asPointer());
+  return out;
+}
 
-  openvdb::Vec3R transform(const openvdb::Vec3R &pos) const override {
-    openvdb::Vec3R out;
-    ::gridTransform(ctx, const_cast<double *>(pos.asPointer()),
-                    out.asPointer());
-    return out;
-  }
-
-  openvdb::Vec3R invTransform(const openvdb::Vec3R &pos) const override {
-    openvdb::Vec3R out;
-    ::gridInvTransform(ctx, const_cast<double *>(pos.asPointer()),
-                       out.asPointer());
-    return out;
-  }
-
-  void *ctx;
-};
+openvdb::Vec3R
+cgo_grid_transform::invTransform(const openvdb::Vec3R &pos) const {
+  openvdb::Vec3R out;
+  ::gridInvTransform(ctx, const_cast<double *>(pos.asPointer()),
+                     out.asPointer());
+  return out;
+}
 
 FLYWAVE_VDB_API voxel_grid_transform_t *voxel_grid_transform_create(void *ctx) {
   return new voxel_grid_transform_t{std::make_shared<cgo_grid_transform>(ctx)};

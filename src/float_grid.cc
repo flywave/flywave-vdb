@@ -1,5 +1,4 @@
 #include "float_grid.hh"
-#include "vdb_utils.hh"
 
 #include <openvdb/Types.h>
 #include <openvdb/tools/Composite.h>
@@ -448,6 +447,35 @@ bool vdb_float_grid::is_sdf() const {
     return true;
 
   return false;
+}
+
+std::shared_ptr<vdb_float_grid>
+vdb_float_grid::resample(float_grid::Ptr refGrid, float voxelSize, int curOrder,
+                         float tolerance, bool prune) {
+  if (refGrid == nullptr) {
+    refGrid = openvdb::FloatGrid::create();
+    refGrid->setTransform(
+        openvdb::math::Transform::createLinearTransform(voxelSize));
+  }
+  openvdb::math::Transform::Ptr refXform = refGrid->transform().copy();
+  vdb_grid_ptr outGrid = _grid->copyGridWithNewTree();
+  outGrid->setTransform(refXform);
+
+  if (curOrder == 0) {
+    grid_resample_to_match_op<openvdb::tools::PointSampler> op(outGrid);
+    _grid->apply<all_grid_types>(op);
+  } else if (curOrder == 1) {
+    grid_resample_to_match_op<openvdb::tools::BoxSampler> op(outGrid);
+    _grid->apply<all_grid_types>(op);
+  } else if (curOrder == 2) {
+    grid_resample_to_match_op<openvdb::tools::QuadraticSampler> op(outGrid);
+    _grid->apply<all_grid_types>(op);
+  }
+
+  if (prune)
+    outGrid->pruneGrid(tolerance);
+
+  return std::make_shared<vdb_float_grid>(vdb_grid_cast<float_grid>(outGrid));
 }
 
 } // namespace flywave

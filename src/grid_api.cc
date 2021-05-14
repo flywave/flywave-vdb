@@ -364,6 +364,21 @@ vdb_float_grid_eval_active_bounding_box(vdb_float_grid_t *grid, double *box) {
   box[5] = vbox.max().z();
 }
 
+FLYWAVE_VDB_API vdb_float_grid_t *
+vdb_float_grid_resample_with_ref(vdb_float_grid_t *grid,
+                                 vdb_float_grid_t *ref_grid, float voxelSize,
+                                 int curOrder, float tolerance, _Bool prune) {
+  return new vdb_float_grid_t{grid->ptr->resample(
+      ref_grid->ptr->grid(), voxelSize, curOrder, tolerance, prune)};
+}
+
+FLYWAVE_VDB_API vdb_float_grid_t *vdb_float_grid_resample_with_grid_transform(
+    vdb_float_grid_t *grid, voxel_grid_transform_t *tran, int curOrder,
+    float tolerance, _Bool prune) {
+  return new vdb_float_grid_t{
+      grid->ptr->resample<cgo_grid_transform>(*tran->ptr, curOrder, tolerance, prune)};
+}
+
 FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create() {
   vdb_pixel_grid_t *ret =
       new vdb_pixel_grid_t{std::make_shared<vdb_pixel_grid>()};

@@ -544,15 +544,13 @@ public:
 
   template <typename GridType> void operator()(const GridType &inGrid) {
     typename GridType::Ptr outGrid = openvdb::gridPtrCast<GridType>(mOutGrid);
-
     openvdb::tools::GridResampler resampler;
-
     resampler.transformGrid<Sampler>(mTransformer, inGrid, *outGrid);
   }
 
 private:
   vdb_grid_ptr mOutGrid;
-  const TransformerType mTransformer;
+  const TransformerType &mTransformer;
 };
 
 template <typename Sampler> class grid_resample_to_match_op {

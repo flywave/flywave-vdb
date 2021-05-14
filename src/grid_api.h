@@ -15,6 +15,7 @@ extern "C" {
 
 typedef struct _vdb_float_grid_t vdb_float_grid_t;
 typedef struct _voxel_transform_t voxel_transform_t;
+typedef struct _voxel_grid_transform_t voxel_grid_transform_t;
 
 extern FLYWAVE_VDB_API vdb_float_grid_t *vdb_float_grid_create();
 extern FLYWAVE_VDB_API void vdb_float_grid_free(vdb_float_grid_t *grid);
@@ -70,8 +71,7 @@ extern FLYWAVE_VDB_API int *vdb_float_grid_face_buffer(vdb_float_grid_t *grid,
 extern FLYWAVE_VDB_API voxel_transform_t *
 vdb_float_grid_get_transform(vdb_float_grid_t *grid);
 
-extern FLYWAVE_VDB_API char *
-vdb_float_grid_print_info(vdb_float_grid_t *grid);
+extern FLYWAVE_VDB_API char *vdb_float_grid_print_info(vdb_float_grid_t *grid);
 
 extern FLYWAVE_VDB_API void
 vdb_float_grid_set_transform(vdb_float_grid_t *grid, voxel_transform_t *tran);
@@ -127,6 +127,17 @@ vdb_float_grid_linear_get(vdb_float_grid_t *grid, float x, float y, float z);
 extern FLYWAVE_VDB_API void
 vdb_float_grid_eval_active_bounding_box(vdb_float_grid_t *grid, double *box);
 
+extern FLYWAVE_VDB_API vdb_float_grid_t *
+vdb_float_grid_resample_with_ref(vdb_float_grid_t *grid,
+                                 vdb_float_grid_t *ref_grid, float voxelSize,
+                                 int curOrder, float tolerance, _Bool prune);
+
+extern FLYWAVE_VDB_API vdb_float_grid_t *
+vdb_float_grid_resample_with_grid_transform(vdb_float_grid_t *grid,
+                                            voxel_grid_transform_t *tran,
+                                            int curOrder, float tolerance,
+                                            _Bool prune);
+
 typedef struct _vdb_pixel_grid_t vdb_pixel_grid_t;
 
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create();
@@ -164,8 +175,7 @@ vdb_pixel_grid_clip_from_coordbox(vdb_pixel_grid_t *grid, int32_t *cbox);
 extern FLYWAVE_VDB_API uint64_t
 vdb_pixel_grid_active_voxel_count(vdb_pixel_grid_t *grid);
 
-extern FLYWAVE_VDB_API char *
-vdb_pixel_grid_print_info(vdb_pixel_grid_t *grid);
+extern FLYWAVE_VDB_API char *vdb_pixel_grid_print_info(vdb_pixel_grid_t *grid);
 
 enum vdb_pixel_type_t { color, material, material_and_color, invalid };
 

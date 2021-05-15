@@ -478,4 +478,19 @@ vdb_float_grid::resample(float_grid::Ptr refGrid, float voxelSize, int curOrder,
   return std::make_shared<vdb_float_grid>(vdb_grid_cast<float_grid>(outGrid));
 }
 
+void vdb_float_grid::sparse_fill(const vdb::CoordBBox &box, const float &v,
+                                 bool active) {
+  _grid->sparseFill(box, v, active);
+}
+
+void vdb_float_grid::fill(const vdb::CoordBBox &box, const float &v,
+                          bool active) {
+  _grid->fill(box, v, active);
+}
+
+void vdb_float_grid::dense_fill(const vdb::CoordBBox &box, const float &v,
+                                bool active) {
+  _grid->denseFill(box, v, active);
+}
+
 } // namespace flywave

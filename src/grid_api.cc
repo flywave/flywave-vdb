@@ -383,6 +383,29 @@ FLYWAVE_VDB_API vdb_float_grid_t *vdb_float_grid_resample_with_grid_transform(
       *tran->ptr, curOrder, tolerance, prune)};
 }
 
+FLYWAVE_VDB_API void vdb_float_grid_sparse_fill(vdb_float_grid_t *grid,
+                                                int32_t *box, float v,
+                                                _Bool active) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{box[0], box[1], box[2]},
+                              vdb::Coord{box[3], box[4], box[5]});
+  grid->ptr->sparse_fill(ccbox, v, active);
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_fill(vdb_float_grid_t *grid, int32_t *box,
+                                         float v, _Bool active) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{box[0], box[1], box[2]},
+                              vdb::Coord{box[3], box[4], box[5]});
+  grid->ptr->fill(ccbox, v, active);
+}
+
+FLYWAVE_VDB_API void vdb_float_grid_dense_fill(vdb_float_grid_t *grid,
+                                               int32_t *box, float v,
+                                               _Bool active) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{box[0], box[1], box[2]},
+                              vdb::Coord{box[3], box[4], box[5]});
+  grid->ptr->dense_fill(ccbox, v, active);
+}
+
 FLYWAVE_VDB_API vdb_pixel_grid_t *vdb_pixel_grid_create() {
   vdb_pixel_grid_t *ret =
       new vdb_pixel_grid_t{std::make_shared<vdb_pixel_grid>()};
@@ -534,6 +557,30 @@ FLYWAVE_VDB_API vdb_pixel_t vdb_pixel_grid_linear_get(vdb_pixel_grid_t *grid,
   return ret;
 }
 
+FLYWAVE_VDB_API void vdb_pixel_grid_sparse_fill(vdb_pixel_grid_t *grid,
+                                                int32_t *box, vdb_pixel_t v,
+                                                _Bool active) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{box[0], box[1], box[2]},
+                              vdb::Coord{box[3], box[4], box[5]});
+  grid->ptr->sparse_fill(ccbox, *reinterpret_cast<flywave::pixel *>(&v),
+                         active);
+}
+
+FLYWAVE_VDB_API void vdb_pixel_grid_fill(vdb_pixel_grid_t *grid, int32_t *box,
+                                         vdb_pixel_t v, _Bool active) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{box[0], box[1], box[2]},
+                              vdb::Coord{box[3], box[4], box[5]});
+  grid->ptr->fill(ccbox, *reinterpret_cast<flywave::pixel *>(&v), active);
+}
+
+FLYWAVE_VDB_API void vdb_pixel_grid_dense_fill(vdb_pixel_grid_t *grid,
+                                               int32_t *box, vdb_pixel_t v,
+                                               _Bool active) {
+  auto ccbox = vdb::CoordBBox(vdb::Coord{box[0], box[1], box[2]},
+                              vdb::Coord{box[3], box[4], box[5]});
+  grid->ptr->dense_fill(ccbox, *reinterpret_cast<flywave::pixel *>(&v), active);
+}
+
 extern _Bool vdbFloatGridVisiton(void *ctx, int32_t *coord, float val);
 extern _Bool vdbPixelGridVisiton(void *ctx, int32_t *coord, vdb_pixel_t val);
 
@@ -554,9 +601,8 @@ struct _vdb_pixel_grid_iterator_t {
   void *iter;
 };
 
-FLYWAVE_VDB_API void
-vdb_float_grid_visit_iterator_on(vdb_float_grid_t *grid,
-                                 vdb_float_grid_iterator_t *v) {
+FLYWAVE_VDB_API void vdb_float_grid_visit_iterator_on(vdb_float_grid_t *grid,
+                                                      void *v) {
   _vdb_float_grid_iterator_t cit{VDB_ITERATOR_ON, nullptr};
   for (auto it = grid->ptr->grid()->beginValueOn(); it; ++it) {
     cit.iter = &it;
@@ -566,9 +612,8 @@ vdb_float_grid_visit_iterator_on(vdb_float_grid_t *grid,
   }
 }
 
-FLYWAVE_VDB_API void
-vdb_float_grid_visit_iterator_off(vdb_float_grid_t *grid,
-                                  vdb_float_grid_iterator_t *v) {
+FLYWAVE_VDB_API void vdb_float_grid_visit_iterator_off(vdb_float_grid_t *grid,
+                                                       void *v) {
   _vdb_float_grid_iterator_t cit{VDB_ITERATOR_OFF, nullptr};
   for (auto it = grid->ptr->grid()->beginValueOn(); it; ++it) {
     cit.iter = &it;
@@ -578,9 +623,8 @@ vdb_float_grid_visit_iterator_off(vdb_float_grid_t *grid,
   }
 }
 
-FLYWAVE_VDB_API void
-vdb_float_grid_visit_iterator_all(vdb_float_grid_t *grid,
-                                  vdb_float_grid_iterator_t *v) {
+FLYWAVE_VDB_API void vdb_float_grid_visit_iterator_all(vdb_float_grid_t *grid,
+                                                       void *v) {
   _vdb_float_grid_iterator_t cit{VDB_ITERATOR_ALL, nullptr};
   for (auto it = grid->ptr->grid()->beginValueOn(); it; ++it) {
     cit.iter = &it;
@@ -857,9 +901,8 @@ vdb_float_grid_iterator_get_voxel_count(vdb_float_grid_iterator_t *it) {
   return 0;
 }
 
-FLYWAVE_VDB_API void
-vdb_pixel_grid_visit_iterator_on(vdb_pixel_grid_t *grid,
-                                 vdb_pixel_grid_iterator_t *v) {
+FLYWAVE_VDB_API void vdb_pixel_grid_visit_iterator_on(vdb_pixel_grid_t *grid,
+                                                      void *v) {
   _vdb_pixel_grid_iterator_t cit{VDB_ITERATOR_ON, nullptr};
   for (auto it = grid->ptr->grid()->beginValueOn(); it; ++it) {
     cit.iter = &it;
@@ -869,9 +912,8 @@ vdb_pixel_grid_visit_iterator_on(vdb_pixel_grid_t *grid,
   }
 }
 
-FLYWAVE_VDB_API void
-vdb_pixel_grid_visit_iterator_off(vdb_pixel_grid_t *grid,
-                                  vdb_pixel_grid_iterator_t *v) {
+FLYWAVE_VDB_API void vdb_pixel_grid_visit_iterator_off(vdb_pixel_grid_t *grid,
+                                                       void *v) {
   _vdb_pixel_grid_iterator_t cit{VDB_ITERATOR_OFF, nullptr};
   for (auto it = grid->ptr->grid()->beginValueOn(); it; ++it) {
     cit.iter = &it;
@@ -881,9 +923,8 @@ vdb_pixel_grid_visit_iterator_off(vdb_pixel_grid_t *grid,
   }
 }
 
-FLYWAVE_VDB_API void
-vdb_pixel_grid_visit_iterator_all(vdb_pixel_grid_t *grid,
-                                  vdb_pixel_grid_iterator_t *v) {
+FLYWAVE_VDB_API void vdb_pixel_grid_visit_iterator_all(vdb_pixel_grid_t *grid,
+                                                       void *v) {
   _vdb_pixel_grid_iterator_t cit{VDB_ITERATOR_ALL, nullptr};
   for (auto it = grid->ptr->grid()->beginValueOn(); it; ++it) {
     cit.iter = &it;

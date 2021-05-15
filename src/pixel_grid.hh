@@ -48,6 +48,14 @@ public:
 
   double calc_positive_density() const;
 
+  void sparse_fill(const vdb::CoordBBox &box, const pixel &v,
+                   bool active = true);
+
+  void fill(const vdb::CoordBBox &box, const pixel &v, bool active = true);
+
+  void dense_fill(const vdb::CoordBBox &box, const pixel &v,
+                  bool active = true);
+
   template <typename GridTypeListT, typename OpT> bool apply(OpT &op) const {
     return has_grid() ? _grid->apply<GridTypeListT>(op) : false;
   }

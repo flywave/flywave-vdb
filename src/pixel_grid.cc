@@ -190,4 +190,19 @@ bool vdb_pixel_grid::is_sdf() const {
   return false;
 }
 
+void vdb_pixel_grid::sparse_fill(const vdb::CoordBBox &box, const pixel &v,
+                                bool active) {
+  _grid->sparseFill(box, v, active);
+}
+
+void vdb_pixel_grid::fill(const vdb::CoordBBox &box, const pixel &v,
+                          bool active) {
+  _grid->fill(box, v, active);
+}
+
+void vdb_pixel_grid::dense_fill(const vdb::CoordBBox &box, const pixel &v,
+                               bool active) {
+  _grid->denseFill(box, v, active);
+}
+
 } // namespace flywave

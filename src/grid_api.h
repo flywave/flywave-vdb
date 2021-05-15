@@ -142,6 +142,18 @@ vdb_float_grid_resample_with_grid_transform(vdb_float_grid_t *grid,
                                             int curOrder, float tolerance,
                                             _Bool prune);
 
+extern FLYWAVE_VDB_API void vdb_float_grid_sparse_fill(vdb_float_grid_t *grid,
+                                                       int32_t *box, float v,
+                                                       _Bool active);
+
+extern FLYWAVE_VDB_API void vdb_float_grid_fill(vdb_float_grid_t *grid,
+                                                int32_t *box, float v,
+                                                _Bool active);
+
+extern FLYWAVE_VDB_API void vdb_float_grid_dense_fill(vdb_float_grid_t *grid,
+                                                      int32_t *box, float v,
+                                                      _Bool active);
+
 extern FLYWAVE_VDB_API void vdb_float_grid_visit_on(vdb_float_grid_t *grid,
                                                     void *v);
 extern FLYWAVE_VDB_API void vdb_float_grid_visit_off(vdb_float_grid_t *grid,
@@ -150,14 +162,11 @@ extern FLYWAVE_VDB_API void vdb_float_grid_visit_all(vdb_float_grid_t *grid,
                                                      void *v);
 
 extern FLYWAVE_VDB_API void
-vdb_float_grid_visit_iterator_on(vdb_float_grid_t *grid,
-                                 vdb_float_grid_iterator_t *v);
+vdb_float_grid_visit_iterator_on(vdb_float_grid_t *grid, void *v);
 extern FLYWAVE_VDB_API void
-vdb_float_grid_visit_iterator_off(vdb_float_grid_t *grid,
-                                  vdb_float_grid_iterator_t *v);
+vdb_float_grid_visit_iterator_off(vdb_float_grid_t *grid, void *v);
 extern FLYWAVE_VDB_API void
-vdb_float_grid_visit_iterator_all(vdb_float_grid_t *grid,
-                                  vdb_float_grid_iterator_t *v);
+vdb_float_grid_visit_iterator_all(vdb_float_grid_t *grid, void *v);
 
 extern FLYWAVE_VDB_API void
 vdb_float_grid_iterator_set_value(vdb_float_grid_iterator_t *it, float v);
@@ -274,15 +283,26 @@ extern FLYWAVE_VDB_API void vdb_pixel_grid_visit_off(vdb_pixel_grid_t *grid,
 extern FLYWAVE_VDB_API void vdb_pixel_grid_visit_all(vdb_pixel_grid_t *grid,
                                                      void *v);
 
+extern FLYWAVE_VDB_API void vdb_pixel_grid_sparse_fill(vdb_pixel_grid_t *grid,
+                                                       int32_t *box,
+                                                       vdb_pixel_t v,
+                                                       _Bool active);
+
+extern FLYWAVE_VDB_API void vdb_pixel_grid_fill(vdb_pixel_grid_t *grid,
+                                                int32_t *box, vdb_pixel_t v,
+                                                _Bool active);
+
+extern FLYWAVE_VDB_API void vdb_pixel_grid_dense_fill(vdb_pixel_grid_t *grid,
+                                                      int32_t *box,
+                                                      vdb_pixel_t v,
+                                                      _Bool active);
+
 extern FLYWAVE_VDB_API void
-vdb_pixel_grid_visit_iterator_on(vdb_pixel_grid_t *grid,
-                                 vdb_pixel_grid_iterator_t *v);
+vdb_pixel_grid_visit_iterator_on(vdb_pixel_grid_t *grid, void *v);
 extern FLYWAVE_VDB_API void
-vdb_pixel_grid_visit_iterator_off(vdb_pixel_grid_t *grid,
-                                  vdb_pixel_grid_iterator_t *v);
+vdb_pixel_grid_visit_iterator_off(vdb_pixel_grid_t *grid, void *v);
 extern FLYWAVE_VDB_API void
-vdb_pixel_grid_visit_iterator_all(vdb_pixel_grid_t *grid,
-                                  vdb_pixel_grid_iterator_t *v);
+vdb_pixel_grid_visit_iterator_all(vdb_pixel_grid_t *grid, void *v);
 
 extern FLYWAVE_VDB_API void
 vdb_pixel_grid_iterator_set_value(vdb_pixel_grid_iterator_t *it, vdb_pixel_t v);

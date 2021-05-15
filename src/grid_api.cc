@@ -615,54 +615,247 @@ FLYWAVE_VDB_API void vdb_float_grid_visit_all(vdb_float_grid_t *grid, void *v) {
 }
 
 FLYWAVE_VDB_API void
-vdb_float_grid_iterator_set_value(vdb_float_grid_iterator_t *it, float v) {}
+vdb_float_grid_iterator_set_value(vdb_float_grid_iterator_t *it, float v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->setValue(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->setValue(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->setValue(v);
+  }
+}
+
 FLYWAVE_VDB_API float
-vdb_float_grid_iterator_get_value(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_value(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getValue();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->getValue();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->getValue();
+  }
+  return 0.0;
+}
 
 FLYWAVE_VDB_API void
 vdb_float_grid_iterator_set_active_state(vdb_float_grid_iterator_t *it,
-                                         _Bool v) {}
+                                         _Bool v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->setActiveState(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->setActiveState(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->setActiveState(v);
+  }
+}
 
 FLYWAVE_VDB_API void
-vdb_float_grid_iterator_set_value_off(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_set_value_off(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->setValueOff();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->setValueOff();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->setValueOff();
+  }
+}
 
 FLYWAVE_VDB_API void
 vdb_float_grid_iterator_set_min_depth(vdb_float_grid_iterator_t *it,
-                                      int32_t v) {}
+                                      int32_t v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->setMinDepth(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->setMinDepth(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->setMinDepth(v);
+  }
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_float_grid_iterator_get_min_depth(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_min_depth(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getMinDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+        ->getMinDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+        ->getMinDepth();
+  }
+  return -1;
+}
 
 FLYWAVE_VDB_API void
 vdb_float_grid_iterator_set_max_depth(vdb_float_grid_iterator_t *it,
-                                      int32_t v) {}
+                                      int32_t v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->setMaxDepth(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->setMaxDepth(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->setMaxDepth(v);
+  }
+}
 FLYWAVE_VDB_API int32_t
-vdb_float_grid_iterator_get_max_depth(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_max_depth(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getMaxDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+        ->getMaxDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+        ->getMaxDepth();
+  }
+  return -1;
+}
 
 FLYWAVE_VDB_API _Bool
-vdb_float_grid_iterator_test(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_test(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->test();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->test();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->test();
+  }
+  return false;
+}
+
 FLYWAVE_VDB_API _Bool
-vdb_float_grid_iterator_is_tile_value(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_is_tile_value(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->isTileValue();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+        ->isTileValue();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+        ->isTileValue();
+  }
+  return false;
+}
+
 FLYWAVE_VDB_API _Bool
-vdb_float_grid_iterator_is_voxel_value(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_is_voxel_value(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)
+        ->isVoxelValue();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+        ->isVoxelValue();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+        ->isVoxelValue();
+  }
+  return false;
+}
+
 FLYWAVE_VDB_API _Bool
-vdb_float_grid_iterator_is_value_on(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_is_value_on(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->isValueOn();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->isValueOn();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->isValueOn();
+  }
+  return false;
+}
 
 FLYWAVE_VDB_API int32_t
-vdb_float_grid_iterator_get_level(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_level(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getLevel();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->getLevel();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->getLevel();
+  }
+  return -1;
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_float_grid_iterator_get_depth(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_depth(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->getDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->getDepth();
+  }
+  return -1;
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_float_grid_iterator_get_leaf_depth(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_leaf_depth(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)
+        ->getLeafDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+        ->getLeafDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+        ->getLeafDepth();
+  }
+  return -1;
+}
 
 FLYWAVE_VDB_API void
 vdb_float_grid_iterator_get_coord(vdb_float_grid_iterator_t *it,
-                                  int32_t *coord) {}
+                                  int32_t *coord) {
+  vdb::Coord ccoord;
+  if (it->type == VDB_ITERATOR_ON) {
+    ccoord = reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getCoord();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    ccoord = reinterpret_cast<float_grid::ValueOffIter *>(it->iter)->getCoord();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    ccoord = reinterpret_cast<float_grid::ValueAllIter *>(it->iter)->getCoord();
+  }
+  coord[0] = ccoord.x();
+  coord[1] = ccoord.y();
+  coord[2] = ccoord.z();
+}
 
 FLYWAVE_VDB_API void
 vdb_float_grid_iterator_get_bounding_box(vdb_float_grid_iterator_t *it,
-                                         int32_t *box) {}
+                                         int32_t *box) {
+  vdb::CoordBBox cbox;
+  if (it->type == VDB_ITERATOR_ON) {
+    cbox =
+        reinterpret_cast<float_grid::ValueOnIter *>(it->iter)->getBoundingBox();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    cbox = reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+               ->getBoundingBox();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    cbox = reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+               ->getBoundingBox();
+  }
+  box[0] = cbox.min().x();
+  box[1] = cbox.min().y();
+  box[2] = cbox.min().z();
+
+  box[3] = cbox.max().x();
+  box[4] = cbox.max().y();
+  box[5] = cbox.max().z();
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_float_grid_iterator_get_voxel_count(vdb_float_grid_iterator_t *it) {}
+vdb_float_grid_iterator_get_voxel_count(vdb_float_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<float_grid::ValueOnIter *>(it->iter)
+        ->getVoxelCount();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<float_grid::ValueOffIter *>(it->iter)
+        ->getVoxelCount();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<float_grid::ValueAllIter *>(it->iter)
+        ->getVoxelCount();
+  }
+  return 0;
+}
 
 FLYWAVE_VDB_API void
 vdb_pixel_grid_visit_iterator_on(vdb_pixel_grid_t *grid,
@@ -731,54 +924,254 @@ FLYWAVE_VDB_API void vdb_pixel_grid_visit_all(vdb_pixel_grid_t *grid, void *v) {
 }
 
 FLYWAVE_VDB_API void
-vdb_pixel_grid_iterator_set_value(vdb_pixel_grid_iterator_t *it, float v) {}
-FLYWAVE_VDB_API float
-vdb_pixel_grid_iterator_get_value(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_set_value(vdb_pixel_grid_iterator_t *it,
+                                  vdb_pixel_t v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->setValue(
+        *reinterpret_cast<flywave::pixel *>(&v));
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->setValue(
+        *reinterpret_cast<flywave::pixel *>(&v));
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->setValue(
+        *reinterpret_cast<flywave::pixel *>(&v));
+  }
+}
+FLYWAVE_VDB_API vdb_pixel_t
+vdb_pixel_grid_iterator_get_value(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    auto p = reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getValue();
+    return *reinterpret_cast<vdb_pixel_t *>(&p);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    auto p = reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->getValue();
+    return *reinterpret_cast<vdb_pixel_t *>(&p);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    auto p = reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->getValue();
+    return *reinterpret_cast<vdb_pixel_t *>(&p);
+  }
+  return vdb_pixel_t{};
+}
 
 FLYWAVE_VDB_API void
 vdb_pixel_grid_iterator_set_active_state(vdb_pixel_grid_iterator_t *it,
-                                         _Bool v) {}
+                                         _Bool v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->setActiveState(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->setActiveState(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->setActiveState(v);
+  }
+}
 
 FLYWAVE_VDB_API void
-vdb_pixel_grid_iterator_set_value_off(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_set_value_off(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->setValueOff();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->setValueOff();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->setValueOff();
+  }
+}
 
 FLYWAVE_VDB_API void
 vdb_pixel_grid_iterator_set_min_depth(vdb_pixel_grid_iterator_t *it,
-                                      int32_t v) {}
+                                      int32_t v) {
+
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->setMinDepth(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->setMinDepth(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->setMinDepth(v);
+  }
+}
 FLYWAVE_VDB_API int32_t
-vdb_pixel_grid_iterator_get_min_depth(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_get_min_depth(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getMinDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+        ->getMinDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+        ->getMinDepth();
+  }
+  return -1;
+}
 
 FLYWAVE_VDB_API void
 vdb_pixel_grid_iterator_set_max_depth(vdb_pixel_grid_iterator_t *it,
-                                      int32_t v) {}
-FLYWAVE_VDB_API int32_t
-vdb_pixel_grid_iterator_get_max_depth(vdb_pixel_grid_iterator_t *it) {}
-
-FLYWAVE_VDB_API _Bool
-vdb_pixel_grid_iterator_test(vdb_pixel_grid_iterator_t *it) {}
-FLYWAVE_VDB_API _Bool
-vdb_pixel_grid_iterator_is_tile_value(vdb_pixel_grid_iterator_t *it) {}
-FLYWAVE_VDB_API _Bool
-vdb_pixel_grid_iterator_is_voxel_value(vdb_pixel_grid_iterator_t *it) {}
-FLYWAVE_VDB_API _Bool
-vdb_pixel_grid_iterator_is_value_on(vdb_pixel_grid_iterator_t *it) {}
+                                      int32_t v) {
+  if (it->type == VDB_ITERATOR_ON) {
+    reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->setMaxDepth(v);
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->setMaxDepth(v);
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->setMaxDepth(v);
+  }
+}
 
 FLYWAVE_VDB_API int32_t
-vdb_pixel_grid_iterator_get_level(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_get_max_depth(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getMaxDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+        ->getMaxDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+        ->getMaxDepth();
+  }
+  return -1;
+}
+
+FLYWAVE_VDB_API _Bool
+vdb_pixel_grid_iterator_test(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->test();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->test();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->test();
+  }
+  return false;
+}
+
+FLYWAVE_VDB_API _Bool
+vdb_pixel_grid_iterator_is_tile_value(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->isTileValue();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+        ->isTileValue();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+        ->isTileValue();
+  }
+  return false;
+}
+
+FLYWAVE_VDB_API _Bool
+vdb_pixel_grid_iterator_is_voxel_value(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)
+        ->isVoxelValue();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+        ->isVoxelValue();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+        ->isVoxelValue();
+  }
+  return false;
+}
+
+FLYWAVE_VDB_API _Bool
+vdb_pixel_grid_iterator_is_value_on(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->isValueOn();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->isValueOn();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->isValueOn();
+  }
+  return false;
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_pixel_grid_iterator_get_depth(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_get_level(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getLevel();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->getLevel();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->getLevel();
+  }
+  return -1;
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_pixel_grid_iterator_get_leaf_depth(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_get_depth(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->getDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->getDepth();
+  }
+  return -1;
+}
+
+FLYWAVE_VDB_API int32_t
+vdb_pixel_grid_iterator_get_leaf_depth(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)
+        ->getLeafDepth();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+        ->getLeafDepth();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+        ->getLeafDepth();
+  }
+  return -1;
+}
 
 FLYWAVE_VDB_API void
 vdb_pixel_grid_iterator_get_coord(vdb_pixel_grid_iterator_t *it,
-                                  int32_t *coord) {}
+                                  int32_t *coord) {
+  vdb::Coord ccoord;
+  if (it->type == VDB_ITERATOR_ON) {
+    ccoord = reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getCoord();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    ccoord = reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)->getCoord();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    ccoord = reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)->getCoord();
+  }
+  coord[0] = ccoord.x();
+  coord[1] = ccoord.y();
+  coord[2] = ccoord.z();
+}
 
 FLYWAVE_VDB_API void
 vdb_pixel_grid_iterator_get_bounding_box(vdb_pixel_grid_iterator_t *it,
-                                         int32_t *box) {}
+                                         int32_t *box) {
+  vdb::CoordBBox cbox;
+  if (it->type == VDB_ITERATOR_ON) {
+    cbox =
+        reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)->getBoundingBox();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    cbox = reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+               ->getBoundingBox();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    cbox = reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+               ->getBoundingBox();
+  }
+  box[0] = cbox.min().x();
+  box[1] = cbox.min().y();
+  box[2] = cbox.min().z();
+
+  box[3] = cbox.max().x();
+  box[4] = cbox.max().y();
+  box[5] = cbox.max().z();
+}
+
 FLYWAVE_VDB_API int32_t
-vdb_pixel_grid_iterator_get_voxel_count(vdb_pixel_grid_iterator_t *it) {}
+vdb_pixel_grid_iterator_get_voxel_count(vdb_pixel_grid_iterator_t *it) {
+  if (it->type == VDB_ITERATOR_ON) {
+    return reinterpret_cast<pixel_grid::ValueOnIter *>(it->iter)
+        ->getVoxelCount();
+  } else if (it->type == VDB_ITERATOR_OFF) {
+    return reinterpret_cast<pixel_grid::ValueOffIter *>(it->iter)
+        ->getVoxelCount();
+  } else if (it->type == VDB_ITERATOR_ALL) {
+    return reinterpret_cast<pixel_grid::ValueAllIter *>(it->iter)
+        ->getVoxelCount();
+  }
+  return 0;
+}
 
 #ifdef __cplusplus
 }

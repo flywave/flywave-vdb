@@ -285,8 +285,8 @@ vdb_pixel_grid_visit_iterator_all(vdb_pixel_grid_t *grid,
                                   vdb_pixel_grid_iterator_t *v);
 
 extern FLYWAVE_VDB_API void
-vdb_pixel_grid_iterator_set_value(vdb_pixel_grid_iterator_t *it, float v);
-extern FLYWAVE_VDB_API float
+vdb_pixel_grid_iterator_set_value(vdb_pixel_grid_iterator_t *it, vdb_pixel_t v);
+extern FLYWAVE_VDB_API vdb_pixel_t
 vdb_pixel_grid_iterator_get_value(vdb_pixel_grid_iterator_t *it);
 
 extern FLYWAVE_VDB_API void

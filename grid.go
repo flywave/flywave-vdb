@@ -482,6 +482,82 @@ type FloatGridIterator struct {
 	iter *C.struct__vdb_float_grid_iterator_t
 }
 
+func (m *FloatGridIterator) SetValue(v float32) {
+	C.vdb_float_grid_iterator_set_value(m.m, C.float(v))
+}
+
+func (m *FloatGridIterator) GetValue() float32 {
+	return float32(C.vdb_float_grid_iterator_get_value())
+}
+
+func (m *FloatGridIterator) SetActiveState(v bool) {
+	C.vdb_float_grid_iterator_set_active_state(m.m, C.bool(v))
+}
+
+func (m *FloatGridIterator) SetValueOff() {
+	C.vdb_float_grid_iterator_set_value_off(m.m)
+}
+
+func (m *FloatGridIterator) SetMinDepth(v int32) {
+	C.vdb_float_grid_iterator_set_min_depth(m.m, C.int(v))
+}
+
+func (m *FloatGridIterator) GetMinDepth() int32 {
+	return int32(C.vdb_float_grid_iterator_get_min_depth())
+}
+
+func (m *FloatGridIterator) SetMaxDepth(v int32) {
+	C.vdb_float_grid_iterator_set_max_depth(m.m, C.int(v))
+}
+
+func (m *FloatGridIterator) GetMaxDepth() int32 {
+	return int32(C.vdb_float_grid_iterator_get_max_depth(m.m))
+}
+
+func (m *FloatGridIterator) Test() bool {
+	return bool(C.vdb_float_grid_iterator_test(m.m))
+}
+
+func (m *FloatGridIterator) IsTileValue() bool {
+	return bool(C.vdb_float_grid_iterator_is_tile_value(m.m))
+}
+
+func (m *FloatGridIterator) IsVoxelValue() bool {
+	return bool(C.vdb_float_grid_iterator_is_voxel_value(m.m))
+}
+
+func (m *FloatGridIterator) IsValueOn() bool {
+	return bool(C.vdb_float_grid_iterator_is_value_on(m.m))
+}
+
+func (m *FloatGridIterator) GetLevel() int32 {
+	return int32(C.vdb_float_grid_iterator_get_level(m.m))
+}
+
+func (m *FloatGridIterator) GetDepth() int32 {
+	return int32(C.vdb_float_grid_iterator_get_depth(m.m))
+}
+
+func (m *FloatGridIterator) GetLeafDepth() int32 {
+	return int32(C.vdb_float_grid_iterator_get_leaf_depth(m.m))
+}
+
+func (m *FloatGridIterator) GetCoord() []int32 {
+	coord := make([]int32, 3)
+	C.vdb_float_grid_iterator_get_coord(m.m, (*C.int)(unsafe.Pointer(&coord[0])))
+	return coord
+}
+
+func (m *FloatGridIterator) GetCoordBox() *CoordBox {
+	_, cb := NewCoordBox(make([]int32, 6))
+	C.vdb_float_grid_iterator_get_bounding_box(m.m, &cb.m[0])
+	return cb
+}
+
+func (m *FloatGridIterator) GetVoxelCount() int32 {
+	return int32(C.vdb_float_grid_iterator_get_voxel_count(m.m))
+}
+
 //export vdbFloatGridVisitonIterator
 func vdbFloatGridVisitonIterator(ctx unsafe.Pointer, iter *C.struct__vdb_float_grid_iterator_t) C.bool {
 	return C.bool((*(*func(iter FloatGridIterator) bool)(ctx))(FloatGridIterator{iter: iter}))
@@ -674,6 +750,82 @@ func (m *PixelGrid) VisitAll(v func(coord []int32, v Pixel) bool) {
 
 type PixelGridIterator struct {
 	iter *C.struct__vdb_pixel_grid_iterator_t
+}
+
+func (m *PixelGridIterator) SetValue(v Pixel) {
+	C.vdb_float_grid_iterator_set_value(m.m, pixel_2_cpixel(v))
+}
+
+func (m *PixelGridIterator) GetValue() Pixel {
+	return cpixel_2_pixel(C.vdb_float_grid_iterator_get_value())
+}
+
+func (m *PixelGridIterator) SetActiveState(v bool) {
+	C.vdb_pixel_grid_iterator_set_active_state(m.m, C.bool(v))
+}
+
+func (m *PixelGridIterator) SetValueOff() {
+	C.vdb_pixel_grid_iterator_set_value_off(m.m)
+}
+
+func (m *PixelGridIterator) SetMinDepth(v int32) {
+	C.vdb_pixel_grid_iterator_set_min_depth(m.m, C.int(v))
+}
+
+func (m *PixelGridIterator) GetMinDepth() int32 {
+	return int32(C.vdb_pixel_grid_iterator_get_min_depth())
+}
+
+func (m *PixelGridIterator) SetMaxDepth(v int32) {
+	C.vdb_pixel_grid_iterator_set_max_depth(m.m, C.int(v))
+}
+
+func (m *PixelGridIterator) GetMaxDepth() int32 {
+	return int32(C.vdb_pixel_grid_iterator_get_max_depth(m.m))
+}
+
+func (m *PixelGridIterator) Test() bool {
+	return bool(C.vdb_pixel_grid_iterator_test(m.m))
+}
+
+func (m *PixelGridIterator) IsTileValue() bool {
+	return bool(C.vdb_pixel_grid_iterator_is_tile_value(m.m))
+}
+
+func (m *PixelGridIterator) IsVoxelValue() bool {
+	return bool(C.vdb_pixel_grid_iterator_is_voxel_value(m.m))
+}
+
+func (m *PixelGridIterator) IsValueOn() bool {
+	return bool(C.vdb_pixel_grid_iterator_is_value_on(m.m))
+}
+
+func (m *PixelGridIterator) GetLevel() int32 {
+	return int32(C.vdb_pixel_grid_iterator_get_level(m.m))
+}
+
+func (m *PixelGridIterator) GetDepth() int32 {
+	return int32(C.vdb_pixel_grid_iterator_get_depth(m.m))
+}
+
+func (m *PixelGridIterator) GetLeafDepth() int32 {
+	return int32(C.vdb_pixel_grid_iterator_get_leaf_depth(m.m))
+}
+
+func (m *PixelGridIterator) GetCoord() []int32 {
+	coord := make([]int32, 3)
+	C.vdb_pixel_grid_iterator_get_coord(m.m, (*C.int)(unsafe.Pointer(&coord[0])))
+	return coord
+}
+
+func (m *PixelGridIterator) GetCoordBox() *CoordBox {
+	_, cb := NewCoordBox(make([]int32, 6))
+	C.vdb_pixel_grid_iterator_get_bounding_box(m.m, &cb.m[0])
+	return cb
+}
+
+func (m *PixelGridIterator) GetVoxelCount() int32 {
+	return int32(C.vdb_pixel_grid_iterator_get_voxel_count(m.m))
 }
 
 //export vdbPixelGridVisitonIterator

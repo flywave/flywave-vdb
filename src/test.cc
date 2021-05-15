@@ -28,6 +28,22 @@ _Bool clipBoxCreateor(void *ctx, vdb_float_grid_t *vertex,
   return false;
 }
 
+_Bool vdbFloatGridVisiton(void *ctx, int32_t *coord, float val) {
+  return false;
+}
+
+_Bool vdbPixelGridVisiton(void *ctx, int32_t *coord, vdb_pixel_t val) {
+  return false;
+}
+
+_Bool vdbFloatGridVisitonIterator(void *ctx, vdb_float_grid_iterator_t *iter) {
+  return false;
+}
+
+_Bool vdbPixelGridVisitonIterator(void *ctx, vdb_pixel_grid_iterator_t *iter) {
+  return false;
+}
+
 #ifdef __cplusplus
 }
 #endif
@@ -112,7 +128,7 @@ int test_mesh_builder() {
 
   std::unique_ptr<voxel_mesh_adapter> stream =
       std::make_unique<voxel_mesh_adapter>(vmesh->ptr, map, tex_map);
-  auto stream_pt = stream.get();
+
   mesh_adapter _mesh_adapter{std::move(stream)};
 
   test_clip_box_createor createor;

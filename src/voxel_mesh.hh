@@ -177,7 +177,7 @@ private:
   std::unordered_map<int, std::shared_ptr<material>> _map;
   std::unordered_map<std::string, std::shared_ptr<texture>> _tex_map;
   mutable std::shared_ptr<voxel_mesh> _mesh;
-  
+
 public:
   voxel_mesh_adapter(
       std::shared_ptr<voxel_mesh> hm,

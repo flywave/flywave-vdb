@@ -191,7 +191,7 @@ bool vdb_pixel_grid::is_sdf() const {
 }
 
 void vdb_pixel_grid::sparse_fill(const vdb::CoordBBox &box, const pixel &v,
-                                bool active) {
+                                 bool active) {
   _grid->sparseFill(box, v, active);
 }
 
@@ -201,7 +201,7 @@ void vdb_pixel_grid::fill(const vdb::CoordBBox &box, const pixel &v,
 }
 
 void vdb_pixel_grid::dense_fill(const vdb::CoordBBox &box, const pixel &v,
-                               bool active) {
+                                bool active) {
   _grid->denseFill(box, v, active);
 }
 

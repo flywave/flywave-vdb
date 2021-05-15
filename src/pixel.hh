@@ -195,7 +195,7 @@ inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b) {
 
 inline bool isApproxEqual(const flywave::pixel &a, const flywave::pixel &b,
                           const flywave::pixel &) {
-    return (a._value == b._value);
+  return (a._value == b._value);
 }
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

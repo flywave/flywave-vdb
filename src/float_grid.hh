@@ -116,8 +116,6 @@ public:
 
   double calc_positive_density() const;
 
-  void set(const int i, const int j, const int k, const float &v);
-
   void sparse_fill(const vdb::CoordBBox &box, const float &v,
                    bool active = true);
 
@@ -125,7 +123,7 @@ public:
 
   void dense_fill(const vdb::CoordBBox &box, const float &v,
                   bool active = true);
-  
+
   template <typename GridTypeListT, typename OpT> bool apply(OpT &op) const {
     return has_grid() ? _grid->apply<GridTypeListT>(op) : false;
   }

@@ -1,6 +1,7 @@
 package vdb
 
 import (
+	"github.com/flywave/flywave-vdb/coord"
 	vec2d "github.com/flywave/go3d/float64/vec2"
 	vec3d "github.com/flywave/go3d/float64/vec3"
 )
@@ -37,16 +38,16 @@ func (t *TileGrid) allWordGridCount() int {
 	return int(1 << t.level)
 }
 
-func (t *TileGrid) ToTileCoord(xyz vec3d.T) []uint32 {
+func (t *TileGrid) ToTileCoord(xyz vec3d.T) coord.T {
 	return t.ToTileCoord2d(t.global.ToGridWord(xyz))
 }
 
-func (t *TileGrid) ToTileCoord2d(xyz vec3d.T) []uint32 {
-	pos := make([]uint32, 2)
-	pos[0] += uint32((t.bounds.Max[0] - t.bounds.Min[0]) / 2.0)
-	pos[1] += uint32((t.bounds.Max[1] - t.bounds.Min[1]) / 2.0)
-	pos[0] /= uint32(t.tileWidth)
-	pos[1] /= uint32(t.tileHeight)
+func (t *TileGrid) ToTileCoord2d(xyz vec3d.T) coord.T {
+	pos := coord.T{}
+	pos[0] += int32((t.bounds.Max[0] - t.bounds.Min[0]) / 2.0)
+	pos[1] += int32((t.bounds.Max[1] - t.bounds.Min[1]) / 2.0)
+	pos[0] /= int32(t.tileWidth)
+	pos[1] /= int32(t.tileHeight)
 	return pos
 }
 

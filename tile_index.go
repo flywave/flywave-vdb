@@ -94,18 +94,6 @@ func geodeticToTile(lon float64, lat float64, zoom uint8) *TileIndex {
 	return NewTileIndexFromLevelAndRowCol(uint32(zoom), uint32(y), uint32(x))
 }
 
-const (
-	EARTH_RADIUS        = float64(6378137.0)
-	EARTH_DIAMETER      = EARTH_RADIUS * 2.0
-	EARTH_CIRCUMFERENCE = EARTH_DIAMETER * math.Pi
-	MAXEXTENT           = EARTH_CIRCUMFERENCE / 2.0
-	M_PI_by2            = float64(math.Pi / 2)
-	D2R                 = float64(math.Pi / 180)
-	R2D                 = float64(180 / math.Pi)
-	M_PIby360           = float64(math.Pi / 360)
-	MAXEXTENTby180      = float64(MAXEXTENT / 180)
-)
-
 func lonlat2merc(x []float64, y []float64, pointCount int) bool {
 	for i := 0; i < pointCount; i++ {
 		if x[i] > 180 {

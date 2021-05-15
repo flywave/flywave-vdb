@@ -13,7 +13,7 @@ import (
 )
 
 type FilterTriangle interface {
-	Vaild(*vec3.T, *vec3.T, *vec3.T) bool
+	Vaild(vec3.T, vec3.T, vec3.T) bool
 }
 
 type FilterTriangleAdapter struct {
@@ -63,5 +63,5 @@ func filterTriangleValid(ctx unsafe.Pointer, a *C.float, b *C.float, c *C.float)
 	var cvec vec3.T
 	copy(cvec[:], cSlice)
 
-	return C.bool((*(**FilterTriangleAdapter)(ctx)).f.Vaild(&avec, &bvec, &cvec))
+	return C.bool((*(**FilterTriangleAdapter)(ctx)).f.Vaild(avec, bvec, cvec))
 }

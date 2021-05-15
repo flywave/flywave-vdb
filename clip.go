@@ -13,15 +13,15 @@ import (
 )
 
 type ClipBoxCreateor interface {
-	Gen(*FloatGrid, *Transform, *vec3d.Box, *vec3d.Box) bool
+	Gen(*FloatGrid, *Transform, vec3d.Box, *vec3d.Box) bool
 }
 
 type NoneClipBoxCreateor struct {
 	ClipBoxCreateor
 }
 
-func (t *NoneClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox *vec3d.Box, box *vec3d.Box) bool {
-	*box = *sbox
+func (t *NoneClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox vec3d.Box, box *vec3d.Box) bool {
+	*box = sbox
 	return true
 }
 
@@ -66,7 +66,7 @@ func clipBoxCreateor(ctx unsafe.Pointer, vertex *C.struct__vdb_float_grid_t, tra
 	outbox := new(vec3d.Box)
 	inbox := vec3d.FromSlice(sboxSlice)
 
-	ret := C.bool((*(**ClipBoxCreateorAdapter)(ctx)).f.Gen(grid, t, inbox, outbox))
+	ret := C.bool((*(**ClipBoxCreateorAdapter)(ctx)).f.Gen(grid, t, *inbox, outbox))
 
 	outSlice := outbox.Slice()
 	for i := 0; i < 6; i++ {

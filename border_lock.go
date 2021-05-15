@@ -13,7 +13,7 @@ import (
 )
 
 type BorderLock interface {
-	Check(*vec3.T) bool
+	Check(vec3.T) bool
 }
 
 type BorderLockAdapter struct {
@@ -44,5 +44,5 @@ func borderLockCheck(ctx unsafe.Pointer, a *C.float) C.bool {
 
 	var vec vec3.T
 	copy(vec[:], cpointsSlice)
-	return C.bool((*(**BorderLockAdapter)(ctx)).f.Check(&vec))
+	return C.bool((*(**BorderLockAdapter)(ctx)).f.Check(vec))
 }

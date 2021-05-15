@@ -21,7 +21,7 @@ const (
 type SamplerType int32
 
 const (
-	ST_POINT = SamplerType(0)
-	ST_BOX   = SamplerType(1)
-	ST_QUADRATIC   = SamplerType(2)
+	ST_POINT     = SamplerType(0)
+	ST_BOX       = SamplerType(1)
+	ST_QUADRATIC = SamplerType(2)
 )

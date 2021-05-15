@@ -15,8 +15,8 @@ import (
 type GridTransform interface {
 	IsAffine() bool
 	IsIdentity() bool
-	Transform(pt, out *vec3d.T)
-	InvTransform(pt, out *vec3d.T)
+	Transform(pt vec3d.T) *vec3d.T
+	InvTransform(pt vec3d.T) *vec3d.T
 }
 
 type GridTransformAdapter struct {
@@ -64,10 +64,9 @@ func gridTransform(ctx unsafe.Pointer, pt *C.double, out *C.double) {
 	var avec vec3d.T
 	copy(avec[:], aSlice)
 
-	var bvec vec3d.T
-	copy(bvec[:], bSlice)
+	bvec := (*(**GridTransformAdapter)(ctx)).f.Transform(avec)
 
-	(*(**GridTransformAdapter)(ctx)).f.Transform(&avec, &bvec)
+	copy(bSlice, bvec[:])
 }
 
 //export gridInvTransform
@@ -87,8 +86,7 @@ func gridInvTransform(ctx unsafe.Pointer, pt *C.double, out *C.double) {
 	var avec vec3d.T
 	copy(avec[:], aSlice)
 
-	var bvec vec3d.T
-	copy(bvec[:], bSlice)
+	bvec := (*(**GridTransformAdapter)(ctx)).f.InvTransform(avec)
 
-	(*(**GridTransformAdapter)(ctx)).f.InvTransform(&avec, &bvec)
+	copy(bSlice, bvec[:])
 }

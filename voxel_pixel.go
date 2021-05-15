@@ -97,7 +97,7 @@ func (m *VoxelPixel) ClearFeatures() {
 
 func (m *VoxelPixel) RayTest(r *Ray) (bool, vec3d.T) {
 	p := make([]float64, 3)
-	ret := bool(C.voxel_pixel_ray_test(m.m, (*C.double)((unsafe.Pointer)(&r.origin[0])), (*C.double)((unsafe.Pointer)(&r.dir[0])), (*C.double)((unsafe.Pointer)(&p[0]))))
+	ret := bool(C.voxel_pixel_ray_test(m.m, (*C.double)((unsafe.Pointer)(&r.Origin[0])), (*C.double)((unsafe.Pointer)(&r.Dir[0])), (*C.double)((unsafe.Pointer)(&p[0]))))
 	return ret, vec3d.T{p[0], p[1], p[2]}
 }
 
@@ -105,13 +105,13 @@ func (m *VoxelPixel) RayTests(rs []Ray) []vec3d.T {
 	origin := make([]float64, 3*len(rs))
 	dir := make([]float64, 3*len(rs))
 	for i, _ := range rs {
-		origin[(i * 3)] = rs[i].origin[0]
-		origin[(i*3)+1] = rs[i].origin[1]
-		origin[(i*3)+2] = rs[i].origin[2]
+		origin[(i * 3)] = rs[i].Origin[0]
+		origin[(i*3)+1] = rs[i].Origin[1]
+		origin[(i*3)+2] = rs[i].Origin[2]
 
-		dir[(i * 3)] = rs[i].dir[0]
-		dir[(i*3)+1] = rs[i].dir[1]
-		dir[(i*3)+2] = rs[i].dir[2]
+		dir[(i * 3)] = rs[i].Dir[0]
+		dir[(i*3)+1] = rs[i].Dir[1]
+		dir[(i*3)+2] = rs[i].Dir[2]
 	}
 	p := make([]float64, 3*len(rs))
 	ok := bool(C.voxel_pixel_ray_tests(m.m, (*C.double)((unsafe.Pointer)(&origin[0])), (*C.double)((unsafe.Pointer)(&dir[0])), (*C.double)((unsafe.Pointer)(&p[0])), C.size_t(len(rs))))

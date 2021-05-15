@@ -1,5 +1,10 @@
 package vdb
 
+import (
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+)
+
 type Task interface {
 	Run() error
 }
@@ -9,13 +14,13 @@ type TileTask struct {
 	tile         []*VoxelTile
 	op           OperatorType
 	src          *VoxelMesh
-	matToWord    []float64
-	boundsInWord *BBox
+	matToWord    mat4d.T
+	boundsInWord vec3d.Box
 	precision    float64
 	tp           GridClass
 }
 
-func NewTileTask(tiles []*VoxelTile, op OperatorType, src *VoxelMesh, matToWord []float64, boundsInWord *BBox) *TileTask {
+func NewTileTask(tiles []*VoxelTile, op OperatorType, src *VoxelMesh, matToWord mat4d.T, boundsInWord vec3d.Box) *TileTask {
 	return &TileTask{tile: tiles, op: op, src: src, matToWord: matToWord, boundsInWord: boundsInWord}
 }
 
@@ -31,12 +36,12 @@ func (t *TileTask) GetMesh() *VoxelMesh {
 	return t.src
 }
 
-func (t *TileTask) GetMatToWord() []float64 {
+func (t *TileTask) GetMatToWord() mat4d.T {
 	return t.matToWord
 }
 
 func (t *TileTask) GetBoundsInWord() []float64 {
-	return t.boundsInWord.GetSlice()
+	return t.boundsInWord.Slice()
 }
 
 func (t *TileTask) Free() {

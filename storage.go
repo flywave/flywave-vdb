@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	vec2d "github.com/flywave/go3d/float64/vec2"
 )
 
 const (
@@ -23,7 +25,7 @@ type Storage interface {
 	ReadTile(tile *VoxelTile) bool
 	TileExists(tile *Tile) bool
 	RemoveTile(tile *Tile) bool
-	ListTiles(bbox BBox2d, tileSize []float64) []Tile
+	ListTiles(bbox BBox2d, tileSize vec2d.T) []Tile
 	UpdateTiles(tiles []*VoxelTile) bool
 	TileModTime(tile *Tile) int64
 }
@@ -33,7 +35,7 @@ func MakeVoxelTileName(root string, tile *Tile, extensions string) string {
 	return root + "/" + strconv.Itoa(int(z)) + "_" + strconv.Itoa(int(x)) + "_" + strconv.Itoa(int(y)) + extensions
 }
 
-func ParseVoxelTileNameToTile(filename string, bounds BBox2d, tileSize []float64) *Tile {
+func ParseVoxelTileNameToTile(filename string, bounds BBox2d, tileSize vec2d.T) *Tile {
 	zxystr := _parsr_file_reg.FindStringSubmatch(filename)
 	if len(zxystr) != 4 {
 		return nil
@@ -127,7 +129,7 @@ func (l *LocalStorage) TileExists(tile *Tile) bool {
 	return fileExist(path)
 }
 
-func (l *LocalStorage) ListTiles(bbox BBox2d, tileSize []float64) []Tile {
+func (l *LocalStorage) ListTiles(bbox BBox2d, tileSize vec2d.T) []Tile {
 	files, err := walkDir(l.root, VOXEL_TILE_EXT)
 	if err != nil {
 		return nil

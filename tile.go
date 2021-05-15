@@ -38,5 +38,5 @@ func (t *Tile) IsBlack() bool {
 }
 
 func (t *Tile) Contains(box BBox2d) bool {
-	return t.bbox.Contains(box[:], EPS)
+	return t.bbox.ContainsBox(box, EPS)
 }

@@ -1,5 +1,10 @@
 package vdb
 
+import (
+	vec2d "github.com/flywave/go3d/float64/vec2"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+)
+
 type TileGrid struct {
 	level      uint16
 	tileWidth  float64
@@ -32,11 +37,11 @@ func (t *TileGrid) allWordGridCount() int {
 	return int(1 << t.level)
 }
 
-func (t *TileGrid) ToTileCoord(xyz []float64) []uint32 {
+func (t *TileGrid) ToTileCoord(xyz vec3d.T) []uint32 {
 	return t.ToTileCoord2d(t.global.ToGridWord(xyz))
 }
 
-func (t *TileGrid) ToTileCoord2d(xy []float64) []uint32 {
+func (t *TileGrid) ToTileCoord2d(xyz vec3d.T) []uint32 {
 	pos := make([]uint32, 2)
 	pos[0] += uint32((t.bounds[2] - t.bounds[0]) / 2.0)
 	pos[1] += uint32((t.bounds[3] - t.bounds[1]) / 2.0)
@@ -52,6 +57,6 @@ func (t *TileGrid) CreateTile(x, y uint32) *Tile {
 	return NewTile(NewTileIndexFromLevelAndRowCol(uint32(t.level), y, x), box)
 }
 
-func (t *TileGrid) CellSize() []float64 {
-	return []float64{t.tileWidth, t.tileHeight}
+func (t *TileGrid) CellSize() vec2d.T {
+	return vec2d.T{t.tileWidth, t.tileHeight}
 }

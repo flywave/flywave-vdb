@@ -8,10 +8,12 @@ import "C"
 import (
 	"reflect"
 	"unsafe"
+
+	"github.com/flywave/go3d/vec3"
 )
 
 type BorderLock interface {
-	Check([]float32) bool
+	Check(*vec3.T) bool
 }
 
 type BorderLockAdapter struct {
@@ -40,5 +42,7 @@ func borderLockCheck(ctx unsafe.Pointer, a *C.float) C.bool {
 	cpointsHeader.Len = int(3)
 	cpointsHeader.Data = uintptr(unsafe.Pointer(a))
 
-	return C.bool((*(**BorderLockAdapter)(ctx)).f.Check(cpointsSlice))
+	var vec vec3.T
+	copy(vec[:], cpointsSlice)
+	return C.bool((*(**BorderLockAdapter)(ctx)).f.Check(&vec))
 }

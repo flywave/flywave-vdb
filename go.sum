@@ -2,5 +2,3 @@ github.com/barnex/fmath v0.0.0-20150108074215-ec9671f295c2 h1:FOAZHSIFEhocAOfB7L
 github.com/barnex/fmath v0.0.0-20150108074215-ec9671f295c2/go.mod h1:G7XW+2O6Hk/x6OP8AuwZjI8ZTyXvKDTTKaRK92gapfk=
 github.com/flywave/go-obj v0.0.0-20210514090620-a1dcb8967ef9 h1:lT+r/6pvnVwJ4Y/vkR1kF3zDUXDxxx8q4UqRxln3lx8=
 github.com/flywave/go-obj v0.0.0-20210514090620-a1dcb8967ef9/go.mod h1:+yO+PGuuoa4ti3kBBXNrtmlQ2KR1WlfQMPHWOMObcnU=
-github.com/flywave/go3d v0.0.0-20200602060901-3ac14d1cc85e h1:WEJ7EzCueUOuJOpLMFeOF43/gXqBYmfXcIl3XbfXGwA=
-github.com/flywave/go3d v0.0.0-20200602060901-3ac14d1cc85e/go.mod h1:QbQZlarSgCPYFAmoTduiDUd4JCnolimXUswTAnSrFWY=

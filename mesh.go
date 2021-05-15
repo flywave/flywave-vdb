@@ -6,9 +6,10 @@ package vdb
 // #cgo CXXFLAGS: -I ./lib
 import "C"
 import (
-	"math"
 	"reflect"
 	"unsafe"
+
+	"github.com/flywave/go3d/vec3"
 )
 
 type MeshMaterial struct {
@@ -25,28 +26,6 @@ type MeshModel struct {
 	Materials []MeshMaterial
 }
 
-func crossAndNormalized(v1 []float32, v2 []float32) []float32 {
-	ret := []float32{0, 0, 0}
-	ret[0] += v1[1]*v2[2] + v1[2]*v2[1]
-	ret[1] += v1[2]*v2[0] + v1[0]*v2[2]
-	ret[2] += v1[0]*v2[1] + v1[1]*v2[0]
-	d := math.Sqrt(float64(ret[0]*ret[0] + ret[1]*ret[1] + ret[2]*ret[2]))
-	ret[0] *= float32(1 / d)
-	ret[1] *= float32(1 / d)
-	ret[2] *= float32(1 / d)
-	return ret
-}
-
-func addVec3(a []float32, b ...[]float32) []float32 {
-	ret := []float32{0, 0, 0}
-	for i := range b {
-		ret[0] += b[i][0]
-		ret[1] += b[i][1]
-		ret[2] += b[i][2]
-	}
-	return ret
-}
-
 func (m *MeshModel) appendTriangle(a uint32, b uint32, c uint32) {
 	if len(m.Materials) == 0 {
 		mtl := MeshMaterial{}
@@ -59,24 +38,28 @@ func (m *MeshModel) appendTriangle(a uint32, b uint32, c uint32) {
 	mtl.Normals = append(mtl.Normals, a, b, c)
 }
 
-func (m *MeshModel) buildQuad(offset []float32, widthDir []float32, lengthDir []float32) {
-	normal := crossAndNormalized(lengthDir, widthDir)
+func (m *MeshModel) buildQuad(offset *vec3.T, widthDir *vec3.T, lengthDir *vec3.T) {
+	normal := vec3.Cross(widthDir, widthDir)
+	normal.Normalize()
 
-	m.Vertices = append(m.Vertices, offset...)
+	m.Vertices = append(m.Vertices, offset[:]...)
 	m.UVs = append(m.UVs, 0.0, 0.0)
-	m.Normals = append(m.Normals, normal...)
+	m.Normals = append(m.Normals, normal[:]...)
 
-	m.Vertices = append(m.Vertices, addVec3(offset, lengthDir)...)
+	pos0 := vec3.Sub(offset, lengthDir)
+	m.Vertices = append(m.Vertices, pos0[:]...)
 	m.UVs = append(m.UVs, 0.0, 1.0)
-	m.Normals = append(m.Normals, normal...)
+	m.Normals = append(m.Normals, normal[:]...)
 
-	m.Vertices = append(m.Vertices, addVec3(offset, lengthDir, widthDir)...)
+	pos1 := vec3.Sub(&pos0, widthDir)
+	m.Vertices = append(m.Vertices, pos1[:]...)
 	m.UVs = append(m.UVs, 1.0, 1.0)
-	m.Normals = append(m.Normals, normal...)
+	m.Normals = append(m.Normals, normal[:]...)
 
-	m.Vertices = append(m.Vertices, addVec3(offset, widthDir)...)
+	pos2 := vec3.Sub(offset, widthDir)
+	m.Vertices = append(m.Vertices, pos2[:]...)
 	m.UVs = append(m.UVs, 1.0, 0.0)
-	m.Normals = append(m.Normals, normal...)
+	m.Normals = append(m.Normals, normal[:]...)
 
 	baseIndex := uint32(len(m.Vertices)/3 - 4)
 
@@ -85,24 +68,25 @@ func (m *MeshModel) buildQuad(offset []float32, widthDir []float32, lengthDir []
 }
 
 func (m *MeshModel) buildBox(length float32, width float32) {
-	upDir := []float32{0, length, 0}
-	rightDir := []float32{width, 0, 0}
-	forwardDir := []float32{0, 0, length}
+	upDir := &vec3.T{0, length, 0}
+	rightDir := &vec3.T{width, 0, 0}
+	forwardDir := &vec3.T{0, 0, length}
 
-	iupDir := []float32{0, -length, 0}
-	irightDir := []float32{-width, 0, 0}
-	iforwardDir := []float32{0, 0, -length}
+	iupDir := &vec3.T{0, -length, 0}
+	irightDir := &vec3.T{-width, 0, 0}
+	iforwardDir := &vec3.T{0, 0, -length}
 
-	nearCorner := []float32{0, 0, 0}
-	farCorner := addVec3(upDir, rightDir, forwardDir)
+	nearCorner := &vec3.T{0, 0, 0}
+	farCorner := vec3.Sub(upDir, rightDir)
+	farCorner = vec3.Sub(&farCorner, forwardDir)
 
 	m.buildQuad(nearCorner, forwardDir, rightDir)
 	m.buildQuad(nearCorner, rightDir, upDir)
 	m.buildQuad(nearCorner, upDir, forwardDir)
 
-	m.buildQuad(farCorner, irightDir, iforwardDir)
-	m.buildQuad(farCorner, iupDir, irightDir)
-	m.buildQuad(farCorner, iforwardDir, iupDir)
+	m.buildQuad(&farCorner, irightDir, iforwardDir)
+	m.buildQuad(&farCorner, iupDir, irightDir)
+	m.buildQuad(&farCorner, iforwardDir, iupDir)
 }
 
 type MeshData struct {

@@ -1,6 +1,11 @@
 package vdb
 
-import "errors"
+import (
+	"errors"
+
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	"github.com/flywave/go3d/mat4"
+)
 
 type OperatorType uint32
 
@@ -23,7 +28,7 @@ type VoxelizeOperator struct {
 	precision    float32
 	creator      ClipBoxCreateor
 	tp           GridClass
-	matrix       []float64
+	matrix       mat4d.T
 }
 
 func (f *VoxelizeOperator) GetVoxelPixel() *VoxelPixel {
@@ -39,7 +44,7 @@ func (f *VoxelizeOperator) Apply() error {
 	return nil
 }
 
-func NewVoxelizeOperator(base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *VoxelizeOperator {
+func NewVoxelizeOperator(base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix mat4.T) *VoxelizeOperator {
 	return nil
 }
 
@@ -74,7 +79,7 @@ type MergeOperator struct {
 	CSGOperator
 }
 
-func NewMergeOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *MergeOperator {
+func NewMergeOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix mat4.T) *MergeOperator {
 	return nil
 }
 
@@ -82,7 +87,7 @@ type MaskOperator struct {
 	CSGOperator
 }
 
-func NewMaskOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *MergeOperator {
+func NewMaskOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix mat4.T) *MergeOperator {
 	return nil
 }
 
@@ -106,6 +111,6 @@ func (f *SurfaceOperator) Apply() error {
 	return nil
 }
 
-func NewSurfaceOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix []float64) *SurfaceOperator {
+func NewSurfaceOperator(base *VoxelPixel, mesh *VoxelMesh, target *VoxelPixel, creator ClipBoxCreateor, precision float32, localFeature uint16, tp GridClass, matrix mat4.T) *SurfaceOperator {
 	return nil
 }

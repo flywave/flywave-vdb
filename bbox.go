@@ -6,101 +6,10 @@ package vdb
 // #cgo CXXFLAGS: -I ./lib
 import "C"
 import (
-	"errors"
 	"math"
+
+	vec2d "github.com/flywave/go3d/float64/vec2"
 )
-
-type BBox struct {
-	m []C.double
-}
-
-func NewBBox(bbox []float64) (error, *BBox) {
-	if len(bbox) != 6 {
-		return errors.New("bbox size must 6"), nil
-	}
-	return nil, &BBox{m: []C.double{C.double(bbox[0]), C.double(bbox[1]), C.double(bbox[2]), C.double(bbox[3]), C.double(bbox[4]), C.double(bbox[5])}}
-}
-
-func (b *BBox) Set(bbox []float64) {
-	for i := 0; i < 6; i++ {
-		b.m[i] = C.double(bbox[i])
-	}
-}
-
-func (b *BBox) SetMin(min []float64) {
-	for i := 0; i < 3; i++ {
-		b.m[i] = C.double(min[i])
-	}
-}
-
-func (b *BBox) SetMax(max []float64) {
-	for i := 0; i < 3; i++ {
-		b.m[i+3] = C.double(max[i])
-	}
-}
-
-func (a *BBox) Contains(b *BBox) bool {
-	return (b.GetMin()[0]-EPS) > a.GetMin()[0] && (b.GetMax()[0]+EPS) < a.GetMax()[0] &&
-		(b.GetMin()[1]-EPS) > a.GetMin()[1] && (b.GetMax()[1]+EPS) < a.GetMax()[1] &&
-		(b.GetMin()[2]-EPS) > a.GetMin()[2] && (b.GetMax()[2]+EPS) < a.GetMax()[2]
-}
-
-func (b *BBox) Intersect(a *BBox) []float64 {
-	return []float64{math.Max(a.GetMin()[0], b.GetMin()[0]), math.Max(a.GetMin()[1], b.GetMin()[1]), math.Max(a.GetMin()[2], b.GetMin()[2]), math.Min(a.GetMax()[0], b.GetMax()[0]), math.Min(a.GetMax()[1], b.GetMax()[1]), math.Min(a.GetMax()[2], b.GetMax()[2])}
-}
-
-func (b *BBox) GetMin() []float64 {
-	return []float64{float64(b.m[0]), float64(b.m[1]), float64(b.m[2])}
-}
-
-func (b *BBox) GetMax() []float64 {
-	return []float64{float64(b.m[3]), float64(b.m[4]), float64(b.m[5])}
-}
-
-func (b *BBox) GetSlice() []float64 {
-	return []float64{float64(b.m[0]), float64(b.m[1]), float64(b.m[2]), float64(b.m[3]), float64(b.m[4]), float64(b.m[5])}
-}
-
-type CoordBox struct {
-	m []C.int
-}
-
-func NewCoordBox(cbox []int32) (error, *CoordBox) {
-	if len(cbox) != 6 {
-		return errors.New("cbox size must 6"), nil
-	}
-	return nil, &CoordBox{m: []C.int{C.int(cbox[0]), C.int(cbox[1]), C.int(cbox[2]), C.int(cbox[3]), C.int(cbox[4]), C.int(cbox[5])}}
-}
-
-func (b *CoordBox) Set(cbox []int32) {
-	for i := 0; i < 6; i++ {
-		b.m[i] = C.int(cbox[i])
-	}
-}
-
-func (b *CoordBox) SetMin(min []int32) {
-	for i := 0; i < 3; i++ {
-		b.m[i] = C.int(min[i])
-	}
-}
-
-func (b *CoordBox) SetMax(max []int32) {
-	for i := 0; i < 3; i++ {
-		b.m[i+3] = C.int(max[i])
-	}
-}
-
-func (b *CoordBox) GetMin() []int32 {
-	return []int32{int32(b.m[0]), int32(b.m[1]), int32(b.m[2])}
-}
-
-func (b *CoordBox) GetMax() []int32 {
-	return []int32{int32(b.m[3]), int32(b.m[4]), int32(b.m[5])}
-}
-
-func (b *CoordBox) GetSlice() []int32 {
-	return []int32{int32(b.m[3]), int32(b.m[4]), int32(b.m[5]), int32(b.m[3]), int32(b.m[4]), int32(b.m[5])}
-}
 
 type BBox2d [4]float64
 
@@ -122,7 +31,7 @@ func (b BBox2d) Size() float64 {
 	return math.Max(width, height)
 }
 
-func (b *BBox2d) add(p []float64) {
+func (b *BBox2d) add(p vec2d.T) {
 	(*b)[0] = math.Min((*b)[0], p[0])
 	(*b)[1] = math.Min((*b)[1], p[1])
 	(*b)[2] = math.Max((*b)[2], p[0])
@@ -133,13 +42,13 @@ func (b *BBox2d) Add(p interface{}) {
 	switch t := p.(type) {
 	case []int:
 	case []float32:
-		b.add([]float64{float64(t[0]), float64(t[1])})
+		b.add(vec2d.T{float64(t[0]), float64(t[1])})
 	case []float64:
-		b.add(t)
+		b.add(vec2d.T{t[0], t[1]})
 	case [3]float64:
-		b.add(t[:])
+		b.add(vec2d.T{t[0], t[1]})
 	case [2]float64:
-		b.add(t[:])
+		b.add(vec2d.T{t[0], t[1]})
 	}
 }
 
@@ -154,7 +63,7 @@ func epseq(l, r, epsilon float64) bool {
 	return math.Abs(l-r) < epsilon
 }
 
-func (b BBox2d) IsOnBorder(point []float64, epsilon float64) bool {
+func (b BBox2d) IsOnBorder(point vec2d.T, epsilon float64) bool {
 	return epseq(point[0], b[0], epsilon) || epseq(point[0], b[2], epsilon) ||
 		epseq(point[1], b[1], epsilon) || epseq(point[1], b[3], epsilon)
 }
@@ -180,7 +89,11 @@ func (b BBox2d) Intersects(o BBox2d, epsilon float64) bool {
 	return true
 }
 
-func (b BBox2d) Contains(point []float64, epsilon float64) bool {
+func (b BBox2d) Contains(point vec2d.T, epsilon float64) bool {
 	return (b[0]-epsilon) <= point[0] && (b[1]-epsilon) <= point[1] &&
 		(b[2]+epsilon) >= point[0] && (b[3]+epsilon) >= point[1]
+}
+
+func (b BBox2d) ContainsBox(box BBox2d, epsilon float64) bool {
+	return (box[0]-epsilon) >= b[0] && (box[2]+epsilon) <= b[2] && (box[1]-epsilon) >= b[1] && (box[3]+epsilon) <= b[3]
 }

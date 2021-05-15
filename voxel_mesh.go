@@ -7,6 +7,8 @@ package vdb
 import "C"
 import (
 	"unsafe"
+
+	mat4d "github.com/flywave/go3d/float64/mat4"
 )
 
 type VoxelMesh struct {
@@ -26,12 +28,12 @@ func (t *VoxelMesh) Clear() {
 	C.voxel_mesh_clear(t.m)
 }
 
-func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type GridClass, matrix []float64) *VoxelPixel {
+func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type GridClass, matrix mat4d.T) *VoxelPixel {
 	ccreator := NewClipBoxCreateorAdapter(creator)
 	defer ccreator.Free()
 	mpt := (*C.struct__voxel_pixel_materials_t)(nil)
 	if mtls != nil {
 		mpt = mtls.m
 	}
-	return &VoxelPixel{m: C.voxel_mesh_to_voxel_pixel(t.m, mpt, C.ushort(local_feature), C.float(precision), ccreator.m, C.int(_type), (*C.double)((unsafe.Pointer)(&matrix[0])))}
+	return &VoxelPixel{m: C.voxel_mesh_to_voxel_pixel(t.m, mpt, C.ushort(local_feature), C.float(precision), ccreator.m, C.int(_type), (*C.double)((unsafe.Pointer)(&matrix.Slice()[0])))}
 }

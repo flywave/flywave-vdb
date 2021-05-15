@@ -1,16 +1,22 @@
 package vdb
 
+import (
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+	vec4d "github.com/flywave/go3d/float64/vec4"
+)
+
 type Space interface {
-	ToGridWord(xyz []float64) []float64
-	ToSpaceWord(xyz []float64) []float64
+	ToGridWord(xyz vec3d.T) vec3d.T
+	ToSpaceWord(xyz vec3d.T) vec3d.T
 
-	TileToSpace(xyz []float64) []float64
-	MakeTileRay(xyz []float64, max []float64) (error, *Ray)
+	TileToSpace(xyz vec3d.T) mat4d.T
+	MakeTileRay(xyz vec3d.T, max vec3d.T) (error, *Ray)
 
-	ComputeDistanceFromSurface(vxyz []float64) float64
+	ComputeDistanceFromSurface(vxyz vec3d.T) float64
 
-	ComputePointFromElevation(xyz []float64, elevation float64) []float64
-	TileSize(min []float64, max []float64) float64
+	ComputePointFromElevation(xyz vec3d.T, elevation float64) vec3d.T
+	TileSize(min vec3d.T, max vec3d.T) float64
 }
 
 type PlaneType uint32
@@ -30,40 +36,40 @@ func NewLocalSpace(plane PlaneType) *Local {
 	return &Local{plane: plane}
 }
 
-func (l *Local) ToGridWord(pxyz []float64) []float64 {
+func (l *Local) ToGridWord(pxyz vec3d.T) vec3d.T {
 	switch l.plane {
 	case PT_XY:
 		return pxyz
 
 	case PT_XZ:
-		return []float64{pxyz[0], pxyz[2], pxyz[1]}
+		return vec3d.T{pxyz[0], pxyz[2], pxyz[1]}
 
 	case PT_YZ:
-		return []float64{pxyz[1], pxyz[2], pxyz[0]}
+		return vec3d.T{pxyz[1], pxyz[2], pxyz[0]}
 	}
-	return nil
+	return vec3d.Zero
 }
 
-func (l *Local) ToSpaceWord(xyz []float64) []float64 {
+func (l *Local) ToSpaceWord(xyz vec3d.T) vec3d.T {
 	return l.ToGridWord(xyz)
 }
 
-func (l *Local) TileToSpace(xyz []float64) []float64 {
-	return []float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
+func (l *Local) TileToSpace(xyz vec3d.T) mat4d.T {
+	return mat4d.T{vec4d.T{1, 0, 0, 0}, vec4d.T{0, 1, 0, 0}, vec4d.T{0, 0, 1, 0}, vec4d.T{0, 0, 0, 1}}
 }
 
-func (l *Local) MakeTileRay(xyz []float64, max []float64) (error, *Ray) {
-	return NewRay([]float64{0, 0, 0}, []float64{1, 0, 0})
+func (l *Local) MakeTileRay(xyz vec3d.T, max vec3d.T) (error, *Ray) {
+	return NewRay(vec3d.T{0, 0, 0}, vec3d.T{1, 0, 0})
 }
 
-func (l *Local) ComputeDistanceFromSurface(vxyz []float64) float64 {
+func (l *Local) ComputeDistanceFromSurface(vxyz vec3d.T) float64 {
 	return vxyz[2]
 }
 
-func (l *Local) ComputePointFromElevation(xyz []float64, elevation float64) []float64 {
-	return []float64{xyz[0], xyz[1], elevation}
+func (l *Local) ComputePointFromElevation(xyz vec3d.T, elevation float64) vec3d.T {
+	return vec3d.T{xyz[0], xyz[1], elevation}
 }
 
-func (l *Local) TileSize(min []float64, max []float64) float64 {
+func (l *Local) TileSize(min vec3d.T, max vec3d.T) float64 {
 	return max[0] - min[0]
 }

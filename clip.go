@@ -8,19 +8,20 @@ import "C"
 import (
 	"reflect"
 	"unsafe"
+
+	vec3d "github.com/flywave/go3d/float64/vec3"
 )
 
 type ClipBoxCreateor interface {
-	Gen(*FloatGrid, *Transform, *BBox, *BBox) bool
+	Gen(*FloatGrid, *Transform, *vec3d.Box, *vec3d.Box) bool
 }
 
 type NoneClipBoxCreateor struct {
 	ClipBoxCreateor
 }
 
-func (t *NoneClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox *BBox, box *BBox) bool {
-	s := sbox.GetSlice()
-	box.Set(s)
+func (t *NoneClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox *vec3d.Box, box *vec3d.Box) bool {
+	*box = *sbox
 	return true
 }
 
@@ -62,13 +63,14 @@ func clipBoxCreateor(ctx unsafe.Pointer, vertex *C.struct__vdb_float_grid_t, tra
 	cboxHeader.Len = int(6)
 	cboxHeader.Data = uintptr(unsafe.Pointer(cbox))
 
-	outbox := &BBox{m: make([]C.double, 6)}
-	_, inbox := NewBBox(sboxSlice)
+	outbox := new(vec3d.Box)
+	inbox := vec3d.FromSlice(sboxSlice)
 
 	ret := C.bool((*(**ClipBoxCreateorAdapter)(ctx)).f.Gen(grid, t, inbox, outbox))
 
+	outSlice := outbox.Slice()
 	for i := 0; i < 6; i++ {
-		cboxSlice[i] = outbox.m[i]
+		cboxSlice[i] = C.double(outSlice[i])
 	}
 	return ret
 }

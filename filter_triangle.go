@@ -8,10 +8,12 @@ import "C"
 import (
 	"reflect"
 	"unsafe"
+
+	"github.com/flywave/go3d/vec3"
 )
 
 type FilterTriangle interface {
-	Vaild([]float32, []float32, []float32) bool
+	Vaild(*vec3.T, *vec3.T, *vec3.T) bool
 }
 
 type FilterTriangleAdapter struct {
@@ -52,5 +54,14 @@ func filterTriangleValid(ctx unsafe.Pointer, a *C.float, b *C.float, c *C.float)
 	cHeader.Len = int(3)
 	cHeader.Data = uintptr(unsafe.Pointer(c))
 
-	return C.bool((*(**FilterTriangleAdapter)(ctx)).f.Vaild(aSlice, bSlice, cSlice))
+	var avec vec3.T
+	copy(avec[:], aSlice)
+
+	var bvec vec3.T
+	copy(bvec[:], bSlice)
+
+	var cvec vec3.T
+	copy(cvec[:], cSlice)
+
+	return C.bool((*(**FilterTriangleAdapter)(ctx)).f.Vaild(&avec, &bvec, &cvec))
 }

@@ -9,6 +9,9 @@ import (
 	"errors"
 	"reflect"
 	"unsafe"
+
+	mat4d "github.com/flywave/go3d/float64/mat4"
+	vec3d "github.com/flywave/go3d/float64/vec3"
 )
 
 func init() {
@@ -92,13 +95,13 @@ func (m *VoxelPixel) ClearFeatures() {
 	C.voxel_pixel_clear_features(m.m)
 }
 
-func (m *VoxelPixel) RayTest(r *Ray) (bool, []float64) {
+func (m *VoxelPixel) RayTest(r *Ray) (bool, vec3d.T) {
 	p := make([]float64, 3)
 	ret := bool(C.voxel_pixel_ray_test(m.m, (*C.double)((unsafe.Pointer)(&r.origin[0])), (*C.double)((unsafe.Pointer)(&r.dir[0])), (*C.double)((unsafe.Pointer)(&p[0]))))
-	return ret, p
+	return ret, vec3d.T{p[0], p[1], p[2]}
 }
 
-func (m *VoxelPixel) RayTests(rs []Ray) [][]float64 {
+func (m *VoxelPixel) RayTests(rs []Ray) []vec3d.T {
 	origin := make([]float64, 3*len(rs))
 	dir := make([]float64, 3*len(rs))
 	for i, _ := range rs {
@@ -115,9 +118,9 @@ func (m *VoxelPixel) RayTests(rs []Ray) [][]float64 {
 	if !ok {
 		return nil
 	}
-	pos := make([][]float64, len(rs))
+	pos := make([]vec3d.T, len(rs))
 	for i := 0; i < len(rs); i++ {
-		pos[i] = p[i*3 : (i*3)+2]
+		pos[i] = vec3d.T{p[i*3], p[i*3+1], p[i*3+2]}
 	}
 	return pos
 }
@@ -202,9 +205,9 @@ func (m *VoxelPixel) FillColor(src *VoxelPixel, color *PixelGrid) {
 	C.voxel_pixel_fill_color(m.m, src.m, color.m)
 }
 
-func (m *VoxelPixel) EvalMaxMinElevation(in *BBox) *BBox {
-	var out *BBox
-	C.voxel_pixel_eval_max_min_elevation(m.m, &in.m[0], &out.m[0])
+func (m *VoxelPixel) EvalMaxMinElevation(in *vec3d.Box) *vec3d.Box {
+	out := new(vec3d.Box)
+	C.voxel_pixel_eval_max_min_elevation(m.m, (*C.double)((unsafe.Pointer)(&in.Slice()[0])), (*C.double)((unsafe.Pointer)(&out.Slice()[0])))
 	return out
 }
 
@@ -223,7 +226,7 @@ type Triangle struct {
 	FID  uint64
 }
 
-func (m *VoxelPixel) MakeTriangles(mat []float64, texOffset int, mtlOffset int, bl BorderLock, ft FilterTriangle, fquality float64,
+func (m *VoxelPixel) MakeTriangles(mat mat4d.T, texOffset int, mtlOffset int, bl BorderLock, ft FilterTriangle, fquality float64,
 	isovalue float64, adapter float64) []Triangle {
 	var tricount C.size_t
 	var ctris *C.struct__voxel_io_triangle_t
@@ -232,7 +235,7 @@ func (m *VoxelPixel) MakeTriangles(mat []float64, texOffset int, mtlOffset int, 
 	cft := NewFilterTriangleAdapter(ft)
 	defer cft.Free()
 
-	C.voxel_pixel_make_triangles(m.m, &ctris, &tricount, (*C.double)((unsafe.Pointer)(&mat[0])), C.size_t(texOffset), C.size_t(mtlOffset), cbl.m, cft.m, C.double(fquality), C.double(isovalue), C.double(adapter))
+	C.voxel_pixel_make_triangles(m.m, &ctris, &tricount, (*C.double)((unsafe.Pointer)(&mat.Slice()[0])), C.size_t(texOffset), C.size_t(mtlOffset), cbl.m, cft.m, C.double(fquality), C.double(isovalue), C.double(adapter))
 	defer C.free(unsafe.Pointer(ctris))
 
 	var trisSlice []C.struct__voxel_io_triangle_t
@@ -295,11 +298,11 @@ func (m *VoxelPixel) MakeTriangles(mat []float64, texOffset int, mtlOffset int, 
 	return ret
 }
 
-func (m *VoxelPixel) MakeTrianglesSimple(mat []float64, texOffset int, mtlOffset int, fquality float64,
+func (m *VoxelPixel) MakeTrianglesSimple(mat mat4d.T, texOffset int, mtlOffset int, fquality float64,
 	isovalue float64, adapter float64) []Triangle {
 	var tricount C.size_t
 	var ctris *C.struct__voxel_io_triangle_t
-	C.voxel_pixel_make_triangles_simple(m.m, &ctris, &tricount, (*C.double)((unsafe.Pointer)(&mat[0])), C.size_t(texOffset), C.size_t(mtlOffset), C.double(fquality), C.double(isovalue), C.double(adapter))
+	C.voxel_pixel_make_triangles_simple(m.m, &ctris, &tricount, (*C.double)((unsafe.Pointer)(&mat.Slice()[0])), C.size_t(texOffset), C.size_t(mtlOffset), C.double(fquality), C.double(isovalue), C.double(adapter))
 	defer C.free(unsafe.Pointer(ctris))
 
 	var trisSlice []C.struct__voxel_io_triangle_t
@@ -362,6 +365,6 @@ func (m *VoxelPixel) MakeTrianglesSimple(mat []float64, texOffset int, mtlOffset
 	return ret
 }
 
-func (m *VoxelPixel) MakeAtlasGenerator(mat []float64, pixelPad float32) *AtlasGenerator {
-	return &AtlasGenerator{m: C.voxel_pixel_make_texture_atlas_generator(m.m, (*C.double)((unsafe.Pointer)(&mat[0])), C.float(pixelPad))}
+func (m *VoxelPixel) MakeAtlasGenerator(mat mat4d.T, pixelPad float32) *AtlasGenerator {
+	return &AtlasGenerator{m: C.voxel_pixel_make_texture_atlas_generator(m.m, (*C.double)((unsafe.Pointer)(&mat.Slice()[0])), C.float(pixelPad))}
 }

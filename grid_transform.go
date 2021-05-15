@@ -8,13 +8,15 @@ import "C"
 import (
 	"reflect"
 	"unsafe"
+
+	vec3d "github.com/flywave/go3d/float64/vec3"
 )
 
 type GridTransform interface {
 	IsAffine() bool
 	IsIdentity() bool
-	Transform(pt, out []float64)
-	InvTransform(pt, out []float64)
+	Transform(pt, out *vec3d.T)
+	InvTransform(pt, out *vec3d.T)
 }
 
 type GridTransformAdapter struct {
@@ -59,7 +61,13 @@ func gridTransform(ctx unsafe.Pointer, pt *C.double, out *C.double) {
 	bHeader.Len = int(3)
 	bHeader.Data = uintptr(unsafe.Pointer(out))
 
-	(*(**GridTransformAdapter)(ctx)).f.Transform(aSlice, bSlice)
+	var avec vec3d.T
+	copy(avec[:], aSlice)
+
+	var bvec vec3d.T
+	copy(bvec[:], bSlice)
+
+	(*(**GridTransformAdapter)(ctx)).f.Transform(&avec, &bvec)
 }
 
 //export gridInvTransform
@@ -76,5 +84,11 @@ func gridInvTransform(ctx unsafe.Pointer, pt *C.double, out *C.double) {
 	bHeader.Len = int(3)
 	bHeader.Data = uintptr(unsafe.Pointer(out))
 
-	(*(**GridTransformAdapter)(ctx)).f.InvTransform(aSlice, bSlice)
+	var avec vec3d.T
+	copy(avec[:], aSlice)
+
+	var bvec vec3d.T
+	copy(bvec[:], bSlice)
+
+	(*(**GridTransformAdapter)(ctx)).f.InvTransform(&avec, &bvec)
 }

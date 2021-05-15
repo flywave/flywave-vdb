@@ -12,6 +12,10 @@ import (
 	"errors"
 	"reflect"
 	"unsafe"
+
+	"github.com/flywave/flywave-vdb/coord"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+	"github.com/flywave/go3d/vec3"
 )
 
 type SmoothType int32
@@ -217,22 +221,22 @@ func (m *FloatGrid) Prune(tolerance float32) {
 	C.vdb_float_grid_prune(m.m, C.float(tolerance))
 }
 
-func (m *FloatGrid) Clip(bbox []float64) {
-	C.vdb_float_grid_clip(m.m, (*C.double)((unsafe.Pointer)(&bbox[0])))
+func (m *FloatGrid) Clip(bbox vec3d.T) {
+	C.vdb_float_grid_clip(m.m, (*C.double)((unsafe.Pointer)(&bbox.Slice()[0])))
 }
 
-func (m *FloatGrid) ClipFromCoordbox(cbox []int32) {
-	C.vdb_float_grid_clip_from_coordbox(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
+func (m *FloatGrid) ClipFromCoordbox(cbox coord.Box) {
+	C.vdb_float_grid_clip_from_coordbox(m.m, (*C.int)(cbox.CSlice()))
 }
 
-func (m *FloatGrid) GetActiveVoxelBoundingBox() []int32 {
+func (m *FloatGrid) GetActiveVoxelBoundingBox() *coord.Box {
 	cbox := make([]int32, 6)
 	C.vdb_float_grid_active_voxel_bounding_box(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
-	return cbox
+	return coord.FromSlice(cbox)
 }
 
-func (m *FloatGrid) GetActiveVoxelDim() []int32 {
-	dim := make([]int32, 3)
+func (m *FloatGrid) GetActiveVoxelDim() coord.T {
+	dim := coord.T{}
 	C.vdb_float_grid_active_voxel_dim(m.m, (*C.int)((unsafe.Pointer)(&dim[0])))
 	return dim
 }
@@ -378,9 +382,9 @@ func (m *FloatGrid) Rebuild(iso float64, exWidth float64, inWidth float64) error
 	return nil
 }
 
-func (m *FloatGrid) Dense() ([]float32, [3]int32, error) {
+func (m *FloatGrid) Dense() ([]float32, coord.T, error) {
 	if m == nil || m.m == nil {
-		return nil, [3]int32{0, 0, 0}, errors.New("Rebuild error ")
+		return nil, coord.T{0, 0, 0}, errors.New("Rebuild error ")
 	}
 
 	var width C.int
@@ -399,10 +403,10 @@ func (m *FloatGrid) Dense() ([]float32, [3]int32, error) {
 		dense[i] = float32(cdenseSlice[i])
 	}
 	C.free(unsafe.Pointer(cdense))
-	return dense, [3]int32{int32(width), int32(height), int32(depth)}, nil
+	return dense, coord.T{int32(width), int32(height), int32(depth)}, nil
 }
 
-func (m *FloatGrid) Set(pos []int32, val float32) error {
+func (m *FloatGrid) Set(pos coord.T, val float32) error {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error ")
 	}
@@ -410,7 +414,7 @@ func (m *FloatGrid) Set(pos []int32, val float32) error {
 	return nil
 }
 
-func (m *FloatGrid) Get(pos []int32) (error, float32) {
+func (m *FloatGrid) Get(pos coord.T) (error, float32) {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error "), float32(0.0)
 	}
@@ -418,7 +422,7 @@ func (m *FloatGrid) Get(pos []int32) (error, float32) {
 	return nil, ret
 }
 
-func (m *FloatGrid) LinearGet(pos []float32) (error, float32) {
+func (m *FloatGrid) LinearGet(pos vec3.T) (error, float32) {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error "), float32(0.0)
 	}
@@ -426,13 +430,13 @@ func (m *FloatGrid) LinearGet(pos []float32) (error, float32) {
 	return nil, ret
 }
 
-func (m *FloatGrid) EvalActiveBoundingBox() (error, []float64) {
+func (m *FloatGrid) EvalActiveBoundingBox() (error, *vec3d.Box) {
 	if m == nil || m.m == nil {
-		return errors.New("Rebuild error "), []float64{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}
+		return errors.New("Rebuild error "), nil
 	}
 	ret := make([]float64, 6)
 	C.vdb_float_grid_eval_active_bounding_box(m.m, (*C.double)((unsafe.Pointer)(&ret[0])))
-	return nil, ret
+	return nil, &vec3d.Box{Min: vec3d.T{ret[0], ret[1], ret[2]}, Max: vec3d.T{ret[3], ret[4], ret[5]}}
 }
 
 func (m *FloatGrid) ResampleWithRef(ref *FloatGrid, voxelSize float32,
@@ -452,40 +456,42 @@ func (m *FloatGrid) ResampleWithTransform(tran GridTransform,
 	return &FloatGrid{m: C.vdb_float_grid_resample_with_grid_transform(m.m, trana.m, C.int(curOrder), C.float(tolerance), C.bool(prune))}
 }
 
-func (m *FloatGrid) SparseFill(box *CoordBox, v float32, active bool) {
-	C.vdb_float_grid_sparse_fill(m.m, &box.m[0], C.float(v), C.bool(active))
+func (m *FloatGrid) SparseFill(box *coord.Box, v float32, active bool) {
+	C.vdb_float_grid_sparse_fill(m.m, (*C.int)(box.CSlice()), C.float(v), C.bool(active))
 }
 
-func (m *FloatGrid) Fill(box *CoordBox, v float32, active bool) {
-	C.vdb_float_grid_fill(m.m, &box.m[0], C.float(v), C.bool(active))
+func (m *FloatGrid) Fill(box *coord.Box, v float32, active bool) {
+	C.vdb_float_grid_fill(m.m, (*C.int)(box.CSlice()), C.float(v), C.bool(active))
 }
 
-func (m *FloatGrid) DenseFill(box *CoordBox, v float32, active bool) {
-	C.vdb_float_grid_dense_fill(m.m, &box.m[0], C.float(v), C.bool(active))
+func (m *FloatGrid) DenseFill(box *coord.Box, v float32, active bool) {
+	C.vdb_float_grid_dense_fill(m.m, (*C.int)(box.CSlice()), C.float(v), C.bool(active))
 }
 
 //export vdbFloatGridVisiton
-func vdbFloatGridVisiton(ctx unsafe.Pointer, coord *C.int, val C.float) C.bool {
+func vdbFloatGridVisiton(ctx unsafe.Pointer, coord_ *C.int, val C.float) C.bool {
 	var aSlice []int32
 	aHeader := (*reflect.SliceHeader)((unsafe.Pointer(&aSlice)))
 	aHeader.Cap = int(3)
 	aHeader.Len = int(3)
-	aHeader.Data = uintptr(unsafe.Pointer(coord))
+	aHeader.Data = uintptr(unsafe.Pointer(coord_))
 
-	return C.bool((*(*func(coord []int32, v float32) bool)(ctx))(aSlice, float32(val)))
+	ccoord := coord.T{aSlice[0], aSlice[1], aSlice[2]}
+
+	return C.bool((*(*func(coord coord.T, v float32) bool)(ctx))(ccoord, float32(val)))
 }
 
-func (m *FloatGrid) VisitOn(v func(coord []int32, v float32) bool) {
+func (m *FloatGrid) VisitOn(v func(coord coord.T, v float32) bool) {
 	inptr := uintptr(unsafe.Pointer(&v))
 	C.vdb_float_grid_visit_on(m.m, (unsafe.Pointer)(inptr))
 }
 
-func (m *FloatGrid) VisitOff(v func(coord []int32, v float32) bool) {
+func (m *FloatGrid) VisitOff(v func(coord coord.T, v float32) bool) {
 	inptr := uintptr(unsafe.Pointer(&v))
 	C.vdb_float_grid_visit_off(m.m, (unsafe.Pointer)(inptr))
 }
 
-func (m *FloatGrid) VisitAll(v func(coord []int32, v float32) bool) {
+func (m *FloatGrid) VisitAll(v func(coord coord.T, v float32) bool) {
 	inptr := uintptr(unsafe.Pointer(&v))
 	C.vdb_float_grid_visit_all(m.m, (unsafe.Pointer)(inptr))
 }
@@ -554,16 +560,16 @@ func (m *FloatGridIterator) GetLeafDepth() int32 {
 	return int32(C.vdb_float_grid_iterator_get_leaf_depth(m.m))
 }
 
-func (m *FloatGridIterator) GetCoord() []int32 {
-	coord := make([]int32, 3)
-	C.vdb_float_grid_iterator_get_coord(m.m, (*C.int)(unsafe.Pointer(&coord[0])))
-	return coord
+func (m *FloatGridIterator) GetCoord() coord.T {
+	ccoord := make([]int32, 3)
+	C.vdb_float_grid_iterator_get_coord(m.m, (*C.int)(unsafe.Pointer(&ccoord[0])))
+	return coord.T{ccoord[0], ccoord[1], ccoord[2]}
 }
 
-func (m *FloatGridIterator) GetCoordBox() *CoordBox {
-	_, cb := NewCoordBox(make([]int32, 6))
-	C.vdb_float_grid_iterator_get_bounding_box(m.m, &cb.m[0])
-	return cb
+func (m *FloatGridIterator) GetCoordBox() *coord.Box {
+	cb := make([]int32, 6)
+	C.vdb_float_grid_iterator_get_bounding_box(m.m, (*C.int)(unsafe.Pointer(&cb[0])))
+	return coord.FromSlice(cb)
 }
 
 func (m *FloatGridIterator) GetVoxelCount() int32 {
@@ -671,7 +677,7 @@ func pixel_2_cpixel(pixel Pixel) C.struct__vdb_pixel_t {
 	return p
 }
 
-func (m *PixelGrid) Set(pos []int32, val Pixel) error {
+func (m *PixelGrid) Set(pos coord.T, val Pixel) error {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error ")
 	}
@@ -691,7 +697,7 @@ func cpixel_2_pixel(cpixel C.struct__vdb_pixel_t) Pixel {
 	return p
 }
 
-func (m *PixelGrid) Get(pos []int32) (error, Pixel) {
+func (m *PixelGrid) Get(pos coord.T) (error, Pixel) {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error "), Pixel{}
 	}
@@ -699,7 +705,7 @@ func (m *PixelGrid) Get(pos []int32) (error, Pixel) {
 	return nil, cpixel_2_pixel(cpixel)
 }
 
-func (m *PixelGrid) LinearGet(pos []float32) (error, Pixel) {
+func (m *PixelGrid) LinearGet(pos vec3.T) (error, Pixel) {
 	if m == nil || m.m == nil {
 		return errors.New("Rebuild error "), Pixel{}
 	}
@@ -723,24 +729,24 @@ func (m *PixelGrid) Prune(tolerance float32) {
 	C.vdb_pixel_grid_prune(m.m, C.float(tolerance))
 }
 
-func (m *PixelGrid) Clip(bbox []float64) {
-	C.vdb_pixel_grid_clip(m.m, (*C.double)((unsafe.Pointer)(&bbox[0])))
+func (m *PixelGrid) Clip(bbox vec3d.Box) {
+	C.vdb_pixel_grid_clip(m.m, (*C.double)((unsafe.Pointer)(&bbox.Slice()[0])))
 }
 
-func (m *PixelGrid) ClipFromCoordbox(cbox []int32) {
-	C.vdb_pixel_grid_clip_from_coordbox(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
+func (m *PixelGrid) ClipFromCoordbox(cbox coord.Box) {
+	C.vdb_pixel_grid_clip_from_coordbox(m.m, (*C.int)(cbox.CSlice()))
 }
 
-func (m *PixelGrid) GetActiveVoxelBoundingBox() []int32 {
+func (m *PixelGrid) GetActiveVoxelBoundingBox() *coord.Box {
 	cbox := make([]int32, 6)
 	C.vdb_pixel_grid_active_voxel_bounding_box(m.m, (*C.int)((unsafe.Pointer)(&cbox[0])))
-	return cbox
+	return coord.FromSlice(cbox)
 }
 
-func (m *PixelGrid) GetActiveVoxelDim() []int32 {
+func (m *PixelGrid) GetActiveVoxelDim() coord.T {
 	dim := make([]int32, 3)
 	C.vdb_pixel_grid_active_voxel_dim(m.m, (*C.int)((unsafe.Pointer)(&dim[0])))
-	return dim
+	return coord.T{dim[0], dim[1], dim[2]}
 }
 
 func (m *PixelGrid) PrintInfo() string {
@@ -750,41 +756,43 @@ func (m *PixelGrid) PrintInfo() string {
 }
 
 //export vdbPixelGridVisiton
-func vdbPixelGridVisiton(ctx unsafe.Pointer, coord *C.int, val C.struct__vdb_pixel_t) C.bool {
+func vdbPixelGridVisiton(ctx unsafe.Pointer, c *C.int, val C.struct__vdb_pixel_t) C.bool {
 	var aSlice []int32
 	aHeader := (*reflect.SliceHeader)((unsafe.Pointer(&aSlice)))
 	aHeader.Cap = int(3)
 	aHeader.Len = int(3)
-	aHeader.Data = uintptr(unsafe.Pointer(coord))
+	aHeader.Data = uintptr(unsafe.Pointer(c))
 
-	return C.bool((*(*func(coord []int32, v Pixel) bool)(ctx))(aSlice, cpixel_2_pixel(val)))
+	ccoord := coord.T{aSlice[0], aSlice[1], aSlice[2]}
+
+	return C.bool((*(*func(c coord.T, v Pixel) bool)(ctx))(ccoord, cpixel_2_pixel(val)))
 }
 
-func (m *PixelGrid) VisitOn(v func(coord []int32, v Pixel) bool) {
+func (m *PixelGrid) VisitOn(v func(c coord.T, v Pixel) bool) {
 	inptr := uintptr(unsafe.Pointer(&v))
 	C.vdb_pixel_grid_visit_on(m.m, (unsafe.Pointer)(inptr))
 }
 
-func (m *PixelGrid) VisitOff(v func(coord []int32, v Pixel) bool) {
+func (m *PixelGrid) VisitOff(v func(c coord.T, v Pixel) bool) {
 	inptr := uintptr(unsafe.Pointer(&v))
 	C.vdb_pixel_grid_visit_off(m.m, (unsafe.Pointer)(inptr))
 }
 
-func (m *PixelGrid) VisitAll(v func(coord []int32, v Pixel) bool) {
+func (m *PixelGrid) VisitAll(v func(c coord.T, v Pixel) bool) {
 	inptr := uintptr(unsafe.Pointer(&v))
 	C.vdb_pixel_grid_visit_all(m.m, (unsafe.Pointer)(inptr))
 }
 
-func (m *PixelGrid) SparseFill(box *CoordBox, v Pixel, active bool) {
-	C.vdb_pixel_grid_sparse_fill(m.m, &box.m[0], pixel_2_cpixel(v), C.bool(active))
+func (m *PixelGrid) SparseFill(box *coord.Box, v Pixel, active bool) {
+	C.vdb_pixel_grid_sparse_fill(m.m, (*C.int)(box.CSlice()), pixel_2_cpixel(v), C.bool(active))
 }
 
-func (m *PixelGrid) Fill(box *CoordBox, v Pixel, active bool) {
-	C.vdb_pixel_grid_fill(m.m, &box.m[0], pixel_2_cpixel(v), C.bool(active))
+func (m *PixelGrid) Fill(box *coord.Box, v Pixel, active bool) {
+	C.vdb_pixel_grid_fill(m.m, (*C.int)(box.CSlice()), pixel_2_cpixel(v), C.bool(active))
 }
 
-func (m *PixelGrid) DenseFill(box *CoordBox, v Pixel, active bool) {
-	C.vdb_pixel_grid_dense_fill(m.m, &box.m[0], pixel_2_cpixel(v), C.bool(active))
+func (m *PixelGrid) DenseFill(box *coord.Box, v Pixel, active bool) {
+	C.vdb_pixel_grid_dense_fill(m.m, (*C.int)(box.CSlice()), pixel_2_cpixel(v), C.bool(active))
 }
 
 type PixelGridIterator struct {
@@ -851,16 +859,16 @@ func (m *PixelGridIterator) GetLeafDepth() int32 {
 	return int32(C.vdb_pixel_grid_iterator_get_leaf_depth(m.m))
 }
 
-func (m *PixelGridIterator) GetCoord() []int32 {
-	coord := make([]int32, 3)
-	C.vdb_pixel_grid_iterator_get_coord(m.m, (*C.int)(unsafe.Pointer(&coord[0])))
-	return coord
+func (m *PixelGridIterator) GetCoord() coord.T {
+	c := make([]int32, 3)
+	C.vdb_pixel_grid_iterator_get_coord(m.m, (*C.int)(unsafe.Pointer(&c[0])))
+	return coord.T{c[0], c[1], c[2]}
 }
 
-func (m *PixelGridIterator) GetCoordBox() *CoordBox {
-	_, cb := NewCoordBox(make([]int32, 6))
-	C.vdb_pixel_grid_iterator_get_bounding_box(m.m, &cb.m[0])
-	return cb
+func (m *PixelGridIterator) GetCoordBox() *coord.Box {
+	cb := make([]int32, 6)
+	C.vdb_pixel_grid_iterator_get_bounding_box(m.m, (*C.int)(unsafe.Pointer(&cb[0])))
+	return coord.FromSlice(cb)
 }
 
 func (m *PixelGridIterator) GetVoxelCount() int32 {

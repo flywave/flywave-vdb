@@ -1,9 +1,12 @@
 package vdb
 
 import (
+	"strconv"
 	"testing"
 
+	"github.com/flywave/flywave-vdb/coord"
 	_ "github.com/flywave/go-obj"
+	mat4d "github.com/flywave/go3d/float64/mat4"
 )
 
 func TestMeshBuilder(t *testing.T) {
@@ -32,7 +35,7 @@ func TestMeshBuilder(t *testing.T) {
 	}
 
 	clip := &NoneClipBoxCreateor{}
-	mat := []float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
+	mat := mat4d.Ident
 	precision := float32(10)
 
 	vpixel := vmesh.SampleVoxelPixel(nil, 1, precision, clip, GC_LEVEL_SET, mat)
@@ -41,7 +44,14 @@ func TestMeshBuilder(t *testing.T) {
 		t.FailNow()
 	}
 
-	str := vpixel.GetVoxelGrid().PrintInfo()
+	grid := vpixel.GetVoxelGrid()
+
+	str := grid.PrintInfo()
 
 	print(str)
+
+	grid.VisitOn(func(c coord.T, v float32) bool {
+		print(strconv.Itoa(int(c[0])) + "_" + strconv.Itoa(int(c[1])) + "_" + strconv.Itoa(int(c[2])) + "_")
+		return true
+	})
 }

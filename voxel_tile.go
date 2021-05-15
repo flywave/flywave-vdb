@@ -1,5 +1,7 @@
 package vdb
 
+import vec3d "github.com/flywave/go3d/float64/vec3"
+
 type VoxelTile struct {
 	Cacheable
 	SizeAware
@@ -40,13 +42,13 @@ func (t *VoxelTile) free() {
 	t.vpixel = nil
 }
 
-func (t *VoxelTile) RayTest(ray *Ray) (bool, []float64) {
+func (t *VoxelTile) RayTest(ray *Ray) (bool, vec3d.T) {
 	return t.vpixel.RayTest(ray)
 }
 
-func (t *VoxelTile) SurfaceQuery(points [][]float64, space Space) [][]float64 {
+func (t *VoxelTile) SurfaceQuery(points []vec3d.T, space Space) []vec3d.T {
 	rays := make([]Ray, len(points))
-	max := t.EvalBoundingBox()[3:]
+	max := t.EvalBoundingBox().Max
 	for i, pts := range points {
 		_, rt := space.MakeTileRay(pts, max)
 		rays[i] = *rt
@@ -101,12 +103,11 @@ func (t *VoxelTile) SetDirty() {
 	t.dirty = true
 }
 
-func (t *VoxelTile) EvalBoundingBox() []float64 {
+func (t *VoxelTile) EvalBoundingBox() *vec3d.Box {
 	if t.vpixel == nil {
-		return []float64{0, 0, 0, 0, 0, 0}
+		return nil
 	}
 	_, box := t.vpixel.GetVoxelGrid().EvalActiveBoundingBox()
-	_, in := NewBBox(box)
-	out := t.vpixel.VoxelResolution().IndexToWorldFromBBox(in)
-	return out.GetSlice()
+	out := t.vpixel.VoxelResolution().IndexToWorldFromBBox(box)
+	return out
 }

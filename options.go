@@ -1,11 +1,15 @@
 package vdb
 
+import (
+	vec2d "github.com/flywave/go3d/float64/vec2"
+)
+
 const (
 	DEFAULT_MAX_CACHE_SIZE = int64(1024 * 1024 * 1024)
 )
 
 type Options struct {
-	Boundbox             BBox2d
+	Boundbox             vec2d.Rect
 	Level                uint16
 	Precision            float64
 	TextureQuality       float64
@@ -17,5 +21,5 @@ type Options struct {
 }
 
 func DefaultOptions() Options {
-	return Options{Boundbox: *NewBBox2d(), Level: 18, Precision: 2.0, TextureQuality: 0.8, IsoValue: 0.01, AdapterValue: 0.01, FaceQuality: 1.0, PackTrianglePixelPad: 2.0, MaxCacheSize: DEFAULT_MAX_CACHE_SIZE}
+	return Options{Boundbox: vec2d.Rect{Min: vec2d.MinVal, Max: vec2d.MaxVal}, Level: 18, Precision: 2.0, TextureQuality: 0.8, IsoValue: 0.01, AdapterValue: 0.01, FaceQuality: 1.0, PackTrianglePixelPad: 2.0, MaxCacheSize: DEFAULT_MAX_CACHE_SIZE}
 }

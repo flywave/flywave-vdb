@@ -1,5 +1,9 @@
 package vdb
 
+import (
+	vec2d "github.com/flywave/go3d/float64/vec2"
+)
+
 type Scene struct {
 	TileGrid
 	opt        Options
@@ -9,7 +13,7 @@ type Scene struct {
 	voxelCache *Cache
 }
 
-func NewScene(g Space, extent BBox2d, level uint16, s Storage, opt Options, needInit bool) *Scene {
+func NewScene(g Space, extent vec2d.Rect, level uint16, s Storage, opt Options, needInit bool) *Scene {
 	cache := NewCache(opt.MaxCacheSize)
 	scene := &Scene{TileGrid: *NewTileGrid(g, extent, level), storage: s, opt: opt, voxelCache: cache}
 	if needInit && !scene.init() {

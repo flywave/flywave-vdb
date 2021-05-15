@@ -10,6 +10,8 @@ package vdb
 import "C"
 import (
 	"math"
+
+	vec2d "github.com/flywave/go3d/float64/vec2"
 )
 
 type TileIndex struct {
@@ -143,10 +145,10 @@ func merc2lonlat(x []float64, y []float64, pointCount int) bool {
 }
 
 func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64) *TileIndex {
-	x := [2]float64{minx, miny}
-	y := [2]float64{maxx, maxy}
+	x := vec2d.T{minx, miny}
+	y := vec2d.T{maxx, maxy}
 	lonlat2merc(x[:], y[:], 2)
-	_box := BBox2d{x[0], y[0], x[1], y[1]}
+	_box := vec2d.Rect{Min: x, Max: y}
 	_zoom := uint8(
 		math.Floor(math.Log((2*math.Pi)/_box.Size())/math.Log(2)) - 1)
 
@@ -160,8 +162,8 @@ func getTileFromBox(minx float64, miny float64, maxx float64, maxy float64) *Til
 	return geodeticToTile((minx+maxx)/2.0, (miny+maxy)/2.0, _zoom)
 }
 
-func NewTileIndexFromBox(box BBox2d) *TileIndex {
-	p := getTileFromBox(box[0], box[1], box[2], box[3])
+func NewTileIndexFromBox(box vec2d.Rect) *TileIndex {
+	p := getTileFromBox(box.Min[0], box.Min[1], box.Max[0], box.Max[1])
 	return p
 }
 

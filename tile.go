@@ -1,21 +1,25 @@
 package vdb
 
+import (
+	vec2d "github.com/flywave/go3d/float64/vec2"
+)
+
 const (
 	EPS = float64(0.000000001)
 )
 
 type Tile struct {
 	id   *TileIndex
-	bbox BBox2d
+	bbox vec2d.Rect
 }
 
-func NewTile(id *TileIndex, bbox BBox2d) *Tile {
+func NewTile(id *TileIndex, bbox vec2d.Rect) *Tile {
 	return &Tile{id: id, bbox: bbox}
 }
 
 func (t *Tile) Center() (x, y float64) {
-	x = (t.bbox[0] + t.bbox[1]) / 2
-	y = (t.bbox[2] + t.bbox[3]) / 2
+	x = (t.bbox.Min[0] + t.bbox.Max[0]) / 2
+	y = (t.bbox.Min[1] + t.bbox.Max[1]) / 2
 	return
 }
 
@@ -23,7 +27,7 @@ func (t *Tile) Index() *TileIndex {
 	return t.id
 }
 
-func (t *Tile) Bounds() BBox2d {
+func (t *Tile) Bounds() vec2d.Rect {
 	return t.bbox
 }
 
@@ -37,6 +41,6 @@ func (t *Tile) IsBlack() bool {
 	return ((x + y) % 2) > 0
 }
 
-func (t *Tile) Contains(box BBox2d) bool {
-	return t.bbox.ContainsBox(box, EPS)
+func (t *Tile) Contains(box vec2d.Rect) bool {
+	return t.bbox.Contains(&box)
 }

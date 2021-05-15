@@ -1,6 +1,9 @@
 package vdb
 
-import vec3d "github.com/flywave/go3d/float64/vec3"
+import (
+	vec2d "github.com/flywave/go3d/float64/vec2"
+	vec3d "github.com/flywave/go3d/float64/vec3"
+)
 
 type VoxelTile struct {
 	Cacheable
@@ -20,7 +23,7 @@ func NewVoxelTile(tile *Tile, p *VoxelPixel) *VoxelTile {
 	return &VoxelTile{Tile: *tile, vpixel: p, dirty: true}
 }
 
-func NewVoxelTileWithBBox(id *TileIndex, bbox BBox2d, p *VoxelPixel) *VoxelTile {
+func NewVoxelTileWithBBox(id *TileIndex, bbox vec2d.Rect, p *VoxelPixel) *VoxelTile {
 	return &VoxelTile{Tile: *NewTile(id, bbox), vpixel: p, dirty: true}
 }
 

@@ -25,7 +25,7 @@ type Storage interface {
 	ReadTile(tile *VoxelTile) bool
 	TileExists(tile *Tile) bool
 	RemoveTile(tile *Tile) bool
-	ListTiles(bbox BBox2d, tileSize vec2d.T) []Tile
+	ListTiles(bbox vec2d.Rect, tileSize vec2d.T) []Tile
 	UpdateTiles(tiles []*VoxelTile) bool
 	TileModTime(tile *Tile) int64
 }
@@ -35,7 +35,7 @@ func MakeVoxelTileName(root string, tile *Tile, extensions string) string {
 	return root + "/" + strconv.Itoa(int(z)) + "_" + strconv.Itoa(int(x)) + "_" + strconv.Itoa(int(y)) + extensions
 }
 
-func ParseVoxelTileNameToTile(filename string, bounds BBox2d, tileSize vec2d.T) *Tile {
+func ParseVoxelTileNameToTile(filename string, bounds vec2d.Rect, tileSize vec2d.T) *Tile {
 	zxystr := _parsr_file_reg.FindStringSubmatch(filename)
 	if len(zxystr) != 4 {
 		return nil
@@ -52,9 +52,9 @@ func ParseVoxelTileNameToTile(filename string, bounds BBox2d, tileSize vec2d.T) 
 	if err != nil {
 		return nil
 	}
-	hw := float64((bounds[2] - bounds[0]) / 2.0)
-	hh := float64((bounds[3] - bounds[1]) / 2.0)
-	box := BBox2d{float64(x)*tileSize[0] - hw, float64(x+1)*tileSize[0] - hw, float64(y+1)*tileSize[1] - hh, float64(y)*tileSize[1] - hh}
+	hw := float64((bounds.Max[0] - bounds.Min[0]) / 2.0)
+	hh := float64((bounds.Max[1] - bounds.Min[1]) / 2.0)
+	box := vec2d.Rect{Min: vec2d.T{float64(x)*tileSize[0] - hw, float64(x+1)*tileSize[0] - hw}, Max: vec2d.T{float64(y+1)*tileSize[1] - hh, float64(y)*tileSize[1] - hh}}
 	return NewTile(NewTileIndexFromLevelAndRowCol(uint32(z), uint32(y), uint32(x)), box)
 }
 
@@ -129,7 +129,7 @@ func (l *LocalStorage) TileExists(tile *Tile) bool {
 	return fileExist(path)
 }
 
-func (l *LocalStorage) ListTiles(bbox BBox2d, tileSize vec2d.T) []Tile {
+func (l *LocalStorage) ListTiles(bbox vec2d.Rect, tileSize vec2d.T) []Tile {
 	files, err := walkDir(l.root, VOXEL_TILE_EXT)
 	if err != nil {
 		return nil

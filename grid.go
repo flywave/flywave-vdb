@@ -351,23 +351,23 @@ func (m *FloatGrid) BlendMask(grid *FloatGrid, position float64, end float64, ma
 	return nil
 }
 
-func (m *FloatGrid) ClosestPoint(points []float32) ([]float32, error) {
+func (m *FloatGrid) ClosestPoint(points []vec3.T) ([]vec3.T, error) {
 	if m == nil || m.m == nil {
 		return nil, errors.New("ClosestPoint error ")
 	}
 
 	var pointsLen C.int
-	cpoints := C.vdb_float_grid_closest_point(m.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)), &pointsLen)
+	cpoints := C.vdb_float_grid_closest_point(m.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)*3), &pointsLen)
 
-	var cpointsSlice []C.float
+	var cpointsSlice []float32
 	cpointsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&cpointsSlice)))
 	cpointsHeader.Cap = int(pointsLen)
 	cpointsHeader.Len = int(pointsLen)
 	cpointsHeader.Data = uintptr(unsafe.Pointer(cpoints))
 
-	closest_points := make([]float32, int(pointsLen))
-	for i := 0; i < int(pointsLen); i++ {
-		closest_points[i] = float32(cpointsSlice[i])
+	closest_points := make([]vec3.T, int(pointsLen)/3)
+	for i := 0; i < int(pointsLen)/3; i++ {
+		closest_points[i] = vec3.T{cpointsSlice[i*3], cpointsSlice[i*3+1], cpointsSlice[i*3+2]}
 	}
 	C.free(unsafe.Pointer(cpoints))
 

@@ -4,3 +4,7 @@ github.com/flywave/go-obj v0.0.0-20210514090620-a1dcb8967ef9 h1:lT+r/6pvnVwJ4Y/v
 github.com/flywave/go-obj v0.0.0-20210514090620-a1dcb8967ef9/go.mod h1:+yO+PGuuoa4ti3kBBXNrtmlQ2KR1WlfQMPHWOMObcnU=
 github.com/flywave/go3d v0.0.0-20210515082135-06192a849a25 h1:LiEt6mjRCrRmkV1rc0ZnFTCkEKCIXFr33525hOyvlvY=
 github.com/flywave/go3d v0.0.0-20210515082135-06192a849a25/go.mod h1:QbQZlarSgCPYFAmoTduiDUd4JCnolimXUswTAnSrFWY=
+github.com/flywave/go3d v0.0.0-20210515085540-655512498272 h1:00ap0Z6zTeBOdefu5lI1riZVyTPT8XaahqYSHI5qmRo=
+github.com/flywave/go3d v0.0.0-20210515085540-655512498272/go.mod h1:QbQZlarSgCPYFAmoTduiDUd4JCnolimXUswTAnSrFWY=
+github.com/flywave/go3d v0.0.0-20210515090501-e8af3f541ef1 h1:kKLO9SWlx5dYEA+2QPl2G2GjjcOxJ2WZd3+jrwBZ/10=
+github.com/flywave/go3d v0.0.0-20210515090501-e8af3f541ef1/go.mod h1:QbQZlarSgCPYFAmoTduiDUd4JCnolimXUswTAnSrFWY=

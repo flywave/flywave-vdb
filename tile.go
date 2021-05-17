@@ -24,7 +24,7 @@ func (t *Tile) Center() (x, y float64) {
 	return
 }
 
-func (t *Tile) Pos() vec3d.T {
+func (t *Tile) Center3D() vec3d.T {
 	return vec3d.T{(t.bbox.Min[0] + t.bbox.Max[0]) / 2, (t.bbox.Min[1] + t.bbox.Max[1]) / 2, 0}
 }
 

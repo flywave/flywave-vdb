@@ -93,7 +93,7 @@ type PointQueryTask struct {
 
 func (t *PointQueryTask) Run() {
 	t.surfaces = make([]vec3d.T, len(t.points))
-	wpos := t.space.ToSpaceWord(t.tile.Tile.Pos())
+	wpos := t.space.ToSpaceWord(t.tile.Tile.Center3D())
 	mat := t.space.TileToSpace(wpos)
 	mat_inv := mat.Inverted()
 	for i := range t.points {
@@ -133,7 +133,7 @@ type RangeQueryTask struct {
 }
 
 func (t *RangeQueryTask) Run() {
-	wpos := t.space.ToSpaceWord(t.tile.Tile.Pos())
+	wpos := t.space.ToSpaceWord(t.tile.Tile.Center3D())
 	mat := t.space.TileToSpace(wpos)
 	mat_inv := mat.Inverted()
 
@@ -204,7 +204,7 @@ func (s *Scene) MapOperatorTask(tp OperatorType, mesh *VoxelMesh, matrix mat4d.T
 	for i := range tiles {
 		_, ok := tmap[tiles[i].Index().path]
 		if !ok {
-			wpos := s.space.ToSpaceWord(tiles[i].Pos())
+			wpos := s.space.ToSpaceWord(tiles[i].Center3D())
 			mat := s.space.TileToSpace(wpos)
 
 			tileWord := mat4d.Ident

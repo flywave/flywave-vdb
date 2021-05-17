@@ -29,7 +29,6 @@ const (
 )
 
 func TestTileIndexConstructors(t *testing.T) {
-
 	if NewTileIndex().path != 0 {
 		t.FailNow()
 	}

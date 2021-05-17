@@ -34,6 +34,8 @@ public:
   void add_tris(std::vector<triangle> &&tr) { _triangles = std::move(tr); }
 
   size_t size() const { return _triangles.size(); }
+
+  vdb::BBoxd get_bounds() const; 
 };
 
 struct texture {

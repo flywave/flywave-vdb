@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	mat4d "github.com/flywave/go3d/float64/mat4"
+	vec3d "github.com/flywave/go3d/float64/vec3"
 )
 
 type VoxelMesh struct {
@@ -26,6 +27,21 @@ func (t *VoxelMesh) Empty() bool {
 
 func (t *VoxelMesh) Clear() {
 	C.voxel_mesh_clear(t.m)
+}
+
+func (t *VoxelMesh) Bounds() *vec3d.Box {
+	box := make([]float64, 6)
+	C.voxel_mesh_get_bounds(t.m, (*C.double)(unsafe.Pointer(&box[0])))
+	return vec3d.FromSlice(box)
+}
+
+func (t *VoxelMesh) BoundsInWord(matrix mat4d.T) *vec3d.Box {
+	box := t.Bounds()
+
+	box.Min = matrix.MulVec3(&box.Min)
+	box.Max = matrix.MulVec3(&box.Max)
+
+	return box
 }
 
 func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type GridClass, matrix mat4d.T) *VoxelPixel {

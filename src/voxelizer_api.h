@@ -330,6 +330,7 @@ voxel_mesh_builder_get_mesh_size(voxel_mesh_builder_t *vox);
 extern FLYWAVE_VDB_API void voxel_mesh_free(voxel_mesh_t *m);
 extern FLYWAVE_VDB_API _Bool voxel_mesh_empty(voxel_mesh_t *m);
 extern FLYWAVE_VDB_API void voxel_mesh_clear(voxel_mesh_t *m);
+extern FLYWAVE_VDB_API void voxel_mesh_get_bounds(voxel_mesh_t *m, double *box);
 
 extern FLYWAVE_VDB_API voxel_pixel_t *
 voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,

@@ -3,6 +3,16 @@
 
 namespace flywave {
 
+vdb::BBoxd voxel_mesh::get_bounds() const {
+  vdb::BBoxd box;
+  for (int i=0;i<_triangles.size(); i++) {
+    for (int j=0;j<3; j++) {
+      box.expand(_triangles[i].ver[j]);
+    }
+  }
+  return box;
+}
+
 voxel_mesh_adapter::voxel_mesh_adapter(
     std::shared_ptr<voxel_mesh> hm,
     std::unordered_map<int, std::shared_ptr<material>> &map,

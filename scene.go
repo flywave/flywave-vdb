@@ -1,6 +1,7 @@
 package vdb
 
 import (
+	mat4d "github.com/flywave/go3d/float64/mat4"
 	vec2d "github.com/flywave/go3d/float64/vec2"
 	vec3d "github.com/flywave/go3d/float64/vec3"
 )
@@ -170,13 +171,13 @@ func (s *Scene) mapRangeQueryTask(in *vec3d.Box) RangeQueryMapped {
 type OperatorTask struct {
 	TileTask
 	tile *VoxelTile
-	src  *VoxelMesh
+	mesh *VoxelMesh
 	op   Operator
 }
 
 func (t *OperatorTask) post() {
 	t.tile.Flush()
-	t.src.Free()
+	t.mesh.Free()
 }
 
 func (t *OperatorTask) Run() {
@@ -184,3 +185,28 @@ func (t *OperatorTask) Run() {
 }
 
 type OperatorMapped map[uint64]OperatorTask
+
+func (s *Scene) mapOperatorTask(tp OperatorType, mesh *VoxelMesh, matrix mat4d.T, localFeature uint16) OperatorMapped {
+	in := mesh.BoundsInWord(matrix)
+
+	min := s.ToTileCoord(in.Min)
+	max := s.ToTileCoord(in.Max)
+
+	var tiles []Tile
+	for x := min[0]; x <= max[0]; x++ {
+		for y := min[1]; y <= max[1]; y++ {
+			tiles = append(tiles, *s.CreateTile(uint32(x), uint32(y)))
+		}
+	}
+
+	tmap := make(OperatorMapped)
+	for i := range tiles {
+		_, ok := tmap[tiles[i].Index().path]
+		if !ok {
+			base := s.GetVoxelTile(&tiles[i])
+			clip := NewTileClipBoxCreateor(&tiles[i], s.opt.ClipOffset)
+			tmap[tiles[i].Index().path] = OperatorTask{tile: base, mesh: mesh, op: NewOperator(tp, base.GetVoxelPixel(), mesh, clip, s.opt.Precision, localFeature, GC_LEVEL_SET, matrix)}
+		}
+	}
+	return tmap
+}

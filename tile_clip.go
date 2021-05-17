@@ -1,24 +1,21 @@
 package vdb
 
 import (
-	mat4d "github.com/flywave/go3d/float64/mat4"
 	vec3d "github.com/flywave/go3d/float64/vec3"
 )
 
 type TileClipBoxCreateor struct {
 	ClipBoxCreateor
 	tile       *Tile
-	precision  float64
-	mat        mat4d.T
 	clipOffset float64
 }
 
-func NewTileClipBoxCreateor(tile *Tile, precision float64, mat mat4d.T, clipOffset float64) *TileClipBoxCreateor {
-	return &TileClipBoxCreateor{tile: tile, precision: precision, mat: mat, clipOffset: clipOffset}
+func NewTileClipBoxCreateor(tile *Tile, clipOffset float64) ClipBoxCreateor {
+	return &TileClipBoxCreateor{tile: tile, clipOffset: clipOffset}
 }
 
-func (t *TileClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox *vec3d.Box, box *vec3d.Box) bool {
-	modelBBox := resolution.IndexToWorldFromBBox(sbox)
+func (t *TileClipBoxCreateor) Gen(vertex *FloatGrid, resolution *Transform, sbox vec3d.Box, box *vec3d.Box) bool {
+	modelBBox := resolution.IndexToWorldFromBBox(&sbox)
 
 	cbox := t.tile.Bounds()
 	width := cbox.Width() / 2.0

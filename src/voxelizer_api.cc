@@ -719,6 +719,17 @@ FLYWAVE_VDB_API void voxel_mesh_clear(voxel_mesh_t *m) {
   m->tex_maps.clear();
 }
 
+FLYWAVE_VDB_API void voxel_mesh_get_bounds(voxel_mesh_t *m, double *cbox) {
+  auto box = m->ptr->get_bounds();
+  cbox[0] = box.min().x();
+  cbox[1] = box.min().y();
+  cbox[2] = box.min().z();
+
+  cbox[3] = box.max().x();
+  cbox[4] = box.max().y();
+  cbox[5] = box.max().z();
+}
+
 FLYWAVE_VDB_API voxel_pixel_t *
 voxel_mesh_to_voxel_pixel(voxel_mesh_t *m, voxel_pixel_materials_t *mtls,
                           uint16_t local_feature, float precision,

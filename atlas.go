@@ -6,6 +6,7 @@ package vdb
 // #cgo CXXFLAGS: -I ./lib
 import "C"
 import (
+	"image"
 	"reflect"
 	"unsafe"
 )
@@ -40,4 +41,14 @@ func (m *AtlasGenerator) Generate(mesh *TextureMesh) []Texture2D {
 	}
 
 	return ret
+}
+
+func (m *AtlasGenerator) GenerateImage(mesh *TextureMesh) []image.NRGBA {
+	textures := m.Generate(mesh)
+	images := make([]image.NRGBA, len(textures))
+	for i := range textures {
+		images[i] = *textures[i].GetImage()
+		textures[i].Free()
+	}
+	return images
 }

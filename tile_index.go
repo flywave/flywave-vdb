@@ -2,14 +2,13 @@ package vdb
 
 // #include <stdlib.h>
 // #include <stdint.h>
+// #include "tile_index_api.h"
 // #cgo CFLAGS: -I ./lib
 // #cgo CXXFLAGS: -I ./lib
-// uint64_t fix_numeric_overflow(uint64_t path_mask, uint64_t level_bit) {
-// return (path_mask << level_bit);
-// }
 import "C"
 import (
 	"math"
+	"unsafe"
 
 	vec2d "github.com/flywave/go3d/float64/vec2"
 )
@@ -19,13 +18,7 @@ type TileIndex struct {
 }
 
 const (
-	QT_LEVEL_BITS        = uint32(2)
-	QT_LEVEL_BIT_MASK    = uint64(0x03)
-	QT_TOTAL_BITS        = uint32(64)
 	QT_DEFAULT_MAX_LEVEL = uint32(24)
-	QT_PATH_MASK         = ^uint64(^uint64(0) >> (QT_DEFAULT_MAX_LEVEL * QT_LEVEL_BITS))
-	QT_LEVEL_MASK        = ^QT_PATH_MASK
-	WEB_GLOBE_MAX_ZOOM   = uint32(20)
 )
 
 var (
@@ -56,13 +49,7 @@ func NewTileIndex() *TileIndex {
 
 func NewTileIndexFromLevelAndRowCol(level uint32, row uint32, col uint32) *TileIndex {
 	p := &TileIndex{path: 0}
-	for j := 0; j < int(level); j++ {
-		right := int(0x01 & (col >> (level - uint32(j) - 1)))
-		top := int(0x01 & (row >> (level - uint32(j) - 1)))
-		p.path |= _order[right][top] << (QT_TOTAL_BITS - ((uint32(j) + 1) * QT_LEVEL_BITS))
-	}
-
-	p.path |= uint64(level)
+	p.path = uint64(C.tile_index_new_from_level_row_col(C.uint(level), C.uint(row), C.uint(col)))
 	return p
 }
 
@@ -79,9 +66,8 @@ func NewTileIndexFromBitList(blist string) *TileIndex {
 }
 
 func NewTileIndexFromBitListAndLevel(other *TileIndex, level uint32) *TileIndex {
-	lev := Min(level, other.GetLevel())
 	p := &TileIndex{path: 0}
-	p.path = other.path_bits_level(lev) | uint64(lev)
+	p.path = uint64(C.tile_index_new_from_other(C.ulong(other.path), C.uint(level)))
 	return p
 }
 
@@ -156,21 +142,11 @@ func NewTileIndexFromBox(box vec2d.Rect) *TileIndex {
 }
 
 func (q *TileIndex) Valid() bool {
-	return q.GetLevel() <= QT_DEFAULT_MAX_LEVEL &&
-		(0 == (q.path & ^(q.path_mask(q.GetLevel()) | QT_LEVEL_MASK)))
+	return bool(C.tile_index_path_is_valid(C.ulong(q.path)))
 }
 
 func (q *TileIndex) Less(other *TileIndex) bool {
-	minlev := other.GetLevel()
-	if q.GetLevel() < other.GetLevel() {
-		minlev = q.GetLevel()
-	}
-	mask := ^(^uint64(0) >> (minlev * QT_LEVEL_BITS))
-	if (mask & (q.path ^ other.path)) > 0 {
-		return q.path_bits() < other.path_bits()
-	} else {
-		return q.GetLevel() < other.GetLevel()
-	}
+	return bool(C.tile_index_less(C.ulong(q.path), C.ulong(other.path)))
 }
 
 func (q *TileIndex) Greater(other *TileIndex) bool {
@@ -189,70 +165,39 @@ func (q *TileIndex) ToString() string {
 	result := make([]byte, int(q.GetLevel()))
 
 	for i := 0; i < int(q.GetLevel()); i++ {
-		result[i] = byte('0') + byte(q.level_bits_at_pos(uint32(i)))
+		result[i] = byte('0') + byte(uint32(C.tile_index_level_bits_at_pos(C.ulong(q.path), C.uint(i))))
 	}
 	return string(result)
 }
 
 func (q *TileIndex) GetGenerationSequence() uint64 {
-	level_ := q.GetLevel()
-	sequence := q.path
-	check_for_2_or_3_mask := (uint64(0x1)) << (QT_TOTAL_BITS - 1)
-	interchange_2_or_3_mask := (uint64(0x01)) << (QT_TOTAL_BITS - 2)
-
-	for j := 0; j < int(level_); j++ {
-		if (sequence & check_for_2_or_3_mask) > 0 {
-			sequence ^= interchange_2_or_3_mask
-		}
-		check_for_2_or_3_mask >>= 2
-		interchange_2_or_3_mask >>= 2
-	}
-	return sequence
+	return uint64(C.tile_index_new_get_generation_sequence(C.ulong(q.path)))
 }
 
 func (q *TileIndex) Parent() *TileIndex {
-	new_level := q.GetLevel() - 1
-
-	return &TileIndex{path: (q.path & (uint64(C.fix_numeric_overflow(C.ulong(QT_PATH_MASK), C.ulong(QT_LEVEL_BITS))) * uint64(QT_DEFAULT_MAX_LEVEL-new_level))) | uint64(new_level)}
+	path := uint64(C.tile_index_get_parent(C.ulong(q.path)))
+	return &TileIndex{path: path}
 }
 
 func (q *TileIndex) Child(child uint32) *TileIndex {
-	new_level := q.GetLevel() + 1
-	return &TileIndex{path: q.path_bits() | uint64(child)<<(QT_TOTAL_BITS-new_level*QT_LEVEL_BITS) | uint64(new_level)}
+	path := uint64(C.tile_index_get_child(C.ulong(q.path), C.uint(child)))
+	return &TileIndex{path: path}
 }
 
 func (q *TileIndex) WhichChild() uint32 {
-	return uint32((q.path >> (QT_TOTAL_BITS - q.GetLevel()*QT_LEVEL_BITS)) & QT_LEVEL_BIT_MASK)
+	return uint32(C.tile_index_which_child(C.ulong(q.path)))
 }
 
 func (q *TileIndex) AdvanceInLevel() bool {
-	path_bits_ := q.path_bits()
-	path_mask_ := q.path_mask(q.GetLevel())
-	if path_bits_ != path_mask_ {
-		q.path += uint64(1) << (QT_TOTAL_BITS - q.GetLevel()*QT_LEVEL_BITS)
-		return true
-	} else {
-		return false
-	}
+	return bool(C.tile_index_advance_in_level((*C.ulong)(unsafe.Pointer(&q.path))))
 }
 
 func (q *TileIndex) Advance(max_level uint32) bool {
-	if q.GetLevel() < max_level {
-		q.path = q.Child(0).path
-		return true
-	} else {
-		for q.WhichChild() == 4-1 {
-			q.path = q.Parent().path
-		}
-		return q.AdvanceInLevel()
-	}
+	return bool(C.tile_index_advance((*C.ulong)(unsafe.Pointer(&q.path)), C.uint(max_level)))
 }
 
 func (q *TileIndex) IsAncestorOf(other *TileIndex) bool {
-	if q.GetLevel() <= other.GetLevel() {
-		return q.path_bits_level(q.GetLevel()) == other.path_bits_level(q.GetLevel())
-	}
-	return false
+	return bool(C.tile_index_is_ancestor_of(C.ulong(q.path), C.ulong(other.path)))
 }
 
 func IsPostOrder(path1 *TileIndex, path2 *TileIndex) bool {
@@ -261,26 +206,12 @@ func IsPostOrder(path1 *TileIndex, path2 *TileIndex) bool {
 }
 
 func (q *TileIndex) GetLevelRowCol() (level uint32, row uint32, col uint32) {
-	rowbits := []uint32{0x00, 0x00, 0x01, 0x01}
-	colbits := []uint32{0x00, 0x01, 0x01, 0x00}
-
-	row_val := uint32(0)
-	col_val := uint32(0)
-
-	for j := 0; j < int(q.GetLevel()); j++ {
-		level_bits := q.level_bits_at_pos(uint32(j))
-		row_val = (row_val << 1) | (rowbits[level_bits])
-		col_val = (col_val << 1) | (colbits[level_bits])
-	}
-
-	level = q.GetLevel()
-	row = row_val
-	col = col_val
+	C.tile_index_get_level_row_col(C.ulong(q.path), (*C.uint)(unsafe.Pointer(&level)), (*C.uint)(unsafe.Pointer(&row)), (*C.uint)(unsafe.Pointer(&col)))
 	return
 }
 
 func (q *TileIndex) GetLevel() uint32 {
-	return uint32(q.path & QT_LEVEL_MASK)
+	return uint32(C.tile_index_path_level(C.ulong(q.path)))
 }
 
 func (q *TileIndex) ChildTileCoordinates(tile_width uint32, child *TileIndex) (success bool, level uint32, row uint32, col uint32) {
@@ -310,45 +241,25 @@ func (q *TileIndex) ChildTileCoordinates(tile_width uint32, child *TileIndex) (s
 }
 
 func (q *TileIndex) Concatenate(sub_path *TileIndex) *TileIndex {
-	level_ := q.GetLevel() + sub_path.GetLevel()
-	return &TileIndex{path: (q.path & QT_PATH_MASK) |
-		((sub_path.path & QT_PATH_MASK) >> q.GetLevel() * uint64(QT_LEVEL_BITS)) | uint64(level_)}
+	path := uint64(C.tile_index_concatenate(C.ulong(q.path), C.ulong(sub_path.path)))
+	return &TileIndex{path: path}
 }
 
 func (q *TileIndex) ToIndex(level uint32) uint64 {
-	return (q.path >> (QT_TOTAL_BITS - level*QT_LEVEL_BITS))
+	return uint64(C.tile_index_as_index(C.ulong(q.path), C.uint(level)))
 }
 
 func (q *TileIndex) Get(position uint32) uint32 {
-	return q.level_bits_at_pos(position)
-}
-
-func (q *TileIndex) path_bits() uint64 { return q.path & QT_PATH_MASK }
-
-func (q *TileIndex) path_mask(level uint32) uint64 {
-	return QT_PATH_MASK << ((QT_DEFAULT_MAX_LEVEL - level) * QT_LEVEL_BITS)
-}
-
-func (q *TileIndex) path_bits_level(level uint32) uint64 {
-	return q.path & q.path_mask(level)
-}
-
-func (q *TileIndex) level_bits_at_pos(position uint32) uint32 {
-	return uint32((q.path >> (QT_TOTAL_BITS - (position+1)*QT_LEVEL_BITS)) &
-		QT_LEVEL_BIT_MASK)
+	return uint32(C.tile_index_level_bits_at_pos(C.ulong(q.path), C.uint(position)))
 }
 
 func (q *TileIndex) from_branchlist(level uint32, blist []byte) {
-	for j := 0; j < int(level); j++ {
-		q.path |= (uint64(blist[j]) & QT_LEVEL_BIT_MASK) << (QT_TOTAL_BITS - (uint32(j+1) * QT_LEVEL_BITS))
-	}
-	q.path |= uint64(level)
+	q.path = uint64(C.tile_index_new_from_branchlist(C.uint(level), (*C.uchar)(unsafe.Pointer(&blist[0]))))
 }
 
 func RelativePath(parent *TileIndex, child *TileIndex) *TileIndex {
-	levelDiff := child.GetLevel() - parent.GetLevel()
-	return &TileIndex{path: (child.path_bits() << (parent.GetLevel() * QT_LEVEL_BITS)) |
-		uint64(levelDiff)}
+	path := uint64(C.tile_index_relative_path(C.ulong(parent.path), C.ulong(child.path)))
+	return &TileIndex{path: path}
 }
 
 func quadToBufferOffset(quad uint32, tileWidth uint32, tileHeight uint32) uint32 {

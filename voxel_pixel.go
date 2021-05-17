@@ -7,6 +7,7 @@ package vdb
 import "C"
 import (
 	"errors"
+	"image"
 	"reflect"
 	"unsafe"
 
@@ -209,12 +210,20 @@ func (m *VoxelPixel) addFeature(feat *FeatureData) LocalFeatureID {
 	return LocalFeatureID(C.voxel_pixel_add_feature(m.m, feat.m))
 }
 
-func (m *VoxelPixel) RemoveFeature(id LocalFeatureID) {
-	C.voxel_pixel_remove_feature(m.m, C.ushort(id))
+func (m *VoxelPixel) RemoveFeature(id FeatureID) {
+	C.voxel_pixel_remove_feature(m.m, C.ulong(id))
 }
 
-func (m *VoxelPixel) HasFeature(id LocalFeatureID) bool {
-	return bool(C.voxel_pixel_has_feature(m.m, C.ushort(id)))
+func (m *VoxelPixel) RemoveFeatureFromLocal(id LocalFeatureID) {
+	C.voxel_pixel_remove_feature_from_local(m.m, C.ushort(id))
+}
+
+func (m *VoxelPixel) HasFeature(id FeatureID) bool {
+	return bool(C.voxel_pixel_has_feature(m.m, C.ulong(id)))
+}
+
+func (m *VoxelPixel) HasLocalFeature(id LocalFeatureID) bool {
+	return bool(C.voxel_pixel_has_local_feature(m.m, C.ushort(id)))
 }
 
 func (m *VoxelPixel) FeatureCount() int {
@@ -399,4 +408,12 @@ func (m *VoxelPixel) MakeTrianglesSimple(mat mat4d.T, texOffset int, mtlOffset i
 
 func (m *VoxelPixel) MakeAtlasGenerator(mat mat4d.T, pixelPad float32) *AtlasGenerator {
 	return &AtlasGenerator{m: C.voxel_pixel_make_texture_atlas_generator(m.m, (*C.double)((unsafe.Pointer)(&mat.Slice()[0])), C.float(pixelPad))}
+}
+
+func (m *VoxelPixel) GenTextureImage(mat mat4d.T, pixelPad float32, tris []Triangle) []image.NRGBA {
+	textMesh := NewTextureMeshFromTriangles(tris)
+	defer textMesh.Free()
+	atlas := m.MakeAtlasGenerator(mat, pixelPad)
+	defer atlas.Free()
+	return atlas.GenerateImage(textMesh)
 }

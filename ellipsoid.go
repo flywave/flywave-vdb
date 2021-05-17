@@ -22,6 +22,7 @@ const (
 	R2D                    = float64(180 / math.Pi)
 	M_PIby360              = float64(math.Pi / 360)
 	MAXEXTENTby180         = float64(MAXEXTENT / 180)
+	WEB_GLOBE_MAX_ZOOM     = uint32(20)
 )
 
 type Ellipsoid struct {

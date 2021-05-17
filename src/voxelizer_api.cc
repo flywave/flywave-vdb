@@ -808,12 +808,22 @@ voxel_pixel_add_feature(voxel_pixel_t *vox, voxel_pixel_feature_data_t *mtls) {
 }
 
 FLYWAVE_VDB_API void voxel_pixel_remove_feature(voxel_pixel_t *vox,
-                                                uint16_t id) {
-  vox->ptr->remove_feature(static_cast<local_feature_id_t>(id));
+                                                uint64_t id) {
+  vox->ptr->remove_feature(static_cast<globe_feature_id_t>(id));
 }
 
-FLYWAVE_VDB_API bool voxel_pixel_has_feature(voxel_pixel_t *vox, uint16_t id) {
-  return vox->ptr->has_feature(static_cast<local_feature_id_t>(id));
+FLYWAVE_VDB_API void voxel_pixel_remove_feature_from_local(voxel_pixel_t *vox,
+                                                           uint16_t id) {
+  vox->ptr->remove_feature_from_local(static_cast<local_feature_id_t>(id));
+}
+
+FLYWAVE_VDB_API bool voxel_pixel_has_feature(voxel_pixel_t *vox, uint64_t id) {
+  return vox->ptr->has_feature(static_cast<globe_feature_id_t>(id));
+}
+
+FLYWAVE_VDB_API bool voxel_pixel_has_local_feature(voxel_pixel_t *vox,
+                                                   uint16_t id) {
+  return vox->ptr->has_local_feature(static_cast<local_feature_id_t>(id));
 }
 
 FLYWAVE_VDB_API size_t voxel_pixel_features_count(voxel_pixel_t *vox) {

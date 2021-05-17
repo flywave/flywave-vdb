@@ -571,13 +571,24 @@ voxel_pixel::add_features(std::shared_ptr<feature_data> feat) {
   return id;
 }
 
-void voxel_pixel::remove_feature(local_feature_id_t id) {
+void voxel_pixel::remove_feature_from_local(local_feature_id_t id) {
   if (has_feature(id)) {
     _features->removeMeta(std::to_string(id));
   }
 }
 
-bool voxel_pixel::has_feature(local_feature_id_t id) const {
+void voxel_pixel::remove_feature(globe_feature_id_t id) {
+  local_feature_id_t local = request_local_feature_id(id);
+  if (has_feature(local)) {
+    _features->removeMeta(std::to_string(local));
+  }
+}
+
+bool voxel_pixel::has_feature(globe_feature_id_t id) const {
+  return _globe_to_local_index.find(id) != _globe_to_local_index.end();
+}
+
+bool voxel_pixel::has_local_feature(local_feature_id_t id) const {
   return (*_features)[std::to_string(id)] != nullptr;
 }
 

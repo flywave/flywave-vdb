@@ -3,9 +3,9 @@
 #include "mesh_adapter.hh"
 #include "trees.hh"
 
+#include <mutex>
 #include <openvdb/Types.h>
 #include <openvdb/math/Ray.h>
-#include <mutex>
 
 namespace flywave {
 
@@ -77,9 +77,13 @@ public:
 
   std::shared_ptr<feature_data> get_feature(local_feature_id_t id);
 
-  void remove_feature(local_feature_id_t id);
+  void remove_feature(globe_feature_id_t id);
 
-  bool has_feature(local_feature_id_t id) const;
+  void remove_feature_from_local(local_feature_id_t id);
+
+  bool has_feature(globe_feature_id_t id) const;
+
+  bool has_local_feature(local_feature_id_t id) const;
 
   local_feature_id_t request_local_feature_id(globe_feature_id_t id);
 

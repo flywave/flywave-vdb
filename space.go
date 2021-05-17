@@ -3,7 +3,6 @@ package vdb
 import (
 	mat4d "github.com/flywave/go3d/float64/mat4"
 	vec3d "github.com/flywave/go3d/float64/vec3"
-	vec4d "github.com/flywave/go3d/float64/vec4"
 )
 
 type Space interface {
@@ -37,10 +36,8 @@ func (l *Local) ToGridWord(pxyz vec3d.T) vec3d.T {
 	switch l.plane {
 	case PT_XY:
 		return pxyz
-
 	case PT_XZ:
 		return vec3d.T{pxyz[0], pxyz[2], pxyz[1]}
-
 	case PT_YZ:
 		return vec3d.T{pxyz[1], pxyz[2], pxyz[0]}
 	}
@@ -52,11 +49,11 @@ func (l *Local) ToSpaceWord(xyz vec3d.T) vec3d.T {
 }
 
 func (l *Local) TileToSpace(xyz vec3d.T) mat4d.T {
-	return mat4d.T{vec4d.T{1, 0, 0, 0}, vec4d.T{0, 1, 0, 0}, vec4d.T{0, 0, 1, 0}, vec4d.T{0, 0, 0, 1}}
+	return mat4d.Ident
 }
 
 func (l *Local) MakeTileRay(xyz vec3d.T, max vec3d.T) (error, *Ray) {
-	return NewRay(vec3d.T{0, 0, 0}, vec3d.T{1, 0, 0})
+	return NewRay(vec3d.Zero, vec3d.UnitX)
 }
 
 func (l *Local) ComputeDistanceFromSurface(vxyz vec3d.T) float64 {

@@ -1,9 +1,16 @@
 package vdb
 
 // #include <stdlib.h>
+// #include <stdint.h>
 // #include "voxelizer_api.h"
 // #cgo CFLAGS: -I ./lib
 // #cgo CXXFLAGS: -I ./lib
+// uint16_t invalid_local_feature_id() {
+// return -1;
+// }
+// uint64_t invalid_global_feature_id() {
+// return -1;
+// }
 import "C"
 import (
 	"reflect"
@@ -12,6 +19,11 @@ import (
 
 type LocalFeatureID uint16
 type FeatureID uint64
+
+var (
+	INVALID_LOCAL_FEATURE_ID = LocalFeatureID(C.invalid_local_feature_id())
+	INVALID_FEATURE_ID       = FeatureID(C.invalid_global_feature_id())
+)
 
 type Features struct {
 	m *C.struct__voxel_pixel_features_t

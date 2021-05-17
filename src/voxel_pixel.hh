@@ -5,6 +5,7 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/math/Ray.h>
+#include <mutex>
 
 namespace flywave {
 
@@ -72,13 +73,17 @@ public:
 
   void set_features(std::vector<std::shared_ptr<feature_data>> feats);
 
-  void add_features(std::shared_ptr<feature_data> feat);
+  local_feature_id_t add_features(std::shared_ptr<feature_data> feat);
 
   std::shared_ptr<feature_data> get_feature(local_feature_id_t id);
 
   void remove_feature(local_feature_id_t id);
 
   bool has_feature(local_feature_id_t id) const;
+
+  local_feature_id_t request_local_feature_id(globe_feature_id_t id);
+
+  globe_feature_id_t fetch_globe_feature_id(local_feature_id_t id);
 
   size_t features_count() const;
 
@@ -127,6 +132,11 @@ private:
   pixel_grid::Ptr _pixel;
   material_meta_map::Ptr _materials;
   feature_meta_map::Ptr _features;
+  std::unordered_map<globe_feature_id_t, local_feature_id_t>
+      _globe_to_local_index;
+
+  std::mutex _local_feature_id_mutex;
+  local_feature_id_t _local_feature_id_offset = 0;
 };
 
 } // namespace flywave

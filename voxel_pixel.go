@@ -104,7 +104,7 @@ func (m *VoxelPixel) RayTest(r *Ray) (bool, vec3d.T) {
 func (m *VoxelPixel) RayTests(rs []Ray) []vec3d.T {
 	origin := make([]float64, 3*len(rs))
 	dir := make([]float64, 3*len(rs))
-	for i, _ := range rs {
+	for i := range rs {
 		origin[(i * 3)] = rs[i].Origin[0]
 		origin[(i*3)+1] = rs[i].Origin[1]
 		origin[(i*3)+2] = rs[i].Origin[2]
@@ -153,11 +153,23 @@ func (m *VoxelPixel) GetMaterials() *Materials {
 	return &Materials{m: C.voxel_pixel_get_materials(m.m)}
 }
 
+func (m *VoxelPixel) GetMaterialSlice() []MaterialModel {
+	feats := &Materials{m: C.voxel_pixel_get_materials(m.m)}
+	defer feats.Free()
+	return feats.Slice()
+}
+
 func (m *VoxelPixel) SetMaterials(mtl *Materials) {
 	C.voxel_pixel_set_materials(m.m, mtl.m)
 }
 
-func (m *VoxelPixel) AddMaterial(mtl *MaterialData) {
+func (m *VoxelPixel) AddMaterial(model MaterialModel) {
+	data := NewMaterialData(model)
+	defer data.Free()
+	C.voxel_pixel_add_material(m.m, data.m)
+}
+
+func (m *VoxelPixel) addMaterial(mtl *MaterialData) {
 	C.voxel_pixel_add_material(m.m, mtl.m)
 }
 
@@ -177,19 +189,31 @@ func (m *VoxelPixel) GetFeatures() *Features {
 	return &Features{m: C.voxel_pixel_get_features(m.m)}
 }
 
+func (m *VoxelPixel) GetFeatureSlice() []FeatureModel {
+	feats := &Features{m: C.voxel_pixel_get_features(m.m)}
+	defer feats.Free()
+	return feats.Slice()
+}
+
 func (m *VoxelPixel) SetFeatures(feats *Features) {
 	C.voxel_pixel_set_features(m.m, feats.m)
 }
 
-func (m *VoxelPixel) AddFeature(feat *FeatureData) {
-	C.voxel_pixel_add_feature(m.m, feat.m)
+func (m *VoxelPixel) AddFeature(model FeatureModel) LocalFeatureID {
+	data := NewFeatureData(model)
+	defer data.Free()
+	return LocalFeatureID(C.voxel_pixel_add_feature(m.m, data.m))
 }
 
-func (m *VoxelPixel) RemoveFeature(id uint16) {
+func (m *VoxelPixel) addFeature(feat *FeatureData) LocalFeatureID {
+	return LocalFeatureID(C.voxel_pixel_add_feature(m.m, feat.m))
+}
+
+func (m *VoxelPixel) RemoveFeature(id LocalFeatureID) {
 	C.voxel_pixel_remove_feature(m.m, C.ushort(id))
 }
 
-func (m *VoxelPixel) HasFeature(id uint16) bool {
+func (m *VoxelPixel) HasFeature(id LocalFeatureID) bool {
 	return bool(C.voxel_pixel_has_feature(m.m, C.ushort(id)))
 }
 
@@ -209,6 +233,14 @@ func (m *VoxelPixel) EvalMaxMinElevation(in *vec3d.Box) *vec3d.Box {
 	out := new(vec3d.Box)
 	C.voxel_pixel_eval_max_min_elevation(m.m, (*C.double)((unsafe.Pointer)(&in.Slice()[0])), (*C.double)((unsafe.Pointer)(&out.Slice()[0])))
 	return out
+}
+
+func (m *VoxelPixel) RequestLocalFeatureId(featureId FeatureID) LocalFeatureID {
+	return LocalFeatureID(C.voxel_pixel_features_globe_feature_to_local(m.m, C.ulong(featureId)))
+}
+
+func (m *VoxelPixel) FetchGlobeFeatureId(featureId LocalFeatureID) FeatureID {
+	return FeatureID(C.voxel_pixel_features_local_feature_to_globe(m.m, C.ushort(featureId)))
 }
 
 type Vertex struct {

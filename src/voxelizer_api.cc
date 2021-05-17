@@ -799,12 +799,12 @@ FLYWAVE_VDB_API bool voxel_pixel_has_material(voxel_pixel_t *vox, uint8_t id) {
 }
 
 FLYWAVE_VDB_API size_t voxel_pixel_materials_count(voxel_pixel_t *vox) {
-  return vox->ptr->features_count();
+  return vox->ptr->materials_count();
 }
 
-FLYWAVE_VDB_API void voxel_pixel_add_feature(voxel_pixel_t *vox,
-                                             voxel_pixel_feature_data_t *mtls) {
-  vox->ptr->add_features(mtls->data);
+FLYWAVE_VDB_API uint16_t
+voxel_pixel_add_feature(voxel_pixel_t *vox, voxel_pixel_feature_data_t *mtls) {
+  return vox->ptr->add_features(mtls->data);
 }
 
 FLYWAVE_VDB_API void voxel_pixel_remove_feature(voxel_pixel_t *vox,
@@ -818,6 +818,16 @@ FLYWAVE_VDB_API bool voxel_pixel_has_feature(voxel_pixel_t *vox, uint16_t id) {
 
 FLYWAVE_VDB_API size_t voxel_pixel_features_count(voxel_pixel_t *vox) {
   return vox->ptr->materials_count();
+}
+
+FLYWAVE_VDB_API uint16_t voxel_pixel_features_globe_feature_to_local(
+    voxel_pixel_t *vox, uint64_t globe_feature_id) {
+  return vox->ptr->request_local_feature_id(globe_feature_id);
+}
+
+FLYWAVE_VDB_API uint64_t voxel_pixel_features_local_feature_to_globe(
+    voxel_pixel_t *vox, uint16_t local_feature_id) {
+  return vox->ptr->fetch_globe_feature_id(local_feature_id);
 }
 
 FLYWAVE_VDB_API voxel_pixel_texture_data_t *
@@ -846,8 +856,56 @@ FLYWAVE_VDB_API void voxel_pixel_materials_free(voxel_pixel_materials_t *mtls) {
   delete mtls;
 }
 
+FLYWAVE_VDB_API size_t
+voxel_pixel_materials_get_materials_count(voxel_pixel_materials_t *mtls) {
+  return mtls->mtls.size();
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_materials_set_material(voxel_pixel_materials_t *mtls, int id,
+                                   voxel_pixel_material_data_t *data) {
+  if (id < mtls->mtls.size()) {
+    mtls->mtls[id] = data->data;
+  }
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_materials_append_material(voxel_pixel_materials_t *mtls,
+                                      voxel_pixel_material_data_t *data) {
+  mtls->mtls.emplace_back(data->data);
+}
+
+FLYWAVE_VDB_API voxel_pixel_material_data_t *
+voxel_pixel_materials_get_material(voxel_pixel_materials_t *mtls, int id) {
+  return new voxel_pixel_material_data_t{mtls->mtls[id]};
+}
+
 FLYWAVE_VDB_API void voxel_pixel_features_free(voxel_pixel_features_t *feats) {
   delete feats;
+}
+
+FLYWAVE_VDB_API size_t
+voxel_pixel_features_get_features_count(voxel_pixel_features_t *feats) {
+  return feats->feats.size();
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_features_set_feature(voxel_pixel_features_t *feats, int id,
+                                 voxel_pixel_feature_data_t *data) {
+  if (id < feats->feats.size()) {
+    feats->feats[id] = data->data;
+  }
+}
+
+FLYWAVE_VDB_API void
+voxel_pixel_features_append_feature(voxel_pixel_features_t *feats,
+                                    voxel_pixel_feature_data_t *data) {
+  feats->feats.emplace_back(data->data);
+}
+
+FLYWAVE_VDB_API voxel_pixel_feature_data_t *
+voxel_pixel_features_get_feature(voxel_pixel_features_t *feats, int id) {
+  return new voxel_pixel_feature_data_t{feats->feats[id]};
 }
 
 FLYWAVE_VDB_API void
@@ -1121,8 +1179,7 @@ FLYWAVE_VDB_API void voxel_filter_triangle_free(voxel_filter_triangle_t *vox) {
 FLYWAVE_VDB_API voxel_pixel_feature_data_t *
 voxel_pixel_feature_data_create(c_feature_data_t t) {
   auto data = std::make_shared<feature_data>();
-  data->_feature_id = t.local;
-  data->_local_feature_id = t.global;
+  data->_feature_id = t.global;
   size_t si = t.size;
   data->data.resize(si);
   memcpy(&data->data[0], t.data, si);
@@ -1138,7 +1195,6 @@ FLYWAVE_VDB_API c_feature_data_t
 voxel_pixel_feature_data_get(voxel_pixel_feature_data_t *vox) {
   c_feature_data_t ret;
   ret.global = vox->data->_feature_id;
-  ret.local = vox->data->_local_feature_id;
   ret.size = static_cast<int>(vox->data->data.size());
   ret.data = const_cast<uint8_t *>(
       reinterpret_cast<const uint8_t *>(vox->data->data.data()));
@@ -1150,7 +1206,6 @@ voxel_pixel_feature_data_set(voxel_pixel_feature_data_t *vox,
                              c_feature_data_t cdata) {
   auto data = std::make_shared<feature_data>();
   data->_feature_id = cdata.global;
-  data->_local_feature_id = cdata.local;
   size_t si = cdata.size;
   data->data.resize(si);
   memcpy(&data->data[0], cdata.data, si);

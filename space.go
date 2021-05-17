@@ -9,12 +9,9 @@ import (
 type Space interface {
 	ToGridWord(xyz vec3d.T) vec3d.T
 	ToSpaceWord(xyz vec3d.T) vec3d.T
-
 	TileToSpace(xyz vec3d.T) mat4d.T
 	MakeTileRay(xyz vec3d.T, max vec3d.T) (error, *Ray)
-
 	ComputeDistanceFromSurface(vxyz vec3d.T) float64
-
 	ComputePointFromElevation(xyz vec3d.T, elevation float64) vec3d.T
 	TileSize(min vec3d.T, max vec3d.T) float64
 }

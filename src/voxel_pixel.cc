@@ -540,16 +540,16 @@ void voxel_pixel::set_features(
     std::vector<std::shared_ptr<feature_data>> feats) {
   _features->clearMetadata();
   for (auto m : feats) {
-    _features->insertMeta(std::to_string(m->_feature_id),
-                          openvdb::FeatureMetadata(*m));
+    local_feature_id_t local = request_local_feature_id(m->_feature_id);
+    _features->insertMeta(std::to_string(local), openvdb::FeatureMetadata(*m));
   }
 }
 
 std::shared_ptr<feature_data> voxel_pixel::get_feature(local_feature_id_t id) {
-  auto mtl = dynamic_cast<openvdb::FeatureMetadata *>(
+  auto feat = dynamic_cast<openvdb::FeatureMetadata *>(
       (*_features)[std::to_string(id)].get());
-  if (mtl != nullptr)
-    return std::make_shared<feature_data>(mtl->value());
+  if (feat != nullptr)
+    return std::make_shared<feature_data>(feat->value());
   return nullptr;
 }
 
@@ -557,12 +557,18 @@ size_t voxel_pixel::features_count() const { return _features->metaCount(); }
 
 void voxel_pixel::clear_features() const { _features->clearMetadata(); }
 
-void voxel_pixel::add_features(std::shared_ptr<feature_data> feat) {
-  auto id = feat->_local_feature_id;
-  if (has_material(id)) {
+local_feature_id_t
+voxel_pixel::add_features(std::shared_ptr<feature_data> feat) {
+  local_feature_id_t id = -1;
+  if (_globe_to_local_index.find(feat->_feature_id) !=
+      _globe_to_local_index.end()) {
+    id = _globe_to_local_index[feat->_feature_id];
     _features->removeMeta(std::to_string(id));
+  } else {
+    id = request_local_feature_id(feat->_feature_id);
   }
   _features->insertMeta(std::to_string(id), openvdb::FeatureMetadata(*feat));
+  return id;
 }
 
 void voxel_pixel::remove_feature(local_feature_id_t id) {
@@ -573,6 +579,26 @@ void voxel_pixel::remove_feature(local_feature_id_t id) {
 
 bool voxel_pixel::has_feature(local_feature_id_t id) const {
   return (*_features)[std::to_string(id)] != nullptr;
+}
+
+local_feature_id_t
+voxel_pixel::request_local_feature_id(globe_feature_id_t id) {
+  if (_globe_to_local_index.find(id) != _globe_to_local_index.end()) {
+    return _globe_to_local_index[id];
+  }
+  std::lock_guard<std::mutex> lock(_local_feature_id_mutex);
+  _local_feature_id_offset++;
+  _globe_to_local_index.emplace(id, _local_feature_id_offset);
+  return _local_feature_id_offset;
+}
+
+globe_feature_id_t voxel_pixel::fetch_globe_feature_id(local_feature_id_t id) {
+  if (has_feature(id)) {
+    auto feat = dynamic_cast<openvdb::FeatureMetadata *>(
+        (*_features)[std::to_string(id)].get());
+    return feat->value()._feature_id;
+  }
+  return globe_feature_id_t(-1);
 }
 
 void voxel_pixel::clear() {

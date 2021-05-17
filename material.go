@@ -15,6 +15,36 @@ func (t *Materials) Free() {
 	t.m = nil
 }
 
+func (t *Materials) Count() int {
+	return int(C.voxel_pixel_materials_get_materials_count(t.m))
+}
+
+func (t *Materials) Append(model MaterialModel) {
+	data := NewMaterialData(model)
+	defer data.Free()
+	C.voxel_pixel_materials_append_material(t.m, data.m)
+}
+
+func (t *Materials) Set(i int, model MaterialModel) {
+	data := NewMaterialData(model)
+	defer data.Free()
+	C.voxel_pixel_materials_set_material(t.m, C.int(int32(i)), data.m)
+}
+
+func (t *Materials) Get(i int) *MaterialModel {
+	data := MaterialData{m: C.voxel_pixel_materials_get_material(t.m, C.int(int32(i)))}
+	defer data.Free()
+	return data.Get()
+}
+
+func (t *Materials) Slice() []MaterialModel {
+	models := make([]MaterialModel, t.Count())
+	for i := 0; i < len(models); i++ {
+		models[i] = *t.Get(i)
+	}
+	return models
+}
+
 type MaterialModel struct {
 	ID                 uint8
 	TP                 uint32

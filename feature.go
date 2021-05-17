@@ -10,6 +10,9 @@ import (
 	"unsafe"
 )
 
+type LocalFeatureID uint16
+type FeatureID uint64
+
 type Features struct {
 	m *C.struct__voxel_pixel_features_t
 }
@@ -19,9 +22,38 @@ func (t *Features) Free() {
 	t.m = nil
 }
 
+func (t *Features) Count() int {
+	return int(C.voxel_pixel_features_get_features_count(t.m))
+}
+
+func (t *Features) Append(model FeatureModel) {
+	data := NewFeatureData(model)
+	defer data.Free()
+	C.voxel_pixel_features_append_feature(t.m, data.m)
+}
+
+func (t *Features) Set(i int, model FeatureModel) {
+	data := NewFeatureData(model)
+	defer data.Free()
+	C.voxel_pixel_features_set_feature(t.m, C.int(int32(i)), data.m)
+}
+
+func (t *Features) Get(i int) *FeatureModel {
+	data := FeatureData{m: C.voxel_pixel_features_get_feature(t.m, C.int(int32(i)))}
+	defer data.Free()
+	return data.Get()
+}
+
+func (t *Features) Slice() []FeatureModel {
+	models := make([]FeatureModel, t.Count())
+	for i := 0; i < len(models); i++ {
+		models[i] = *t.Get(i)
+	}
+	return models
+}
+
 type FeatureModel struct {
-	LocalID  uint8
-	GlobalID uint64
+	GlobalID FeatureID
 	Data     []byte
 }
 
@@ -31,7 +63,6 @@ type FeatureData struct {
 
 func NewFeatureData(model FeatureModel) *FeatureData {
 	var cdata C.struct__c_feature_data_t
-	cdata.local = C.uchar(model.LocalID)
 	cdata.global = C.ulong(model.GlobalID)
 	cdata.size = C.size_t(len(model.Data))
 	cdata.data = (*C.uchar)((unsafe.Pointer)(&model.Data[0]))
@@ -45,18 +76,17 @@ func (t *FeatureData) Free() {
 
 func (t *FeatureData) Set(model FeatureModel) {
 	var cdata C.struct__c_feature_data_t
-	cdata.local = C.uchar(model.LocalID)
 	cdata.global = C.ulong(model.GlobalID)
 	cdata.size = C.size_t(len(model.Data))
 	cdata.data = (*C.uchar)((unsafe.Pointer)(&model.Data[0]))
+
 	C.voxel_pixel_feature_data_set(t.m, cdata)
 }
 
 func (t *FeatureData) Get() *FeatureModel {
 	cdata := C.voxel_pixel_feature_data_get(t.m)
 
-	local := uint8(cdata.local)
-	global := uint64(cdata.global)
+	global := FeatureID(cdata.global)
 
 	si := uint32(cdata.size)
 	raw := make([]byte, si)
@@ -69,5 +99,5 @@ func (t *FeatureData) Get() *FeatureModel {
 
 	copy(raw, src)
 
-	return &FeatureModel{LocalID: local, GlobalID: global, Data: raw}
+	return &FeatureModel{GlobalID: global, Data: raw}
 }

@@ -24,7 +24,7 @@ type VoxelizeOperator struct {
 	Operator
 	mesh         *VoxelMesh
 	base         *VoxelPixel
-	localFeature uint16
+	localFeature LocalFeatureID
 	precision    float32
 	creator      ClipBoxCreateor
 	class        GridClass
@@ -102,11 +102,11 @@ func (f *SurfaceOperator) Apply() error {
 	return nil
 }
 
-func newCSGOperator(ctp CompositeType, base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature uint16, class GridClass, matrix mat4d.T) *CSGOperator {
+func newCSGOperator(ctp CompositeType, base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature LocalFeatureID, class GridClass, matrix mat4d.T) *CSGOperator {
 	return &CSGOperator{ctp: ctp, VoxelizeOperator: VoxelizeOperator{mesh: mesh, base: base, localFeature: localFeature, precision: precision, creator: creator, class: class, matrix: matrix}}
 }
 
-func NewOperator(tp OperatorType, base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature uint16, class GridClass, matrix mat4d.T) Operator {
+func NewOperator(tp OperatorType, base *VoxelPixel, mesh *VoxelMesh, creator ClipBoxCreateor, precision float32, localFeature LocalFeatureID, class GridClass, matrix mat4d.T) Operator {
 	switch tp {
 	case OP_VOXELIZE:
 		return &VoxelizeOperator{mesh: mesh, base: base, localFeature: localFeature, precision: precision, creator: creator, class: class, matrix: matrix}

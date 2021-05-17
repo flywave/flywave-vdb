@@ -29,13 +29,13 @@ func (t *VoxelMesh) Clear() {
 	C.voxel_mesh_clear(t.m)
 }
 
-func (t *VoxelMesh) Bounds() *vec3d.Box {
+func (t *VoxelMesh) Bounds() vec3d.Box {
 	box := make([]float64, 6)
 	C.voxel_mesh_get_bounds(t.m, (*C.double)(unsafe.Pointer(&box[0])))
-	return vec3d.FromSlice(box)
+	return *vec3d.FromSlice(box)
 }
 
-func (t *VoxelMesh) BoundsInWord(matrix mat4d.T) *vec3d.Box {
+func (t *VoxelMesh) BoundsInWord(matrix mat4d.T) vec3d.Box {
 	box := t.Bounds()
 
 	box.Min = matrix.MulVec3(&box.Min)
@@ -44,7 +44,7 @@ func (t *VoxelMesh) BoundsInWord(matrix mat4d.T) *vec3d.Box {
 	return box
 }
 
-func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature uint16, precision float32, creator ClipBoxCreateor, _type GridClass, matrix mat4d.T) *VoxelPixel {
+func (t *VoxelMesh) SampleVoxelPixel(mtls *Materials, local_feature LocalFeatureID, precision float32, creator ClipBoxCreateor, _type GridClass, matrix mat4d.T) *VoxelPixel {
 	ccreator := NewClipBoxCreateorAdapter(creator)
 	defer ccreator.Free()
 	mpt := (*C.struct__voxel_pixel_materials_t)(nil)

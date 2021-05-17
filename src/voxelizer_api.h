@@ -89,13 +89,17 @@ extern FLYWAVE_VDB_API voxel_pixel_features_t *
 voxel_pixel_get_features(voxel_pixel_t *vox);
 extern FLYWAVE_VDB_API void
 voxel_pixel_set_features(voxel_pixel_t *vox, voxel_pixel_features_t *mtls);
-extern FLYWAVE_VDB_API void
+extern FLYWAVE_VDB_API uint16_t
 voxel_pixel_add_feature(voxel_pixel_t *vox, voxel_pixel_feature_data_t *mtls);
 extern FLYWAVE_VDB_API void voxel_pixel_remove_feature(voxel_pixel_t *vox,
                                                        uint16_t id);
 extern FLYWAVE_VDB_API bool voxel_pixel_has_feature(voxel_pixel_t *vox,
                                                     uint16_t id);
 extern FLYWAVE_VDB_API size_t voxel_pixel_features_count(voxel_pixel_t *vox);
+extern FLYWAVE_VDB_API uint16_t voxel_pixel_features_globe_feature_to_local(
+    voxel_pixel_t *vox, uint64_t globe_feature_id);
+extern FLYWAVE_VDB_API uint64_t voxel_pixel_features_local_feature_to_globe(
+    voxel_pixel_t *vox, uint16_t local_feature_id);
 
 extern FLYWAVE_VDB_API vdb_pixel_grid_t *
 voxel_pixel_extract_color(voxel_pixel_t *vox, voxel_pixel_t *svox);
@@ -111,8 +115,36 @@ voxel_pixel_eval_max_min_elevation(voxel_pixel_t *vox, double *bboxin,
 extern FLYWAVE_VDB_API void
 voxel_pixel_materials_free(voxel_pixel_materials_t *mtls);
 
+extern FLYWAVE_VDB_API size_t
+voxel_pixel_materials_get_materials_count(voxel_pixel_materials_t *mtls);
+
+extern FLYWAVE_VDB_API void
+voxel_pixel_materials_set_material(voxel_pixel_materials_t *mtls, int id,
+                                   voxel_pixel_material_data_t *data);
+
+extern FLYWAVE_VDB_API void
+voxel_pixel_materials_append_material(voxel_pixel_materials_t *mtls,
+                                      voxel_pixel_material_data_t *data);
+
+extern FLYWAVE_VDB_API voxel_pixel_material_data_t *
+voxel_pixel_materials_get_material(voxel_pixel_materials_t *mtls, int id);
+
 extern FLYWAVE_VDB_API void
 voxel_pixel_features_free(voxel_pixel_features_t *feats);
+
+extern FLYWAVE_VDB_API size_t
+voxel_pixel_features_get_features_count(voxel_pixel_features_t *feats);
+
+extern FLYWAVE_VDB_API void
+voxel_pixel_features_set_feature(voxel_pixel_features_t *feats, int id,
+                                 voxel_pixel_feature_data_t *data);
+
+extern FLYWAVE_VDB_API void
+voxel_pixel_features_append_feature(voxel_pixel_features_t *feats,
+                                    voxel_pixel_feature_data_t *data);
+
+extern FLYWAVE_VDB_API voxel_pixel_feature_data_t *
+voxel_pixel_features_get_feature(voxel_pixel_features_t *feats, int id);
 
 typedef struct _voxel_io_vertex_t {
   float v_x;
@@ -452,7 +484,6 @@ extern FLYWAVE_VDB_API void
 voxel_clip_box_createor_free(voxel_clip_box_createor_t *vox);
 
 typedef struct _c_feature_data_t {
-  uint8_t local;
   uint64_t global;
   size_t size;
   uint8_t *data;

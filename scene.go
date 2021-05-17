@@ -108,7 +108,7 @@ func (t *PointQueryTask) Run() {
 
 type PointQueryMapped map[uint64]PointQueryTask
 
-func (s *Scene) mapPointQueryTask(points []vec3d.T) PointQueryMapped {
+func (s *Scene) MapPointQueryTask(points []vec3d.T) PointQueryMapped {
 	tmap := make(PointQueryMapped)
 	for i := range points {
 		coord := s.ToTileCoord(points[i])
@@ -148,7 +148,7 @@ func (t *RangeQueryTask) Run() {
 
 type RangeQueryMapped map[uint64]RangeQueryTask
 
-func (s *Scene) mapRangeQueryTask(in *vec3d.Box) RangeQueryMapped {
+func (s *Scene) MapRangeQueryTask(in *vec3d.Box) RangeQueryMapped {
 	min := s.ToTileCoord(in.Min)
 	max := s.ToTileCoord(in.Max)
 
@@ -175,18 +175,16 @@ type OperatorTask struct {
 	op   Operator
 }
 
-func (t *OperatorTask) post() {
-	t.tile.Flush()
-	t.mesh.Free()
-}
-
 func (t *OperatorTask) Run() {
-	t.post()
+	defer t.mesh.Free()
+	t.op.Apply()
+	t.tile.SetVoxelPixel(t.op.GetVoxelPixel())
+	t.tile.Flush()
 }
 
 type OperatorMapped map[uint64]OperatorTask
 
-func (s *Scene) mapOperatorTask(tp OperatorType, mesh *VoxelMesh, matrix mat4d.T, localFeature uint16) OperatorMapped {
+func (s *Scene) MapOperatorTask(tp OperatorType, mesh *VoxelMesh, matrix mat4d.T, feature FeatureModel) OperatorMapped {
 	in := mesh.BoundsInWord(matrix)
 
 	min := s.ToTileCoord(in.Min)
@@ -199,13 +197,27 @@ func (s *Scene) mapOperatorTask(tp OperatorType, mesh *VoxelMesh, matrix mat4d.T
 		}
 	}
 
+	featureData := NewFeatureData(feature)
+	defer featureData.Free()
+
 	tmap := make(OperatorMapped)
 	for i := range tiles {
 		_, ok := tmap[tiles[i].Index().path]
 		if !ok {
+			wpos := s.space.ToSpaceWord(tiles[i].Pos())
+			mat := s.space.TileToSpace(wpos)
+
+			tileWord := mat4d.Ident
+			tileWord.AssignMul(&matrix, &mat)
+
 			base := s.GetVoxelTile(&tiles[i])
+
+			vpixel := base.GetVoxelPixel()
+
+			localFeature := vpixel.addFeature(featureData)
+
 			clip := NewTileClipBoxCreateor(&tiles[i], s.opt.ClipOffset)
-			tmap[tiles[i].Index().path] = OperatorTask{tile: base, mesh: mesh, op: NewOperator(tp, base.GetVoxelPixel(), mesh, clip, s.opt.Precision, localFeature, GC_LEVEL_SET, matrix)}
+			tmap[tiles[i].Index().path] = OperatorTask{tile: base, mesh: mesh, op: NewOperator(tp, vpixel, mesh, clip, s.opt.Precision, localFeature, GC_LEVEL_SET, tileWord)}
 		}
 	}
 	return tmap

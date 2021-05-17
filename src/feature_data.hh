@@ -11,7 +11,6 @@ namespace flywave {
 
 struct feature_data {
   globe_feature_id_t _feature_id = -1;
-  local_feature_id_t _local_feature_id = -1;
   std::string data;
 
   bool operator==(const feature_data &p) const;

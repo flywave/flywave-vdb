@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string.h>
+#include <stdexcept>
 
 #include "io_jpeg.hh"
 #include "io_png.hh"

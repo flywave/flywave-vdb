@@ -1,0 +1,21 @@
+
+if(MSVC OR MSVC90 OR MSVC10)
+  set(MSVC ON)
+endif (MSVC OR MSVC90 OR MSVC10)
+
+file(GLOB sources *.c)
+set(bzip2_STAT_SRCS
+  ${sources}
+)
+
+include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+add_library(bz2 ${bzip2_STAT_SRCS})
+
+SOURCE_GROUP("src" FILES ${bzip2_STAT_SRCS})
+
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(bz2 PROPERTIES FOLDER external)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

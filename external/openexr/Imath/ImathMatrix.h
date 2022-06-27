@@ -966,7 +966,14 @@ template <class T>
 inline const Matrix33<T> &
 Matrix33<T>::operator = (const Matrix33 &v)
 {
+    #ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wstringop-overflow"
+    #endif
     memcpy (x, v.x, sizeof (x));
+    #ifdef __GNUC__
+    #pragma GCC diagnostic pop
+    #endif
     return *this;
 }
 

@@ -218,7 +218,7 @@ func (s *Scene) MapOperatorTask(tp OperatorType, mesh *VoxelMesh, matrix mat4d.T
 			localFeature := vpixel.addFeature(featureData)
 
 			clip := NewTileClipBoxCreateor(&tiles[i], s.opt.ClipOffset)
-			tmap[tiles[i].Index().path] = OperatorTask{tile: base, mesh: mesh, op: NewOperator(tp, vpixel, mesh, clip, s.opt.Precision, localFeature, GC_LEVEL_SET, tileWord)}
+			tmap[tiles[i].Index().path] = OperatorTask{tile: base, mesh: mesh, op: NewOperator(tp, vpixel, mesh, clip, s.opt.Precision, localFeature, s.opt.GridClass, tileWord)}
 		}
 	}
 	return tmap

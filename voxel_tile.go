@@ -50,8 +50,12 @@ func (t *VoxelTile) RayTest(ray *Ray) (bool, vec3d.T) {
 }
 
 func (t *VoxelTile) SurfaceQuery(points []vec3d.T, space Space) []vec3d.T {
+	bbox := t.EvalBoundingBox()
+	if bbox == nil || len(points) == 0 {
+		return nil
+	}
 	rays := make([]Ray, len(points))
-	max := t.EvalBoundingBox().Max
+	max := bbox.Max
 	for i, pts := range points {
 		_, rt := space.MakeTileRay(pts, max)
 		rays[i] = *rt
@@ -111,6 +115,9 @@ func (t *VoxelTile) EvalBoundingBox() *vec3d.Box {
 		return nil
 	}
 	_, box := t.vpixel.GetVoxelGrid().EvalActiveBoundingBox()
+	if box == nil {
+		return nil
+	}
 	out := t.vpixel.VoxelResolution().IndexToWorldFromBBox(box)
 	return out
 }

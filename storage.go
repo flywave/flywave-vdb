@@ -54,7 +54,7 @@ func ParseVoxelTileNameToTile(filename string, bounds vec2d.Rect, tileSize vec2d
 	}
 	hw := float64((bounds.Max[0] - bounds.Min[0]) / 2.0)
 	hh := float64((bounds.Max[1] - bounds.Min[1]) / 2.0)
-	box := vec2d.Rect{Min: vec2d.T{float64(x)*tileSize[0] - hw, float64(x+1)*tileSize[0] - hw}, Max: vec2d.T{float64(y+1)*tileSize[1] - hh, float64(y)*tileSize[1] - hh}}
+	box := vec2d.Rect{Min: vec2d.T{float64(x)*tileSize[0] - hw, float64(y)*tileSize[1] - hh}, Max: vec2d.T{float64(x+1)*tileSize[0] - hw, float64(y+1)*tileSize[1] - hh}}
 	return NewTile(NewTileIndexFromLevelAndRowCol(uint32(z), uint32(y), uint32(x)), box)
 }
 

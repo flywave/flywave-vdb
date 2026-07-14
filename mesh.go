@@ -93,15 +93,29 @@ type MeshData struct {
 	m *C.struct__voxel_pixel_mesh_data_t
 }
 
+func toCFloatPtr(s []float32) *C.float {
+	if len(s) == 0 {
+		return nil
+	}
+	return (*C.float)(unsafe.Pointer(&s[0]))
+}
+
+func toCUintPtr(s []uint32) *C.uint {
+	if len(s) == 0 {
+		return nil
+	}
+	return (*C.uint)(unsafe.Pointer(&s[0]))
+}
+
 func NewMeshData(m *MeshModel) *MeshData {
 	var cmeshData C.struct__c_mesh_data_t
 	cmeshData.vertices = (*C.float)((unsafe.Pointer)(&m.Vertices[0]))
 	cmeshData.v_count = C.size_t(len(m.Vertices) / 3)
 
-	cmeshData.texcoords = (*C.float)((unsafe.Pointer)(&m.UVs[0]))
+	cmeshData.texcoords = toCFloatPtr(m.UVs)
 	cmeshData.t_count = C.size_t(len(m.UVs) / 2)
 
-	cmeshData.normals = (*C.float)((unsafe.Pointer)(&m.Normals[0]))
+	cmeshData.normals = toCFloatPtr(m.Normals)
 	cmeshData.n_count = C.size_t(len(m.Normals) / 3)
 
 	cmeshData.mtl_map = (*C.struct__c_mesh_data_mtl_t)(C.malloc(C.sizeof_struct__c_mesh_data_mtl_t * C.ulong(len(m.Materials))))
@@ -118,13 +132,13 @@ func NewMeshData(m *MeshModel) *MeshData {
 	for i := 0; i < len(m.Materials); i++ {
 		trisSlice[i].mtl = C.int(m.Materials[i].ID)
 
-		trisSlice[i].faces = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Faces[0]))
+		trisSlice[i].faces = toCUintPtr(m.Materials[i].Faces)
 		trisSlice[i].f_count = C.size_t(len(m.Materials[i].Faces) / 3)
 
-		trisSlice[i].texcoords = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Texcoords[0]))
+		trisSlice[i].texcoords = toCUintPtr(m.Materials[i].Texcoords)
 		trisSlice[i].t_count = C.size_t(len(m.Materials[i].Texcoords) / 3)
 
-		trisSlice[i].normals = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Normals[0]))
+		trisSlice[i].normals = toCUintPtr(m.Materials[i].Normals)
 		trisSlice[i].n_count = C.size_t(len(m.Materials[i].Normals) / 3)
 	}
 
@@ -239,10 +253,10 @@ func (t *MeshData) Set(m *MeshModel) {
 	cmeshData.vertices = (*C.float)((unsafe.Pointer)(&m.Vertices[0]))
 	cmeshData.v_count = C.size_t(len(m.Vertices) / 3)
 
-	cmeshData.texcoords = (*C.float)((unsafe.Pointer)(&m.UVs[0]))
+	cmeshData.texcoords = toCFloatPtr(m.UVs)
 	cmeshData.t_count = C.size_t(len(m.UVs) / 2)
 
-	cmeshData.normals = (*C.float)((unsafe.Pointer)(&m.Normals[0]))
+	cmeshData.normals = toCFloatPtr(m.Normals)
 	cmeshData.n_count = C.size_t(len(m.Normals) / 3)
 
 	cmeshData.mtl_map = (*C.struct__c_mesh_data_mtl_t)(C.malloc(C.sizeof_struct__c_mesh_data_mtl_t * C.ulong(len(m.Materials))))
@@ -259,13 +273,13 @@ func (t *MeshData) Set(m *MeshModel) {
 	for i := 0; i < len(m.Materials); i++ {
 		trisSlice[i].mtl = C.int(m.Materials[i].ID)
 
-		trisSlice[i].faces = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Faces[0]))
+		trisSlice[i].faces = toCUintPtr(m.Materials[i].Faces)
 		trisSlice[i].f_count = C.size_t(len(m.Materials[i].Faces) / 3)
 
-		trisSlice[i].texcoords = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Texcoords[0]))
+		trisSlice[i].texcoords = toCUintPtr(m.Materials[i].Texcoords)
 		trisSlice[i].t_count = C.size_t(len(m.Materials[i].Texcoords) / 3)
 
-		trisSlice[i].normals = (*C.uint)((unsafe.Pointer)(&m.Materials[i].Normals[0]))
+		trisSlice[i].normals = toCUintPtr(m.Materials[i].Normals)
 		trisSlice[i].n_count = C.size_t(len(m.Materials[i].Normals) / 3)
 	}
 

@@ -224,16 +224,18 @@ func (q *TileIndex) ChildTileCoordinates(tile_width uint32, child *TileIndex) (s
 	level = tile_width
 	row = 0
 	col = 0
-	for level_ := 0; level_ < int(relative_qpath.GetLevel()) && level_ > 1; level_++ {
-		quad := relative_qpath.Get(level)
-		level >>= 1
-		if quad == 0 {
-			row += level
-		} else if quad == 1 {
-			row += level
-			col += level
-		} else if quad == 2 {
-			col += level
+	for l := uint32(0); l < relative_qpath.GetLevel(); l++ {
+		quad := relative_qpath.Get(l)
+		row <<= 1
+		col <<= 1
+		switch quad {
+		case 1:
+			col |= 1
+		case 2:
+			row |= 1
+			col |= 1
+		case 3:
+			row |= 1
 		}
 	}
 	success = true
@@ -254,6 +256,10 @@ func (q *TileIndex) Get(position uint32) uint32 {
 }
 
 func (q *TileIndex) from_branchlist(level uint32, blist []byte) {
+	if level == 0 || len(blist) == 0 {
+		q.path = uint64(C.tile_index_new_from_branchlist(C.uint(level), nil))
+		return
+	}
 	q.path = uint64(C.tile_index_new_from_branchlist(C.uint(level), (*C.uchar)(unsafe.Pointer(&blist[0]))))
 }
 

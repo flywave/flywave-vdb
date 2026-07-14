@@ -50,6 +50,9 @@ func NewFloatGridFromPoints(points []float64, radius []float64, voxelSize float6
 	var g = &FloatGrid{
 		m: C.vdb_float_grid_create(),
 	}
+	if len(points) == 0 || len(radius) == 0 {
+		return g
+	}
 	C.vdb_float_grid_from_points(g.m, (*C.double)(unsafe.Pointer(&points[0])), C.int(len(points)), (*C.double)(unsafe.Pointer(&radius[0])), C.int(len(radius)), C.double(voxelSize), C.double(bandwidth))
 	return g
 }
@@ -65,6 +68,9 @@ func NewFloatGridFromMesh(points []float32, faces []int32, voxelSize float64, ba
 
 	var g = &FloatGrid{
 		m: C.vdb_float_grid_create(),
+	}
+	if len(points) == 0 || len(faces) == 0 {
+		return g
 	}
 	C.vdb_float_grid_from_mesh(g.m, (*C.float)(unsafe.Pointer(&points[0])), C.int(len(points)), (*C.int)(unsafe.Pointer(&faces[0])), C.int(len(faces)), C.double(voxelSize), C.double(bandwidth))
 	return g
@@ -358,6 +364,9 @@ func (m *FloatGrid) BlendMask(grid *FloatGrid, position float64, end float64, ma
 func (m *FloatGrid) ClosestPoint(points []vec3.T) ([]vec3.T, error) {
 	if m == nil || m.m == nil {
 		return nil, errors.New("ClosestPoint error ")
+	}
+	if len(points) == 0 {
+		return []vec3.T{}, nil
 	}
 
 	var pointsLen C.int

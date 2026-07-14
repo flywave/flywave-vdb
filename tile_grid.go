@@ -1,6 +1,8 @@
 package vdb
 
 import (
+	"math"
+
 	"github.com/flywave/flywave-vdb/coord"
 	vec2d "github.com/flywave/go3d/float64/vec2"
 	vec3d "github.com/flywave/go3d/float64/vec3"
@@ -43,18 +45,19 @@ func (t *TileGrid) ToTileCoord(xyz vec3d.T) coord.T {
 }
 
 func (t *TileGrid) ToTileCoord2d(xyz vec3d.T) coord.T {
-	pos := coord.T{}
-	pos[0] += int32((t.bounds.Max[0] - t.bounds.Min[0]) / 2.0)
-	pos[1] += int32((t.bounds.Max[1] - t.bounds.Min[1]) / 2.0)
-	pos[0] /= int32(t.tileWidth)
-	pos[1] /= int32(t.tileHeight)
-	return pos
+	hw := (t.bounds.Max[0] - t.bounds.Min[0]) / 2.0
+	hh := (t.bounds.Max[1] - t.bounds.Min[1]) / 2.0
+	return coord.T{
+		int32(math.Floor((xyz[0] + hw) / t.tileWidth)),
+		int32(math.Floor((xyz[1] + hh) / t.tileHeight)),
+		int32(xyz[2]),
+	}
 }
 
 func (t *TileGrid) CreateTile(x, y uint32) *Tile {
 	hw := float64((t.bounds.Max[0] - t.bounds.Min[0]) / 2.0)
 	hh := float64((t.bounds.Max[1] - t.bounds.Min[1]) / 2.0)
-	box := vec2d.Rect{Min: vec2d.T{float64(x)*t.tileWidth - hw, float64(x+1)*t.tileWidth - hw}, Max: vec2d.T{float64(y+1)*t.tileHeight - hh, float64(y)*t.tileHeight - hh}}
+	box := vec2d.Rect{Min: vec2d.T{float64(x)*t.tileWidth - hw, float64(y)*t.tileHeight - hh}, Max: vec2d.T{float64(x+1)*t.tileWidth - hw, float64(y+1)*t.tileHeight - hh}}
 	return NewTile(NewTileIndexFromLevelAndRowCol(uint32(t.level), y, x), box)
 }
 

@@ -58,6 +58,9 @@ func (f *CSGOperator) Apply() error {
 	if f.mesh == nil || f.base == nil {
 		return errors.New("op not inited")
 	}
+	if f.class != GC_LEVEL_SET {
+		return errors.New("csg operators require GC_LEVEL_SET")
+	}
 	mtls := f.base.GetMaterials()
 	defer mtls.Free()
 	f.target = f.mesh.SampleVoxelPixel(mtls, f.localFeature, f.precision, f.creator, f.class, f.matrix)

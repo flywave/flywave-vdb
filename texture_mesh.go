@@ -25,8 +25,12 @@ func NewTextureMeshFromMeshDatas(datas []MeshData) *TextureMesh {
 	for i := 0; i < len(datas); i++ {
 		datasSlice[i] = datas[i].m
 	}
+	var ptr *C.struct__voxel_pixel_mesh_data_t
+	if len(datasSlice) > 0 {
+		ptr = &datasSlice[0]
+	}
 	return &TextureMesh{
-		m: C.voxel_texture_mesh_create_from_mesh_datas(&datasSlice[0], C.int(len(datas))),
+		m: C.voxel_texture_mesh_create_from_mesh_datas(ptr, C.int(len(datas))),
 	}
 }
 
@@ -82,8 +86,12 @@ func NewTextureMeshFromTriangles(tris []Triangle) *TextureMesh {
 		trisSlice[i].feature_id = C.ulong(tris[i].FID)
 	}
 
+	var triPtr *C.struct__voxel_io_triangle_t
+	if len(trisSlice) > 0 {
+		triPtr = &trisSlice[0]
+	}
 	return &TextureMesh{
-		m: C.voxel_texture_mesh_create_from_triangles(&trisSlice[0], C.int(len(tris))),
+		m: C.voxel_texture_mesh_create_from_triangles(triPtr, C.int(len(tris))),
 	}
 }
 
@@ -109,6 +117,7 @@ func (t *TextureMesh) GetTriangles(node int32) []Triangle {
 	var csi C.int
 
 	C.voxel_texture_mesh_get_triangles(t.m, &ctris, &csi, C.int(node))
+	defer C.free(unsafe.Pointer(ctris))
 
 	var trisSlice []C.struct__voxel_io_triangle_t
 	trisHeader := (*reflect.SliceHeader)(unsafe.Pointer(&trisSlice))
@@ -171,6 +180,9 @@ func (t *TextureMesh) GetTriangles(node int32) []Triangle {
 }
 
 func (m *TextureMesh) Lock(locked []bool) {
+	if len(locked) == 0 {
+		return
+	}
 	C.voxel_texture_mesh_lock(m.m, (*C.bool)(unsafe.Pointer(&locked[0])), C.int(len(locked)))
 }
 

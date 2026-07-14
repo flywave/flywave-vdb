@@ -63,10 +63,14 @@ func (m *Renderer) RenderScene() error {
 }
 
 func (m *Renderer) GetFrameBuffer(resolution []int32) ([]uint8, error) {
+	if len(resolution) < 2 {
+		return nil, errors.New("resolution must have at least 2 elements")
+	}
 	var buf *C.uchar
 	if !bool(C.voxel_renderer_frame_buffer(m.m, (*C.int)((unsafe.Pointer)(&resolution[0])), &buf)) {
 		return nil, errors.New("get frame buffer failed")
 	}
+	defer C.free(unsafe.Pointer(buf))
 
 	si := uint32(resolution[0] * resolution[1] * 3)
 

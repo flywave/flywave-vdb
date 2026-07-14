@@ -107,6 +107,9 @@ func (m *VoxelPixel) RayTest(r *Ray) (bool, vec3d.T) {
 }
 
 func (m *VoxelPixel) RayTests(rs []Ray) []vec3d.T {
+	if len(rs) == 0 {
+		return nil
+	}
 	origin := make([]float64, 3*len(rs))
 	dir := make([]float64, 3*len(rs))
 	for i := range rs {

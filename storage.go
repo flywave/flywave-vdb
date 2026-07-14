@@ -111,7 +111,7 @@ func (l *LocalStorage) ReadTile(tile *VoxelTile) bool {
 	}
 	if l.TileExists(&tile.Tile) {
 		path := MakeVoxelTileName(l.root, &tile.Tile, VOXEL_TILE_EXT)
-		return tile.vpixel.Read(path) != nil
+		return tile.vpixel.Read(path) == nil
 	}
 	return false
 }

@@ -88,7 +88,9 @@ func (m *FloatGrid) Read(file string) error {
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.vdb_float_grid_read(m.m, fname)
+	if !bool(C.vdb_float_grid_read(m.m, fname)) {
+		return errors.New("Grid read error ")
+	}
 
 	return nil
 }
@@ -100,7 +102,9 @@ func (m *FloatGrid) Write(file string) error {
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.vdb_float_grid_write(m.m, fname)
+	if !bool(C.vdb_float_grid_write(m.m, fname)) {
+		return errors.New("Grid write error ")
+	}
 
 	return nil
 }
@@ -593,7 +597,7 @@ func (m *FloatGrid) VisitAllIterator(v func(iter *FloatGridIterator) bool) {
 
 //export vdbFloatGridVisitonIterator
 func vdbFloatGridVisitonIterator(ctx unsafe.Pointer, iter *C.struct__vdb_float_grid_iterator_t) C.bool {
-	return C.bool((*(*func(iter FloatGridIterator) bool)(ctx))(FloatGridIterator{m: iter}))
+	return C.bool((*(*func(iter *FloatGridIterator) bool)(ctx))(&FloatGridIterator{m: iter}))
 }
 
 type PixelGrid struct {
@@ -632,7 +636,9 @@ func (m *PixelGrid) Read(file string) error {
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.vdb_pixel_grid_read(m.m, fname)
+	if !bool(C.vdb_pixel_grid_read(m.m, fname)) {
+		return errors.New("Grid read error ")
+	}
 
 	return nil
 }
@@ -644,7 +650,9 @@ func (m *PixelGrid) Write(file string) error {
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.vdb_pixel_grid_write(m.m, fname)
+	if !bool(C.vdb_pixel_grid_write(m.m, fname)) {
+		return errors.New("Grid write error ")
+	}
 
 	return nil
 }
@@ -892,5 +900,5 @@ func (m *PixelGrid) VisitAllIterator(v func(iter *PixelGridIterator) bool) {
 
 //export vdbPixelGridVisitonIterator
 func vdbPixelGridVisitonIterator(ctx unsafe.Pointer, iter *C.struct__vdb_pixel_grid_iterator_t) C.bool {
-	return C.bool((*(*func(iter PixelGridIterator) bool)(ctx))(PixelGridIterator{m: iter}))
+	return C.bool((*(*func(iter *PixelGridIterator) bool)(ctx))(&PixelGridIterator{m: iter}))
 }

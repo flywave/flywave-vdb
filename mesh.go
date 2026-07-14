@@ -171,7 +171,7 @@ func (t *MeshData) Get() *MeshModel {
 	normalsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&normalsSlice)))
 	normalsHeader.Cap = int(len(m.Normals))
 	normalsHeader.Len = int(len(m.Normals))
-	normalsHeader.Data = uintptr(unsafe.Pointer(cmeshData.texcoords))
+	normalsHeader.Data = uintptr(unsafe.Pointer(cmeshData.normals))
 
 	for i := 0; i < len(m.Normals); i++ {
 		m.Normals[i] = float32(normalsSlice[i])
@@ -210,7 +210,7 @@ func (t *MeshData) Get() *MeshModel {
 			normalsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&normalsSlice)))
 			normalsHeader.Cap = int(mtlSlice[i].n_count * 3)
 			normalsHeader.Len = int(mtlSlice[i].n_count * 3)
-			normalsHeader.Data = uintptr(unsafe.Pointer(mtlSlice[i].faces))
+			normalsHeader.Data = uintptr(unsafe.Pointer(mtlSlice[i].normals))
 
 			for j := 0; j < int(mtlSlice[i].n_count*3); j++ {
 				m.Materials[i].Normals[j] = uint32(normalsSlice[j])
@@ -224,7 +224,7 @@ func (t *MeshData) Get() *MeshModel {
 			texcoordsHeader := (*reflect.SliceHeader)((unsafe.Pointer(&texcoordsSlice)))
 			texcoordsHeader.Cap = int(mtlSlice[i].t_count * 3)
 			texcoordsHeader.Len = int(mtlSlice[i].t_count * 3)
-			texcoordsHeader.Data = uintptr(unsafe.Pointer(mtlSlice[i].faces))
+			texcoordsHeader.Data = uintptr(unsafe.Pointer(mtlSlice[i].texcoords))
 
 			for j := 0; j < int(mtlSlice[i].t_count*3); j++ {
 				m.Materials[i].Texcoords[j] = uint32(texcoordsSlice[j])

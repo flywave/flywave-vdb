@@ -17,7 +17,7 @@ type Scene struct {
 
 func NewScene(g Space, extent vec2d.Rect, level uint16, s Storage, opt Options, needInit bool) *Scene {
 	cache := NewCache(opt.MaxCacheSize)
-	scene := &Scene{TileGrid: *NewTileGrid(g, extent, level), storage: s, opt: opt, voxelCache: cache}
+	scene := &Scene{TileGrid: *NewTileGrid(g, extent, level), space: g, storage: s, opt: opt, voxelCache: cache}
 	if needInit && !scene.init() {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (s *Scene) GetVoxelTile(t *Tile) *VoxelTile {
 
 func (s *Scene) GetTiles() []Tile {
 	tiles := make([]Tile, 0, len(s.tiles))
-	for _, v := range tiles {
+	for _, v := range s.tiles {
 		tiles = append(tiles, v)
 	}
 	return tiles
@@ -117,8 +117,9 @@ func (s *Scene) MapPointQueryTask(points []vec3d.T) PointQueryMapped {
 		if !ok {
 			tmap[tile.Index().path] = PointQueryTask{tile: s.GetVoxelTile(tile), points: []vec3d.T{points[i]}, space: s.space}
 		} else {
-			rpoints := tmap[tile.Index().path].points
-			rpoints = append(rpoints, points[i])
+			task := tmap[tile.Index().path]
+			task.points = append(task.points, points[i])
+			tmap[tile.Index().path] = task
 		}
 	}
 	return tmap

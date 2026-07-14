@@ -80,11 +80,13 @@ func (t *TextureData) GetImage() interface{} {
 			Rect: rect}
 	case RGB:
 		rimg := image.NewNRGBA(rect)
-		for x := rect.Min.X; x < rect.Max.X; x++ {
-			for y := rect.Min.Y; y < rect.Max.Y; y++ {
-				rimg.Set(x, y, color.NRGBA{raw[(x*3*int(w))+y], raw[(x*3*int(w))+y+1], raw[(x*3*int(w))+y+2], 255})
+		for y := rect.Min.Y; y < rect.Max.Y; y++ {
+			for x := rect.Min.X; x < rect.Max.X; x++ {
+				idx := (y*int(w) + x) * 3
+				rimg.Set(x, y, color.NRGBA{R: raw[idx], G: raw[idx+1], B: raw[idx+2], A: 255})
 			}
 		}
+		return rimg
 	case RGBA:
 		return &image.NRGBA{Pix: raw, Stride: 4 * rect.Dx(),
 			Rect: rect}

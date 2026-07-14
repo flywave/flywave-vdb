@@ -53,6 +53,14 @@ func (l *Local) TileToSpace(xyz vec3d.T) mat4d.T {
 }
 
 func (l *Local) MakeTileRay(xyz vec3d.T, max vec3d.T) (error, *Ray) {
+	switch l.plane {
+	case PT_XY:
+		return NewRay(vec3d.T{xyz[0], xyz[1], max[2]}, vec3d.T{0, 0, -1})
+	case PT_XZ:
+		return NewRay(vec3d.T{xyz[0], max[1], xyz[2]}, vec3d.T{0, -1, 0})
+	case PT_YZ:
+		return NewRay(vec3d.T{max[0], xyz[1], xyz[2]}, vec3d.T{-1, 0, 0})
+	}
 	return NewRay(vec3d.Zero, vec3d.UnitX)
 }
 

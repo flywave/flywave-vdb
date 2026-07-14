@@ -55,7 +55,9 @@ func (m *VoxelPixel) Read(file string) error {
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.voxel_pixel_read(m.m, fname)
+	if !bool(C.voxel_pixel_read(m.m, fname)) {
+		return errors.New("VoxelPixel read error!")
+	}
 
 	return nil
 }
@@ -67,7 +69,9 @@ func (m *VoxelPixel) Write(file string) error {
 
 	fname := C.CString(file)
 	defer C.free(unsafe.Pointer(fname))
-	C.voxel_pixel_write(m.m, fname)
+	if !bool(C.voxel_pixel_write(m.m, fname)) {
+		return errors.New("VoxelPixel write error!")
+	}
 
 	return nil
 }

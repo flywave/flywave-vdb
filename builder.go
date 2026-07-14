@@ -64,7 +64,7 @@ func (t *VoxelMeshBuilder) addTextureData(m *TextureData, name string) {
 
 func (t *VoxelMeshBuilder) TextureExist(name string) bool {
 	cname := C.CString(name)
-	C.free(unsafe.Pointer(cname))
+	defer C.free(unsafe.Pointer(cname))
 	return bool(C.voxel_mesh_builder_texture_exist(t.m, cname))
 }
 

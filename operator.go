@@ -51,11 +51,11 @@ type CSGOperator struct {
 }
 
 func (f *CSGOperator) GetVoxelPixel() *VoxelPixel {
-	return f.target
+	return f.base
 }
 
 func (f *CSGOperator) Apply() error {
-	if f.mesh == nil || f.target == nil {
+	if f.mesh == nil || f.base == nil {
 		return errors.New("op not inited")
 	}
 	mtls := f.base.GetMaterials()
@@ -88,7 +88,7 @@ type SurfaceOperator struct {
 }
 
 func (f *SurfaceOperator) Apply() error {
-	if f.mesh == nil || f.target == nil {
+	if f.mesh == nil || f.base == nil {
 		return errors.New("op not inited")
 	}
 	mtls := f.base.GetMaterials()

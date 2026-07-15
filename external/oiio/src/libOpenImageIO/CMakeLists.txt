@@ -1,11 +1,11 @@
-# Copyright 2008-present Contributors to the OpenImageIO project.
-# SPDX-License-Identifier: BSD-3-Clause
-# https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+# Copyright Contributors to the OpenImageIO project.
+# SPDX-License-Identifier: Apache-2.0
+# https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 if (VERBOSE)
-   message (STATUS "Create imagio_pvt.h from imageio_pvt.h.in")
+   message (STATUS "Create buildopts.h from buildopts.h.in")
 endif ()
-configure_file (imageio_pvt.h.in "${CMAKE_CURRENT_BINARY_DIR}/../include/imageio_pvt.h" @ONLY)
+configure_file (buildopts.h.in "${CMAKE_CURRENT_BINARY_DIR}/../../include/buildopts.h" @ONLY)
 
 file (GLOB libOpenImageIO_hdrs ../include/OpenImageIO/*.h)
 
@@ -52,47 +52,71 @@ set (libOpenImageIO_srcs
                           imagebufalgo_addsub.cpp
                           imagebufalgo_muldiv.cpp
                           imagebufalgo_mad.cpp
+                          imagebufalgo_minmaxchan.cpp
                           imagebufalgo_orient.cpp
                           imagebufalgo_xform.cpp
-                          imagebufalgo_yee.cpp imagebufalgo_opencv.cpp
+                          imagebufalgo_demosaic.cpp
+                          imagebufalgo_yee.cpp
+                          imagebufalgo_yee.cpp
                           deepdata.cpp exif.cpp exif-canon.cpp
-                          formatspec.cpp imagebuf.cpp
+                          formatspec.cpp
+                          icc.cpp imagebuf.cpp
                           imageinput.cpp imageio.cpp imageioplugin.cpp
-                          imageoutput.cpp iptc.cpp xmp.cpp
+                          imageoutput.cpp
+                          iptc.cpp xmp.cpp
                           color_ocio.cpp
                           maketexture.cpp
-                          ../libutil/argparse.cpp
-                          ../libutil/benchmark.cpp
-                          ../libutil/errorhandler.cpp 
-                          ../libutil/filesystem.cpp 
-                          ../libutil/farmhash.cpp 
-                          ../libutil/filter.cpp 
-                          ../libutil/hashes.cpp 
-                          ../libutil/paramlist.cpp 
-                          ../libutil/plugin.cpp 
-                          ../libutil/SHA1.cpp 
-                          ../libutil/strutil.cpp 
-                          ../libutil/sysutil.cpp 
-                          ../libutil/thread.cpp 
-                          ../libutil/timer.cpp 
-                          ../libutil/typedesc.cpp 
-                          ../libutil/ustring.cpp 
-                          ../libutil/xxhash.cpp 
-                          ../libtexture/texturesys.cpp 
-                          ../libtexture/texture3d.cpp 
-                          ../libtexture/environment.cpp 
-                          ../libtexture/texoptions.cpp 
+                          bluenoise.cpp
+                          printinfo.cpp
+                          oiio_gpu.cpp
+                          ../libtexture/texturesys.cpp
+                          ../libtexture/texture3d.cpp
+                          ../libtexture/environment.cpp
+                          ../libtexture/texoptions.cpp
                           ../libtexture/imagecache.cpp
                           ${libOpenImageIO_srcs}
                           ${libOpenImageIO_hdrs}
                          )
 
-
 add_library (OpenImageIO STATIC ${libOpenImageIO_srcs})
-target_compile_definitions (OpenImageIO
-PRIVATE
-    EMBED_PLUGINS=1
-    ${format_plugin_definitions})
+
+# If the 'EMBEDPLUGINS' option is set, we want to compile the source for
+# all the plugins into libOpenImageIO.
+if (EMBEDPLUGINS)
+    target_compile_definitions (OpenImageIO
+                                PRIVATE
+                                    EMBED_PLUGINS=1
+                                    ${format_plugin_definitions})
+    target_compile_options (OpenImageIO
+                            PRIVATE ${format_plugin_compile_options})
+    target_include_directories (OpenImageIO BEFORE
+                                PRIVATE ${format_plugin_include_dirs})
+
+    # Organize the embedded plugins into source folders
+    set (plugin_types "")
+    foreach (src ${libOpenImageIO_srcs})
+        if (src MATCHES "^.+/([^/]+)\\.imageio/.+$")
+            set (plugin_types ${plugin_types} ${CMAKE_MATCH_1})
+        endif ()
+    endforeach ()
+    list (REMOVE_DUPLICATES plugin_types)
+    foreach (plugin ${plugin_types})
+        source_group ("Plugins\\${plugin}"
+                      REGULAR_EXPRESSION "^.+/${plugin}\\.imageio/.+$"
+                     )
+    endforeach ()
+endif ()
+
 IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
   SET_TARGET_PROPERTIES(OpenImageIO PROPERTIES FOLDER external/oiio)
 ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+
+SET_TARGET_PROPERTIES(OpenImageIO PROPERTIES
+ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}/../../
+ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}/../../)
+SET_TARGET_PROPERTIES(OpenImageIO PROPERTIES 
+LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}/../../
+LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}/../../)
+SET_TARGET_PROPERTIES(OpenImageIO PROPERTIES
+RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}/../../
+RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR}/../../)

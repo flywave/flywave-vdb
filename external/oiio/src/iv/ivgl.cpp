@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: BSD-3-Clause and Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include "ivgl.h"
 #include "imageviewer.h"
@@ -11,10 +11,22 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QProgressBar>
+#if OIIO_QT_MAJOR >= 6
+#    include <QPainter>
+#    include <QPen>
+#endif
 
 #include "ivutils.h"
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/timer.h>
+#include <cfloat>
+
+OIIO_PRAGMA_WARNING_PUSH
+#if defined(__APPLE__)
+// Apple deprecates OpenGL calls, ugh
+OIIO_CLANG_PRAGMA(GCC diagnostic ignored "-Wdeprecated-declarations")
+#endif
+
 
 
 static const char*
@@ -32,23 +44,20 @@ gl_err_to_string(GLenum err)
     }
 }
 
-
-#define GLERRPRINT(msg)                                                     \
-    for (GLenum err = glGetError(); err != GL_NO_ERROR; err = glGetError()) \
-        std::cerr << "GL error " << msg << " " << (int)err << " - "         \
-                  << gl_err_to_string(err) << "\n";
-
-
-
 IvGL::IvGL(QWidget* parent, ImageViewer& viewer)
     : QOpenGLWidget(parent)
     , m_viewer(viewer)
     , m_shaders_created(false)
+    , m_vertex_shader(0)
+    , m_shader_program(0)
     , m_tex_created(false)
     , m_zoom(1.0)
     , m_centerx(0)
     , m_centery(0)
     , m_dragging(false)
+    , m_mousex(0)
+    , m_mousey(0)
+    , m_drag_button(Qt::NoButton)
     , m_use_shaders(false)
     , m_use_halffloat(false)
     , m_use_float(false)
@@ -140,19 +149,19 @@ IvGL::create_textures(void)
     for (unsigned int texture : textures) {
         m_texbufs.emplace_back();
         glBindTexture(GL_TEXTURE_2D, texture);
-        GLERRPRINT("bind tex");
+        print_error("bind tex");
         glTexImage2D(GL_TEXTURE_2D, 0 /*mip level*/,
                      4 /*internal format - color components */, 1 /*width*/,
                      1 /*height*/, 0 /*border width*/,
                      GL_RGBA /*type - GL_RGB, GL_RGBA, GL_LUMINANCE */,
                      GL_FLOAT /*format - GL_FLOAT */, NULL /*data*/);
-        GLERRPRINT("tex image 2d");
+        print_error("tex image 2d");
         // Initialize tex parameters.
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-        GLERRPRINT("After tex parameters");
+        print_error("After tex parameters");
         m_texbufs.back().tex_object = texture;
         m_texbufs.back().x          = 0;
         m_texbufs.back().y          = 0;
@@ -178,192 +187,236 @@ IvGL::create_textures(void)
     m_tex_created = true;
 }
 
+const char*
+IvGL::color_func_shader_text()
+{
+    return R"glsl(
+        uniform float gain;
+        uniform float gamma;
 
+        vec4 ColorFunc(vec4 C)
+        {
+            C.xyz *= gain;
+            float invgamma = 1.0/gamma;
+            C.xyz = pow (C.xyz, vec3 (invgamma, invgamma, invgamma));
+            return C;
+        }
+    )glsl";
+}
 
 void
 IvGL::create_shaders(void)
 {
-    // clang-format off
-    static const GLchar *vertex_source =
-        "varying vec2 vTexCoord;\n"
-        "void main ()\n"
-        "{\n"
-        "    vTexCoord = gl_MultiTexCoord0.xy;\n"
-        "    gl_Position = ftransform();\n"
-        "}\n";
-
-    static const GLchar *fragment_source =
-        "uniform sampler2D imgtex;\n"
-        "varying vec2 vTexCoord;\n"
-        "uniform float gain;\n"
-        "uniform float gamma;\n"
-        "uniform int startchannel;\n"
-        "uniform int colormode;\n"
-        // Remember, if imgchannels == 2, second channel would be channel 4 (a).
-        "uniform int imgchannels;\n"
-        "uniform int pixelview;\n"
-        "uniform int linearinterp;\n"
-        "uniform int width;\n"
-        "uniform int height;\n"
-        "vec4 rgba_mode (vec4 C)\n"
-        "{\n"
-        "    if (imgchannels <= 2) {\n"
-        "        if (startchannel == 1)\n"
-        "           return vec4(C.aaa, 1.0);\n"
-        "        return C.rrra;\n"
-        "    }\n"
-        "    return C;\n"
-        "}\n"
-        "vec4 rgb_mode (vec4 C)\n"
-        "{\n"
-        "    if (imgchannels <= 2) {\n"
-        "        if (startchannel == 1)\n"
-        "           return vec4(C.aaa, 1.0);\n"
-        "        return vec4 (C.rrr, 1.0);\n"
-        "    }\n"
-        "    float C2[4];\n"
-        "    C2[0]=C.x; C2[1]=C.y; C2[2]=C.z; C2[3]=C.w;\n"
-        "    return vec4 (C2[startchannel], C2[startchannel+1], C2[startchannel+2], 1.0);\n"
-        "}\n"
-        "vec4 singlechannel_mode (vec4 C)\n"
-        "{\n"
-        "    float C2[4];\n"
-        "    C2[0]=C.x; C2[1]=C.y; C2[2]=C.z; C2[3]=C.w;\n"
-        "    if (startchannel > imgchannels)\n"
-        "        return vec4 (0.0,0.0,0.0,1.0);\n"
-        "    return vec4 (C2[startchannel], C2[startchannel], C2[startchannel], 1.0);\n"
-        "}\n"
-        "vec4 luminance_mode (vec4 C)\n"
-        "{\n"
-        "    if (imgchannels <= 2)\n"
-        "        return vec4 (C.rrr, C.a);\n"
-        "    float lum = dot (C.rgb, vec3(0.2126, 0.7152, 0.0722));\n"
-        "    return vec4 (lum, lum, lum, C.a);\n"
-        "}\n"
-        "float heat_red(float x)\n"
-        "{\n"
-        "    return clamp (mix(0.0, 1.0, (x-0.35)/(0.66-0.35)), 0.0, 1.0) -\n"
-        "           clamp (mix(0.0, 0.5, (x-0.89)/(1.0-0.89)), 0.0, 1.0);\n"
-        "}\n"
-        "float heat_green(float x)\n"
-        "{\n"
-        "    return clamp (mix(0.0, 1.0, (x-0.125)/(0.375-0.125)), 0.0, 1.0) -\n"
-        "           clamp (mix(0.0, 1.0, (x-0.64)/(0.91-0.64)), 0.0, 1.0);\n"
-        "}\n"
-        "vec4 heatmap_mode (vec4 C)\n"
-        "{\n"
-        "    float C2[4];\n"
-        "    C2[0]=C.x; C2[1]=C.y; C2[2]=C.z; C2[3]=C.w;\n"
-        "    return vec4(heat_red(C2[startchannel]),\n"
-        "                heat_green(C2[startchannel]),\n"
-        "                heat_red(1.0-C2[startchannel]),\n"
-        "                1.0);\n"
-        "}\n"
-        "void main ()\n"
-        "{\n"
-        "    vec2 st = vTexCoord;\n"
-        "    float black = 0.0;\n"
-        "    if (pixelview != 0 || linearinterp == 0) {\n"
-        "        vec2 wh = vec2(width,height);\n"
-        "        vec2 onehalf = vec2(0.5,0.5);\n"
-        "        vec2 st_res = st * wh /* + onehalf */ ;\n"
-        "        vec2 st_pix = floor (st_res);\n"
-        "        vec2 st_rem = st_res - st_pix;\n"
-        "        st = (st_pix + onehalf) / wh;\n"
-        "        if (pixelview != 0) {\n"
-        "            if (st.x < 0.0 || st.x >= 1.0 || \n"
-        "                    st.y < 0.0 || st.y >= 1.0 || \n"
-        "                    st_rem.x < 0.05 || st_rem.x >= 0.95 || \n"
-        "                    st_rem.y < 0.05 || st_rem.y >= 0.95)\n"
-        "                black = 1.0;\n"
-        "        }\n"
-        "    }\n"
-        "    vec4 C = texture2D (imgtex, st);\n"
-        "    C = mix (C, vec4(0.05,0.05,0.05,1.0), black);\n"
-        "    if (startchannel < 0)\n"
-        "        C = vec4(0.0,0.0,0.0,1.0);\n"
-        "    else if (colormode == 0)\n" // RGBA
-        "        C = rgba_mode (C);\n"
-        "    else if (colormode == 1)\n" // RGB (i.e., ignore alpha).
-        "        C = rgb_mode (C);\n"
-        "    else if (colormode == 2)\n" // Single channel.
-        "        C = singlechannel_mode (C);\n"
-        "    else if (colormode == 3)\n" // Luminance.
-        "        C = luminance_mode (C);\n"
-        "    else if (colormode == 4)\n" // Heatmap.
-        "        C = heatmap_mode (C);\n"
-        "    if (pixelview != 0)\n"
-        "        C.a = 1.0;\n"
-        "    C.xyz *= gain;\n"
-        "    float invgamma = 1.0/gamma;\n"
-        "    C.xyz = pow (C.xyz, vec3 (invgamma, invgamma, invgamma));\n"
-        "    gl_FragColor = C;\n"
-        "}\n";
-    // clang-format on
-
     if (!m_use_shaders) {
         std::cerr << "Not using shaders!\n";
         return;
     }
-    if (m_shaders_created)
+
+    const char* color_shader = color_func_shader_text();
+    if (m_color_shader_text != color_shader) {
+        if (m_shader_program) {
+            if (m_vertex_shader) {
+                glDetachShader(m_shader_program, m_vertex_shader);
+            }
+            glUseProgram(0);
+            glDeleteProgram(m_shader_program);
+            m_shader_program  = 0;
+            m_shaders_created = false;
+        }
+    }
+
+    if (m_shaders_created) {
         return;
-
-    //initialize shader object handles for abort function
-    m_shader_program  = 0;
-    m_vertex_shader   = 0;
-    m_fragment_shader = 0;
-
-    // When using extensions to support shaders, we need to load the function
-    // entry points (which is actually done by GLEW) and then call them. So
-    // we have to get the functions through the right symbols otherwise
-    // extension-based shaders won't work.
-    m_shader_program = glCreateProgram();
-
-    GLERRPRINT("create program");
+    }
 
     // This holds the compilation status
     GLint status;
 
-    m_vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(m_vertex_shader, 1, &vertex_source, NULL);
-    glCompileShader(m_vertex_shader);
-    glGetShaderiv(m_vertex_shader, GL_COMPILE_STATUS, &status);
+    if (!m_vertex_shader) {
+        static const GLchar* vertex_source = R"glsl(
+            varying vec2 vTexCoord;
+            void main ()
+            {
+                vTexCoord = gl_MultiTexCoord0.xy;
+                gl_Position = ftransform();
+            }
+        )glsl";
 
-    if (!status) {
-        std::cerr << "vertex shader compile status: " << status << "\n";
-        print_shader_log(std::cerr, m_vertex_shader);
-        create_shaders_abort();
-        return;
+        m_vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(m_vertex_shader, 1, &vertex_source, NULL);
+        glCompileShader(m_vertex_shader);
+        glGetShaderiv(m_vertex_shader, GL_COMPILE_STATUS, &status);
+
+        if (!status) {
+            std::cerr << "vertex shader compile status: " << status << "\n";
+            print_shader_log(std::cerr, m_vertex_shader);
+            create_shaders_abort();
+            return;
+        }
     }
-    glAttachShader(m_shader_program, m_vertex_shader);
-    GLERRPRINT("After attach vertex shader.");
 
-    m_fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(m_fragment_shader, 1, &fragment_source, NULL);
-    glCompileShader(m_fragment_shader);
-    glGetShaderiv(m_fragment_shader, GL_COMPILE_STATUS, &status);
+    static const GLchar* fragment_source = R"glsl(
+        uniform sampler2D imgtex;
+        varying vec2 vTexCoord;
+        uniform int startchannel;
+        uniform int colormode;
+        // Remember, if imgchannels == 2, second channel would be channel 4 (a).
+        uniform int imgchannels;
+        uniform int pixelview;
+        uniform int linearinterp;
+        uniform int width;
+        uniform int height;
+
+        vec4 rgba_mode (vec4 C)
+        {
+            if (imgchannels <= 2) {
+                if (startchannel == 1)
+                return vec4(C.aaa, 1.0);
+                return C.rrra;
+            }
+            return C;
+        }
+
+        vec4 rgb_mode (vec4 C)
+        {
+            if (imgchannels <= 2) {
+                if (startchannel == 1)
+                return vec4(C.aaa, 1.0);
+                return vec4 (C.rrr, 1.0);
+            }
+            float C2[4];
+            C2[0]=C.x; C2[1]=C.y; C2[2]=C.z; C2[3]=C.w;
+            return vec4 (C2[startchannel], C2[startchannel+1], C2[startchannel+2], 1.0);
+        }
+
+        vec4 singlechannel_mode (vec4 C)
+        {
+            float C2[4];
+            C2[0]=C.x; C2[1]=C.y; C2[2]=C.z; C2[3]=C.w;
+            if (startchannel > imgchannels)
+                return vec4 (0.0,0.0,0.0,1.0);
+            return vec4 (C2[startchannel], C2[startchannel], C2[startchannel], 1.0);
+        }
+
+        vec4 luminance_mode (vec4 C)
+        {
+            if (imgchannels <= 2)
+                return vec4 (C.rrr, C.a);
+            float lum = dot (C.rgb, vec3(0.2126, 0.7152, 0.0722));
+            return vec4 (lum, lum, lum, C.a);
+        }
+
+        float heat_red(float x)
+        {
+            return clamp (mix(0.0, 1.0, (x-0.35)/(0.66-0.35)), 0.0, 1.0) -
+                clamp (mix(0.0, 0.5, (x-0.89)/(1.0-0.89)), 0.0, 1.0);
+        }
+
+        float heat_green(float x)
+        {
+            return clamp (mix(0.0, 1.0, (x-0.125)/(0.375-0.125)), 0.0, 1.0) -
+                clamp (mix(0.0, 1.0, (x-0.64)/(0.91-0.64)), 0.0, 1.0);
+        }
+
+        vec4 heatmap_mode (vec4 C)
+        {
+            float C2[4];
+            C2[0]=C.x; C2[1]=C.y; C2[2]=C.z; C2[3]=C.w;
+            return vec4(heat_red(C2[startchannel]),
+                        heat_green(C2[startchannel]),
+                        heat_red(1.0-C2[startchannel]),
+                        1.0);
+        }
+
+        void main ()
+        {
+            vec2 st = vTexCoord;
+            float black = 0.0;
+            if (pixelview != 0 || linearinterp == 0) {
+                vec2 wh = vec2(width,height);
+                vec2 onehalf = vec2(0.5,0.5);
+                vec2 st_res = st * wh /* + onehalf */ ;
+                vec2 st_pix = floor (st_res);
+                vec2 st_rem = st_res - st_pix;
+                st = (st_pix + onehalf) / wh;
+                if (pixelview != 0) {
+                    if (st.x < 0.0 || st.x >= 1.0 || 
+                            st.y < 0.0 || st.y >= 1.0 || 
+                            st_rem.x < 0.05 || st_rem.x >= 0.95 || 
+                            st_rem.y < 0.05 || st_rem.y >= 0.95)
+                        black = 1.0;
+                }
+            }
+            vec4 C = texture2D (imgtex, st);
+            C = mix (C, vec4(0.05,0.05,0.05,1.0), black);
+            if (startchannel < 0)
+                C = vec4(0.0,0.0,0.0,1.0);
+            else if (colormode == 0) // RGBA
+                C = rgba_mode (C);
+            else if (colormode == 1) // RGB (i.e., ignore alpha).
+                C = rgb_mode (C);
+            else if (colormode == 2) // Single channel.
+                C = singlechannel_mode (C);
+            else if (colormode == 3) // Luminance.
+                C = luminance_mode (C);
+            else if (colormode == 4) // Heatmap.
+                C = heatmap_mode (C);
+            if (pixelview != 0)
+                C.a = 1.0;
+            C = ColorFunc(C);
+            gl_FragColor = C;
+        }
+    )glsl";
+
+    const char* fragment_sources[] = { "#version 120\n", color_shader,
+                                       fragment_source };
+    m_color_shader_text            = color_shader;
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 3, fragment_sources, NULL);
+    glCompileShader(fragment_shader);
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &status);
     if (!status) {
         std::cerr << "fragment shader compile status: " << status << "\n";
-        print_shader_log(std::cerr, m_fragment_shader);
+        print_shader_log(std::cerr, fragment_shader);
         create_shaders_abort();
         return;
     }
-    glAttachShader(m_shader_program, m_fragment_shader);
-    GLERRPRINT("After attach fragment shader");
 
-    glLinkProgram(m_shader_program);
-    GLERRPRINT("link");
-    GLint linked;
-    glGetProgramiv(m_shader_program, GL_LINK_STATUS, &linked);
-    if (!linked) {
-        std::cerr << "NOT LINKED\n";
-        char buf[10000];
-        buf[0] = 0;
-        GLsizei len;
-        glGetProgramInfoLog(m_shader_program, sizeof(buf), &len, buf);
-        std::cerr << "link log:\n" << buf << "---\n";
-        create_shaders_abort();
-        return;
+    if (!m_shader_program) {
+        // When using extensions to support shaders, we need to load the
+        // function entry points (which is actually done by GLEW) and then call
+        // them. So we have to get the functions through the right symbols
+        // otherwise extension-based shaders won't work.
+        m_shader_program = glCreateProgram();
+        print_error("create program");
+
+        glAttachShader(m_shader_program, m_vertex_shader);
+        print_error("After attach vertex shader.");
+
+        glAttachShader(m_shader_program, fragment_shader);
+        print_error("After attach fragment shader");
+
+        glLinkProgram(m_shader_program);
+        print_error("link");
+        GLint linked;
+        glGetProgramiv(m_shader_program, GL_LINK_STATUS, &linked);
+        if (!linked) {
+            std::cerr << "NOT LINKED\n";
+            char buf[10000];
+            buf[0] = 0;
+            GLsizei len;
+            glGetProgramInfoLog(m_shader_program, sizeof(buf), &len, buf);
+            std::cerr << "link log:\n" << buf << "---\n";
+            create_shaders_abort();
+            return;
+        }
+
+        glDetachShader(m_shader_program, fragment_shader);
+        print_error("After detach fragment shader");
+
+        glDeleteShader(fragment_shader);
+        print_error("After delete fragment shader");
     }
 
     m_shaders_created = true;
@@ -379,10 +432,8 @@ IvGL::create_shaders_abort(void)
         glDeleteProgram(m_shader_program);
     if (m_vertex_shader)
         glDeleteShader(m_vertex_shader);
-    if (m_fragment_shader)
-        glDeleteShader(m_fragment_shader);
 
-    GLERRPRINT("After delete shaders");
+    print_error("After delete shaders");
     m_use_shaders = false;
 }
 
@@ -391,7 +442,7 @@ IvGL::create_shaders_abort(void)
 void
 IvGL::resizeGL(int w, int h)
 {
-    GLERRPRINT("resizeGL entry");
+    print_error("resizeGL entry");
     glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -402,7 +453,7 @@ IvGL::resizeGL(int w, int h)
     glMatrixMode(GL_MODELVIEW);
 
     clamp_view_to_window();
-    GLERRPRINT("resizeGL exit");
+    print_error("resizeGL exit");
 }
 
 
@@ -428,6 +479,32 @@ gl_rect(float xmin, float ymin, float xmax, float ymax, float z = 0,
 
 
 static void
+gl_rect_border(float xmin, float ymin, float xmax, float ymax, float z = 0)
+{
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(xmin, ymin, z);
+    glVertex3f(xmax, ymin, z);
+    glVertex3f(xmax, ymax, z);
+    glVertex3f(xmin, ymax, z);
+    glEnd();
+}
+
+
+
+static void
+gl_rect_dotted_border(float xmin, float ymin, float xmax, float ymax,
+                      float z = 0)
+{
+    glPushAttrib(GL_ENABLE_BIT);
+    glLineStipple(1, 0xF0F0);
+    glEnable(GL_LINE_STIPPLE);
+    gl_rect_border(xmin, ymin, xmax, ymax, z);
+    glPopAttrib();
+}
+
+
+
+static void
 handle_orientation(int orientation, int width, int height, float& scale_x,
                    float& scale_y, float& rotate_z, float& point_x,
                    float& point_y, bool pixel = false)
@@ -438,7 +515,7 @@ handle_orientation(int orientation, int width, int height, float& scale_x,
         point_x = width - point_x;
         if (pixel)
             // We want to access the pixel at (point_x,pointy), so we have to
-            // substract 1 to get the right index.
+            // subtract 1 to get the right index.
             --point_x;
         break;
     case 3:  // bottom up, right to left (rotated 180).
@@ -539,6 +616,8 @@ IvGL::paintGL()
     // Recentered so that the pixel space (m_centerx,m_centery) position is
     // at the center of the visible window.
 
+    update_state();
+
     useshader(m_texture_width, m_texture_height);
 
     float smin = 0, smax = 1.0;
@@ -556,17 +635,13 @@ IvGL::paintGL()
     ybegin     = std::max(spec.y, ybegin - (ybegin % m_texture_height));
     int xend   = (int)floor(real_centerx) + wincenterx;
     xend       = std::min(spec.x + spec.width,
-                    xend + m_texture_width - (xend % m_texture_width));
+                          xend + m_texture_width - (xend % m_texture_width));
     int yend   = (int)floor(real_centery) + wincentery;
     yend       = std::min(spec.y + spec.height,
-                    yend + m_texture_height - (yend % m_texture_height));
+                          yend + m_texture_height - (yend % m_texture_height));
     //std::cerr << "(" << xbegin << ',' << ybegin << ") - (" << xend << ',' << yend << ")\n";
 
     // Provide some feedback
-    int total_tiles    = (int)(ceilf(float(xend - xbegin) / m_texture_width)
-                            * ceilf(float(yend - ybegin) / m_texture_height));
-    float tile_advance = 1.0f / total_tiles;
-    float percent      = tile_advance;
     m_viewer.statusViewInfo->hide();
     m_viewer.statusProgress->show();
 
@@ -588,14 +663,56 @@ IvGL::paintGL()
             load_texture(xstart, ystart, tile_width, tile_height);
             gl_rect(xstart, ystart, xstart + tile_width, ystart + tile_height,
                     0, smin, tmin, smax, tmax);
-            percent += tile_advance;
         }
     }
 
+    if (m_viewer.windowguidesOn()) {
+        paint_windowguides();
+    }
+
+    if (m_selecting) {
+        glPushMatrix();
+        glLoadIdentity();
+
+        glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+        glDisable(GL_TEXTURE_2D);
+        if (m_use_shaders) {
+            glUseProgram(0);
+        }
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(0.2f, 0.5f, 1.0f, 0.3f);  // Light blue fill with transparency
+
+        int w = width();
+        int h = height();
+
+        float x1 = m_select_start.x() - w / 2.0f;
+        float y1 = -(m_select_start.y() - h / 2.0f);
+
+        float x2 = m_select_end.x() - w / 2.0f;
+        float y2 = -(m_select_end.y() - h / 2.0f);
+
+        int left   = std::min(x1, x2);
+        int right  = std::max(x1, x2);
+        int bottom = std::min(y1, y2);
+        int top    = std::max(y1, y2);
+
+        gl_rect(left, bottom, right, top, -0.1f);
+
+        glPopAttrib();
+        glPopMatrix();
+    }
     glPopMatrix();
 
     if (m_viewer.pixelviewOn()) {
         paint_pixelview();
+    }
+
+    if (m_viewer.probeviewOn()) {
+        paint_probeview();
+    } else {
+        m_area_probe_text.clear();
     }
 
     // Show the status info again.
@@ -618,7 +735,9 @@ IvGL::shadowed_text(float x, float y, float /*z*/, const std::string& s,
      * Paint on intermediate QImage, AA text on QOpenGLWidget based
      * QPaintDevice requires MSAA
      */
-    QImage t(size(), QImage::Format_ARGB32_Premultiplied);
+    qreal dpr = devicePixelRatio();
+    QImage t(size() * dpr, QImage::Format_ARGB32_Premultiplied);
+    t.setDevicePixelRatio(dpr);
     t.fill(qRgba(0, 0, 0, 0));
     {
         QPainter painter(&t);
@@ -748,9 +867,10 @@ IvGL::paint_pixelview()
                                      m_viewer.current_color_mode());
         }
 
-        void* zoombuffer = OIIO_ALLOCA(char, (xend - xbegin) * (yend - ybegin)
-                                                 * nchannels
-                                                 * spec.channel_bytes());
+        auto zoombuffer = OIIO_ALLOCA_SPAN(std::byte,
+                                           (xend - xbegin) * (yend - ybegin)
+                                               * nchannels
+                                               * spec.channel_bytes());
         if (!m_use_shaders) {
             img->get_pixels(ROI(spec.x + xbegin, spec.x + xend, spec.y + ybegin,
                                 spec.y + yend),
@@ -768,8 +888,8 @@ IvGL::paint_pixelview()
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, m_pixelview_tex);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, xend - xbegin, yend - ybegin,
-                        glformat, gltype, zoombuffer);
-        GLERRPRINT("After tsi2d");
+                        glformat, gltype, zoombuffer.data());
+        print_error("After tsi2d");
     } else {
         smin = -1;
         smax = -1;
@@ -829,8 +949,8 @@ IvGL::paint_pixelview()
                 texty = closeupsize + yspacing;
             }
         }
-        std::string s = Strutil::sprintf("(%d, %d)", (int)real_xp + spec.x,
-                                         (int)real_yp + spec.y);
+        std::string s = Strutil::fmt::format("({}, {})", (int)real_xp + spec.x,
+                                             (int)real_yp + spec.y);
         shadowed_text(textx, texty, 0.0f, s, font);
         texty += yspacing;
         img->getpixel((int)real_xp + spec.x, (int)real_yp + spec.y, fpixel);
@@ -839,20 +959,20 @@ IvGL::paint_pixelview()
             case TypeDesc::UINT8: {
                 ImageBuf::ConstIterator<unsigned char, unsigned char> p(
                     *img, (int)real_xp + spec.x, (int)real_yp + spec.y);
-                s = Strutil::sprintf("%s: %3d  (%5.3f)",
-                                     spec.channelnames[i].c_str(), (int)(p[i]),
-                                     fpixel[i]);
+                s = Strutil::fmt::format("{}: {:3}  ({:5.3f})",
+                                         spec.channelnames[i], int(p[i]),
+                                         fpixel[i]);
             } break;
             case TypeDesc::UINT16: {
                 ImageBuf::ConstIterator<unsigned short, unsigned short> p(
                     *img, (int)real_xp + spec.x, (int)real_yp + spec.y);
-                s = Strutil::sprintf("%s: %3d  (%5.3f)",
-                                     spec.channelnames[i].c_str(), (int)(p[i]),
-                                     fpixel[i]);
+                s = Strutil::fmt::format("{}: {:3}  ({:5.3f})",
+                                         spec.channelnames[i], int(p[i]),
+                                         fpixel[i]);
             } break;
             default:  // everything else, treat as float
-                s = Strutil::sprintf("%s: %5.3f", spec.channelnames[i].c_str(),
-                                     fpixel[i]);
+                s = Strutil::fmt::format("{}: {:5.3f}", spec.channelnames[i],
+                                         fpixel[i]);
             }
             shadowed_text(textx, texty, 0.0f, s, font);
             texty += yspacing;
@@ -866,12 +986,106 @@ IvGL::paint_pixelview()
 
 
 void
+IvGL::paint_probeview()
+{
+    if (!m_current_image)
+        return;
+    IvImage* img = m_current_image;
+    const ImageSpec& spec(img->spec());
+
+    int xw, yw;
+    get_focus_window_pixel(xw, yw);
+
+    glPushMatrix();
+    glLoadIdentity();
+
+    // Set to window pixel units and center the origin
+    glTranslatef(0, 0, -1);  // Push into screen to draw on top
+
+    float closeup_width  = closeupsize * 1.3f;
+    float closeup_height = closeupsize * (0.06f * (spec.nchannels + 1));
+
+    // Position the close-up box
+    const float status_bar_offset = 35.0f;
+    glTranslatef(closeup_width * 0.5f + 5 - width() / 2,
+                 closeup_height * 0.5f + status_bar_offset - height() / 2, 0);
+
+    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+    glDisable(GL_TEXTURE_2D);
+    if (m_use_shaders)
+        glUseProgram(0);
+    float extraspace = 10 * (1 + spec.nchannels) + 4;
+    glColor4f(0.1f, 0.1f, 0.1f, 0.5f);
+    gl_rect(-0.5f * closeup_width - 2, 0.5f * closeup_height + 10 + 2,
+            0.5f * closeup_width + 2, -0.5f * closeup_height - extraspace,
+            -0.1f);
+    // Draw probe text
+    QFont font;
+
+    int textx    = 9;
+    int texty    = height() - closeup_height - 30;
+    int yspacing = 15;
+
+    if (m_area_probe_text.empty()) {
+        std::ostringstream oss;  // Output stream
+        oss << "Area Probe:\n";
+        for (int i = 0; i < spec.nchannels; ++i)
+            oss << spec.channel_name(i)
+                << ":   [min:  -----, max:  -----, avg:  -----]\n";
+        m_area_probe_text = oss.str();
+    }
+
+    std::istringstream iss(m_area_probe_text);
+    std::string line;
+    while (std::getline(iss, line)) {
+        shadowed_text(textx, texty, 0.0f, line, font);
+        texty += yspacing;
+    }
+
+    glPopAttrib();
+    glPopMatrix();
+}
+
+
+
+void
+IvGL::paint_windowguides()
+{
+    IvImage* img = m_current_image;
+    const ImageSpec& spec(img->spec());
+
+    glDisable(GL_TEXTURE_2D);
+    glUseProgram(0);
+    glPushAttrib(GL_ENABLE_BIT);
+    glEnable(GL_COLOR_LOGIC_OP);
+    glLogicOp(GL_XOR);
+
+    // Data window
+    {
+        const float xmin = spec.x;
+        const float xmax = spec.x + spec.width;
+        const float ymin = spec.y;
+        const float ymax = spec.y + spec.height;
+        gl_rect_border(xmin, ymin, xmax, ymax);
+    }
+
+    // Display window
+    {
+        const float xmin = spec.full_x;
+        const float xmax = spec.full_x + spec.full_width;
+        const float ymin = spec.full_y;
+        const float ymax = spec.full_y + spec.full_height;
+        gl_rect_dotted_border(xmin, ymin, xmax, ymax);
+    }
+
+    glPopAttrib();
+}
+
+
+
+void
 IvGL::useshader(int tex_width, int tex_height, bool pixelview)
 {
-    IvImage* img = m_viewer.cur();
-    if (!img)
-        return;
-
     if (!m_use_shaders) {
         glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
         for (auto&& tb : m_texbufs) {
@@ -891,10 +1105,29 @@ IvGL::useshader(int tex_width, int tex_height, bool pixelview)
         return;
     }
 
-    const ImageSpec& spec(img->spec());
+    use_program();
+    update_uniforms(tex_width, tex_height, pixelview);
+}
 
+
+
+void
+IvGL::use_program(void)
+{
     glUseProgram(m_shader_program);
-    GLERRPRINT("After use program");
+    print_error("After use program");
+}
+
+
+
+void
+IvGL::update_uniforms(int tex_width, int tex_height, bool pixelview)
+{
+    IvImage* img = m_viewer.cur();
+    if (!img)
+        return;
+
+    const ImageSpec& spec(img->spec());
 
     GLint loc;
 
@@ -909,8 +1142,7 @@ IvGL::useshader(int tex_width, int tex_height, bool pixelview)
     // This is the texture unit, not the texture object
     glUniform1i(loc, 0);
 
-    loc = glGetUniformLocation(m_shader_program, "gain");
-
+    loc        = glGetUniformLocation(m_shader_program, "gain");
     float gain = powf(2.0, img->exposure());
     glUniform1f(loc, gain);
 
@@ -934,7 +1166,8 @@ IvGL::useshader(int tex_width, int tex_height, bool pixelview)
 
     loc = glGetUniformLocation(m_shader_program, "height");
     glUniform1i(loc, tex_height);
-    GLERRPRINT("After setting uniforms");
+
+    print_error("After setting uniforms");
 }
 
 
@@ -980,14 +1213,14 @@ IvGL::update()
         glTexImage2D(GL_TEXTURE_2D, 0 /*mip level*/, glinternalformat,
                      m_texture_width, m_texture_height, 0 /*border width*/,
                      glformat, gltype, NULL /*data*/);
-        GLERRPRINT("Setting up texture");
+        print_error("Setting up texture");
     }
 
     // Set the right type for the texture used for pixelview.
     glBindTexture(GL_TEXTURE_2D, m_pixelview_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, glinternalformat, closeuptexsize,
                  closeuptexsize, 0, glformat, gltype, NULL);
-    GLERRPRINT("Setting up pixelview texture");
+    print_error("Setting up pixelview texture");
 
     // Resize the buffer at once, rather than create one each drawing.
     m_tex_buffer.resize(m_texture_width * m_texture_height * nchannels
@@ -1089,23 +1322,113 @@ IvGL::clamp_view_to_window()
 
 
 void
+IvGL::update_area_probe_text()
+{
+    IvImage* img = m_current_image;
+    const ImageSpec& spec(img->spec());
+    // (xw,yw) are the window coordinates of the mouse.
+    int xw, yw;
+    get_focus_window_pixel(xw, yw);
+
+    int x1, y1;
+    get_given_image_pixel(x1, y1, m_select_start.x(), m_select_start.y());
+
+    int x2, y2;
+    get_given_image_pixel(x2, y2, m_select_end.x(), m_select_end.y());
+
+    float scale_x  = 1.0f;
+    float scale_y  = 1.0f;
+    float rotate_z = 0.0f;
+    float x1_img   = x1;
+    float y1_img   = y1;
+    float x2_img   = x2;
+    float y2_img   = y2;
+
+    handle_orientation(img->orientation(), spec.width, spec.height, scale_x,
+                       scale_y, rotate_z, x1_img, y1_img, true);
+    handle_orientation(img->orientation(), spec.width, spec.height, scale_x,
+                       scale_y, rotate_z, x2_img, y2_img, true);
+
+    x1_img = clamp<int>(x1_img, 0, spec.width - 1);
+    x2_img = clamp<int>(x2_img, 0, spec.width - 1);
+    y1_img = clamp<int>(y1_img, 0, spec.height - 1);
+    y2_img = clamp<int>(y2_img, 0, spec.height - 1);
+
+    int xmin = std::min(x1_img, x2_img);
+    int xmax = std::max(x1_img, x2_img);
+    int ymin = std::min(y1_img, y2_img);
+    int ymax = std::max(y1_img, y2_img);
+
+    // Min and max
+    std::vector<float> min_vals(spec.nchannels,
+                                std::numeric_limits<float>::max());
+    std::vector<float> max_vals(spec.nchannels,
+                                std::numeric_limits<float>::lowest());
+    std::vector<double> sums(spec.nchannels, 0.0);
+    int count = 0;
+
+    // loop through each pixel
+    float* fpixel = OIIO_ALLOCA(float, spec.nchannels);
+    for (int y = ymin; y <= ymax; ++y) {
+        for (int x = xmin; x <= xmax; ++x) {
+            img->getpixel(x + spec.x, y + spec.y, fpixel);
+            for (int c = 0; c < spec.nchannels; ++c) {
+                min_vals[c] = std::min(min_vals[c], fpixel[c]);
+                max_vals[c] = std::max(max_vals[c], fpixel[c]);
+                sums[c] += fpixel[c];
+            }
+            ++count;
+        }
+    }
+
+    QString result = "Area Probe:\n";
+    for (int c = 0; c < spec.nchannels; ++c) {
+        float avg = (count > 0) ? static_cast<float>(sums[c] / count) : 0.0f;
+        result += QString("%1: [min: %2  max: %3  avg: %4]\n")
+                      .arg(QString::fromStdString(spec.channel_name(c))
+                               .leftJustified(5))
+                      .arg(min_vals[c], 6, 'f', 3)
+                      .arg(max_vals[c], 6, 'f', 3)
+                      .arg(avg, 6, 'f', 3);
+    }
+
+    m_area_probe_text = result.toStdString();
+}
+
+
+
+void
 IvGL::mousePressEvent(QMouseEvent* event)
 {
     remember_mouse(event->pos());
     int mousemode = m_viewer.mouseModeComboBox->currentIndex();
+    bool areaMode = m_viewer.areaSampleMode();
     bool Alt      = (event->modifiers() & Qt::AltModifier);
     m_drag_button = event->button();
     if (!m_mouse_activation) {
         switch (event->button()) {
         case Qt::LeftButton:
-            if (mousemode == ImageViewer::MouseModeZoom && !Alt)
-                m_viewer.zoomIn();
-            else
+            if (areaMode) {
+                m_select_start = event->pos();
+                m_select_end   = m_select_start;
+                m_selecting    = true;
+                parent_t::update();
+            } else if (mousemode == ImageViewer::MouseModeSelect && !Alt
+                       && areaMode) {
+                std::cerr << areaMode;
+                m_select_start = event->pos();
+                m_select_end   = m_select_start;
+                m_selecting    = true;
+                parent_t::update();
+            } else if (mousemode == ImageViewer::MouseModeZoom && !Alt
+                       && !areaMode) {
+                m_viewer.zoomIn(true);  // Animated zoom for mouse clicks
+            } else
                 m_dragging = true;
             return;
         case Qt::RightButton:
-            if (mousemode == ImageViewer::MouseModeZoom && !Alt)
-                m_viewer.zoomOut();
+            if (mousemode == ImageViewer::MouseModeZoom && !Alt && !areaMode)
+                m_viewer.zoomOut(true);  // Animated zoom for mouse clicks
             else
                 m_dragging = true;
             return;
@@ -1132,6 +1455,14 @@ IvGL::mouseReleaseEvent(QMouseEvent* event)
     remember_mouse(event->pos());
     m_drag_button = Qt::NoButton;
     m_dragging    = false;
+    if (m_selecting) {
+        m_select_end = event->pos();
+        m_selecting  = false;
+        update_area_probe_text();
+        m_select_start = QPoint();
+        m_select_end   = QPoint();
+        parent_t::update();
+    }
     parent_t::mouseReleaseEvent(event);
 }
 
@@ -1141,6 +1472,20 @@ void
 IvGL::mouseMoveEvent(QMouseEvent* event)
 {
     QPoint pos = event->pos();
+
+    // Area probe override
+    if (m_viewer.areaSampleMode() && m_selecting) {
+        m_select_end = event->pos();
+        update_area_probe_text();
+        remember_mouse(pos);
+        parent_t::update();
+        if (m_viewer.pixelviewOn()) {
+            parent_t::update();
+        }
+        parent_t::mouseMoveEvent(event);
+        return;
+    }
+
     // FIXME - there's probably a better Qt way than tracking the button
     // myself.
     bool Alt      = (event->modifiers() & Qt::AltModifier);
@@ -1191,6 +1536,10 @@ IvGL::mouseMoveEvent(QMouseEvent* event)
     } else if (do_wipe) {
         // FIXME -- unimplemented
     } else if (do_select) {
+        if (m_selecting) {
+            m_select_end = event->pos();
+            parent_t::update();
+        }
         // FIXME -- unimplemented
     } else if (do_annotate) {
         // FIXME -- unimplemented
@@ -1202,6 +1551,7 @@ IvGL::mouseMoveEvent(QMouseEvent* event)
 }
 
 
+
 void
 IvGL::wheelEvent(QWheelEvent* event)
 {
@@ -1209,9 +1559,11 @@ IvGL::wheelEvent(QWheelEvent* event)
     QPoint angdelta    = event->angleDelta() / 8;  // div by 8 to get degrees
     if (abs(angdelta.y()) > abs(angdelta.x())      // predominantly vertical
         && abs(angdelta.y()) > 2) {                // suppress tiny motions
-        float oldzoom = m_viewer.zoom();
-        float newzoom = (angdelta.y() > 0) ? ceil2f(oldzoom) : floor2f(oldzoom);
-        m_viewer.zoom(newzoom);
+        if (angdelta.y() > 0) {
+            m_viewer.zoomIn(false);
+        } else {
+            m_viewer.zoomOut(false);
+        }
         event->accept();
     }
     // TODO: Update this to keep the zoom centered on the event .x, .y
@@ -1232,6 +1584,33 @@ IvGL::get_focus_window_pixel(int& x, int& y)
 {
     x = m_mousex;
     y = m_mousey;
+}
+
+
+
+void
+IvGL::get_given_image_pixel(int& x, int& y, int mouseX, int mouseY)
+{
+    int w = width(), h = height();
+    float z = m_zoom;
+    // left,top,right,bottom are the borders of the visible window, in
+    // pixel coordinates
+    float left   = m_centerx - 0.5 * w / z;
+    float top    = m_centery - 0.5 * h / z;
+    float right  = m_centerx + 0.5 * w / z;
+    float bottom = m_centery + 0.5 * h / z;
+    // normx,normy are the position of the mouse, in normalized (i.e. [0..1])
+    // visible window coordinates.
+    float normx = (float)(mouseX + 0.5f) / w;
+    float normy = (float)(mouseY + 0.5f) / h;
+    // imgx,imgy are the position of the mouse, in pixel coordinates
+    float imgx = OIIO::lerp(left, right, normx);
+    float imgy = OIIO::lerp(top, bottom, normy);
+    // So finally x,y are the coordinates of the image pixel (on [0,res-1])
+    // underneath the mouse cursor.
+    //FIXME: Shouldn't this take image rotation into account?
+    x = (int)floorf(imgx);
+    y = (int)floorf(imgy);
 }
 
 
@@ -1272,6 +1651,7 @@ IvGL::get_focus_image_pixel(int& x, int& y)
     std::cerr << "    mouse pixel image coords " << x << ' ' << y << "\n";
 #endif
 }
+
 
 
 void
@@ -1479,28 +1859,33 @@ IvGL::load_texture(int x, int y, int width, int height)
     // may not be resident at once.
     if (!m_use_shaders) {
         m_current_image->get_pixels(ROI(x, x + width, y, y + height),
-                                    spec.format, &m_tex_buffer[0]);
+                                    spec.format,
+                                    as_writable_bytes(make_span(m_tex_buffer)));
     } else {
         m_current_image->get_pixels(ROI(x, x + width, y, y + height, 0, 1,
                                         m_viewer.current_channel(),
                                         m_viewer.current_channel() + nchannels),
-                                    spec.format, &m_tex_buffer[0]);
+                                    spec.format,
+                                    as_writable_bytes(make_span(m_tex_buffer)));
     }
 
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo_objects[m_last_pbo_used]);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * spec.pixel_bytes(),
+    glBufferData(GL_PIXEL_UNPACK_BUFFER,
+                 GLsizeiptr(uint64_t(width) * uint64_t(height)
+                            * uint64_t(nchannels)
+                            * uint64_t(spec.format.size())),
                  &m_tex_buffer[0], GL_STREAM_DRAW);
-    GLERRPRINT("After buffer data");
+    print_error("After buffer data");
     m_last_pbo_used = (m_last_pbo_used + 1) & 1;
 
     // When using PBO this is the offset within the buffer.
     void* data = 0;
 
     glBindTexture(GL_TEXTURE_2D, tb.tex_object);
-    GLERRPRINT("After bind texture");
+    print_error("After bind texture");
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, glformat, gltype,
                     data);
-    GLERRPRINT("After loading sub image");
+    print_error("After loading sub image");
     m_last_texbuf_used = (m_last_texbuf_used + 1) % m_texbufs.size();
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
@@ -1514,3 +1899,23 @@ IvGL::is_too_big(float width, float height)
                                         * ceilf(height / m_max_texture_size));
     return tiles > m_texbufs.size();
 }
+
+
+
+void
+IvGL::update_state(void)
+{
+    create_shaders();
+}
+
+
+
+void
+IvGL::print_error(const char* msg)
+{
+    for (GLenum err = glGetError(); err != GL_NO_ERROR; err = glGetError())
+        std::cerr << "GL error " << msg << " " << (int)err << " - "
+                  << gl_err_to_string(err) << "\n";
+}
+
+OIIO_PRAGMA_WARNING_POP

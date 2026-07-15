@@ -1,5 +1,5 @@
 // Ceres Solver - A fast non-linear least squares minimizer
-// Copyright 2017 Google Inc. All rights reserved.
+// Copyright 2023 Google Inc. All rights reserved.
 // http://ceres-solver.org/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,10 +28,12 @@
 //
 // Author: sameeragarwal@google.com (Sameer Agarwal)
 
+#include <memory>
+
+#include "Eigen/Cholesky"
 #include "ceres/block_sparse_matrix.h"
 #include "ceres/casts.h"
 #include "ceres/context_impl.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/linear_least_squares_problems.h"
 #include "ceres/linear_solver.h"
 #include "ceres/triplet_sparse_matrix.h"
@@ -39,10 +41,7 @@
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
-#include "Eigen/Cholesky"
-
-namespace ceres {
-namespace internal {
+namespace ceres::internal {
 
 // TODO(sameeragarwal): These tests needs to be re-written, since
 // SparseNormalCholeskySolver is a composition of two classes now,
@@ -53,21 +52,21 @@ namespace internal {
 // classes.
 class SparseNormalCholeskySolverTest : public ::testing::Test {
  protected:
-  virtual void SetUp() {
-    scoped_ptr<LinearLeastSquaresProblem> problem(
-        CreateLinearLeastSquaresProblemFromId(2));
+  void SetUp() final {
+    std::unique_ptr<LinearLeastSquaresProblem> problem =
+        CreateLinearLeastSquaresProblemFromId(2);
 
-    CHECK_NOTNULL(problem.get());
+    CHECK(problem != nullptr);
     A_.reset(down_cast<BlockSparseMatrix*>(problem->A.release()));
-    b_.reset(problem->b.release());
-    D_.reset(problem->D.release());
+    b_ = std::move(problem->b);
+    D_ = std::move(problem->D);
   }
 
   void TestSolver(const LinearSolver::Options& options, double* D) {
     Matrix dense_A;
     A_->ToDenseMatrix(&dense_A);
     Matrix lhs = dense_A.transpose() * dense_A;
-    if (D != NULL) {
+    if (D != nullptr) {
       lhs += (ConstVectorRef(D, A_->num_cols()).array() *
               ConstVectorRef(D, A_->num_cols()).array())
                  .matrix()
@@ -76,10 +75,10 @@ class SparseNormalCholeskySolverTest : public ::testing::Test {
 
     Vector rhs(A_->num_cols());
     rhs.setZero();
-    A_->LeftMultiply(b_.get(), rhs.data());
+    A_->LeftMultiplyAndAccumulate(b_.get(), rhs.data());
     Vector expected_solution = lhs.llt().solve(rhs);
 
-    scoped_ptr<LinearSolver> solver(LinearSolver::Create(options));
+    std::unique_ptr<LinearSolver> solver(LinearSolver::Create(options));
     LinearSolver::PerSolveOptions per_solve_options;
     per_solve_options.D = D;
     Vector actual_solution(A_->num_cols());
@@ -87,7 +86,7 @@ class SparseNormalCholeskySolverTest : public ::testing::Test {
     summary = solver->Solve(
         A_.get(), b_.get(), per_solve_options, actual_solution.data());
 
-    EXPECT_EQ(summary.termination_type, LINEAR_SOLVER_SUCCESS);
+    EXPECT_EQ(summary.termination_type, LinearSolverTerminationType::SUCCESS);
 
     for (int i = 0; i < A_->num_cols(); ++i) {
       EXPECT_NEAR(expected_solution(i), actual_solution(i), 1e-8)
@@ -97,13 +96,13 @@ class SparseNormalCholeskySolverTest : public ::testing::Test {
   }
 
   void TestSolver(const LinearSolver::Options& options) {
-    TestSolver(options, NULL);
+    TestSolver(options, nullptr);
     TestSolver(options, D_.get());
   }
 
-  scoped_ptr<BlockSparseMatrix> A_;
-  scoped_array<double> b_;
-  scoped_array<double> D_;
+  std::unique_ptr<BlockSparseMatrix> A_;
+  std::unique_ptr<double[]> b_;
+  std::unique_ptr<double[]> D_;
 };
 
 #ifndef CERES_NO_SUITESPARSE
@@ -112,7 +111,7 @@ TEST_F(SparseNormalCholeskySolverTest,
   LinearSolver::Options options;
   options.sparse_linear_algebra_library_type = SUITE_SPARSE;
   options.type = SPARSE_NORMAL_CHOLESKY;
-  options.use_postordering = false;
+  options.ordering_type = OrderingType::NATURAL;
   ContextImpl context;
   options.context = &context;
   TestSolver(options);
@@ -123,31 +122,31 @@ TEST_F(SparseNormalCholeskySolverTest,
   LinearSolver::Options options;
   options.sparse_linear_algebra_library_type = SUITE_SPARSE;
   options.type = SPARSE_NORMAL_CHOLESKY;
-  options.use_postordering = true;
+  options.ordering_type = OrderingType::AMD;
   ContextImpl context;
   options.context = &context;
   TestSolver(options);
 }
 #endif
 
-#ifndef CERES_NO_CXSPARSE
+#ifndef CERES_NO_ACCELERATE_SPARSE
 TEST_F(SparseNormalCholeskySolverTest,
-       SparseNormalCholeskyUsingCXSparsePreOrdering) {
+       SparseNormalCholeskyUsingAccelerateSparsePreOrdering) {
   LinearSolver::Options options;
-  options.sparse_linear_algebra_library_type = CX_SPARSE;
+  options.sparse_linear_algebra_library_type = ACCELERATE_SPARSE;
   options.type = SPARSE_NORMAL_CHOLESKY;
-  options.use_postordering = false;
+  options.ordering_type = OrderingType::NATURAL;
   ContextImpl context;
   options.context = &context;
   TestSolver(options);
 }
 
 TEST_F(SparseNormalCholeskySolverTest,
-       SparseNormalCholeskyUsingCXSparsePostOrdering) {
+       SparseNormalCholeskyUsingAcceleratePostOrdering) {
   LinearSolver::Options options;
-  options.sparse_linear_algebra_library_type = CX_SPARSE;
+  options.sparse_linear_algebra_library_type = ACCELERATE_SPARSE;
   options.type = SPARSE_NORMAL_CHOLESKY;
-  options.use_postordering = true;
+  options.ordering_type = OrderingType::AMD;
   ContextImpl context;
   options.context = &context;
   TestSolver(options);
@@ -160,7 +159,7 @@ TEST_F(SparseNormalCholeskySolverTest,
   LinearSolver::Options options;
   options.sparse_linear_algebra_library_type = EIGEN_SPARSE;
   options.type = SPARSE_NORMAL_CHOLESKY;
-  options.use_postordering = false;
+  options.ordering_type = OrderingType::NATURAL;
   ContextImpl context;
   options.context = &context;
   TestSolver(options);
@@ -171,12 +170,11 @@ TEST_F(SparseNormalCholeskySolverTest,
   LinearSolver::Options options;
   options.sparse_linear_algebra_library_type = EIGEN_SPARSE;
   options.type = SPARSE_NORMAL_CHOLESKY;
-  options.use_postordering = true;
+  options.ordering_type = OrderingType::AMD;
   ContextImpl context;
   options.context = &context;
   TestSolver(options);
 }
 #endif  // CERES_USE_EIGEN_SPARSE
 
-}  // namespace internal
-}  // namespace ceres
+}  // namespace ceres::internal

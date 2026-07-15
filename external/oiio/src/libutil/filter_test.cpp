@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <vector>
 
@@ -19,6 +19,7 @@ using namespace OIIO;
 static int iterations = 10;
 static int ntrials    = 5;
 static bool verbose   = false;
+static bool graph     = false;
 static bool normalize = false;
 static int graphxres = 1280, graphyres = 500;
 static int graphyzero  = graphyres * 3 / 4;
@@ -38,9 +39,9 @@ getargs(int argc, char* argv[])
     ap.arg("-v", &verbose)
       .help("Verbose mode");
     // ap.arg("--threads %d", &numthreads)
-    //   .help(Strutil::sprintf("Number of threads (default: %d)", numthreads));
+    //   .help(Strutil::fmt::format("Number of threads (default: {})", numthreads));
     ap.arg("--iters %d", &iterations)
-      .help(Strutil::sprintf("Number of iterations (default: %d)", iterations));
+      .help(Strutil::fmt::format("Number of iterations (default: {})", iterations));
     ap.arg("--trials %d", &ntrials)
       .help("Number of trials");
     ap.arg("--normalize", &normalize)
@@ -48,6 +49,179 @@ getargs(int argc, char* argv[])
     // clang-format on
 
     ap.parse(argc, (const char**)argv);
+}
+
+
+
+void
+test_1d()
+{
+    print("\nTesting 1D filters\n");
+    for (int i = 0, e = Filter1D::num_filters(); i < e; ++i) {
+        FilterDesc filtdesc;
+        Filter1D::get_filterdesc(i, &filtdesc);
+        auto filter = Filter1D::create_shared(filtdesc.name, filtdesc.width);
+        print("1D {:<20s}: ", filter->name());
+        for (float x = 0.0f; x <= filter->width() / 2.0f; x += 0.5f) {
+            float y = (*filter)(x);
+            print("{:.1f}, {:.4f}  ", x, y);
+        }
+        print("\n");
+    }
+}
+
+
+
+void
+test_2d()
+{
+    print("\nTesting 2D filters\n");
+    for (int i = 0, e = Filter1D::num_filters(); i < e; ++i) {
+        FilterDesc filtdesc;
+        Filter2D::get_filterdesc(i, &filtdesc);
+        auto filter = Filter2D::create_shared(filtdesc.name, filtdesc.width,
+                                              filtdesc.width);
+        print("2D {:<20s}: ", filter->name());
+        for (float x = 0.0f; x <= filter->width() / 2.0f; x += 0.5f) {
+            float y = (*filter)(x, 0.0f);
+            print("{:.1f}, {:.4f}  ", x, y);
+        }
+        print("\n");
+    }
+}
+
+
+
+void
+graph_1d()
+{
+    print("\nGraphing 1D filters\n");
+
+    Benchmarker bench;
+    bench.iterations(iterations);
+    bench.trials(ntrials);
+    // bench.units (Benchmarker::Unit::ms);
+
+    ImageBuf graph(ImageSpec(graphxres, graphyres, 3, TypeDesc::UINT8));
+    float white[3] = { 1, 1, 1 };
+    float black[3] = { 0, 0, 0 };
+    ImageBufAlgo::fill(graph, cspan<float>(white));
+    ImageBufAlgo::render_line(graph, 0, graphyzero, graphxres - 1, graphyzero,
+                              cspan<float>(black));
+    ImageBufAlgo::render_line(graph, graphxzero, 0, graphxzero, graphyres - 1,
+                              cspan<float>(black));
+    int lastx = 0, lasty = 0;
+    for (int i = 0, e = Filter1D::num_filters(); i < e; ++i) {
+        FilterDesc filtdesc;
+        Filter1D::get_filterdesc(i, &filtdesc);
+        auto filter = Filter1D::create_shared(filtdesc.name, filtdesc.width);
+        auto f      = filter.get();
+        // Graph it
+        float scale          = normalize ? 1.0f / (*f)(0.0f) : 1.0f;
+        float color[3]       = { 0.25f * (i & 3), 0.25f * ((i >> 2) & 3),
+                                 0.25f * ((i >> 4) & 3) };
+        std::string filtname = filtdesc.name;
+        if (filtdesc.name != f->name())
+            filtname = Strutil::fmt::format("{} ({})", filtname, f->name());
+        ImageBufAlgo::render_text(graph, 10, 20 + i * 20, filtname, 16,
+                                  "" /*font name*/, cspan<float>(color));
+        for (int x = 0; x < graphxres; ++x) {
+            float xx = float(x - graphxzero) / graphunit;
+            float yy = (*f)(xx)*scale;
+            int y    = int(graphyzero - yy * graphunit);
+            if (x > 0)
+                ImageBufAlgo::render_line(graph, lastx, lasty, x, y, color);
+            lastx = x;
+            lasty = y;
+        }
+
+        // Time it
+        bench(filtdesc.name, [=]() { DoNotOptimize((*f)(0.25f)); });
+    }
+
+    graph.write("filters.tif");
+}
+
+
+
+void
+graph_2d()
+{
+    print("\nGraphing 2D filters\n");
+
+    ImageBuf graph(ImageSpec(graphxres, graphyres, 3, TypeDesc::UINT8));
+    float white[3] = { 1, 1, 1 };
+    float black[3] = { 0, 0, 0 };
+    ImageBufAlgo::fill(graph, cspan<float>(white));
+    ImageBufAlgo::render_line(graph, 0, graphyzero, graphxres - 1, graphyzero,
+                              black);
+    ImageBufAlgo::render_line(graph, graphxzero, 0, graphxzero, graphyres - 1,
+                              black);
+    int lastx = 0, lasty = 0;
+    for (int i = 0, e = Filter2D::num_filters(); i < e; ++i) {
+        FilterDesc filtdesc;
+        Filter2D::get_filterdesc(i, &filtdesc);
+        auto filter = Filter2D::create_shared(filtdesc.name, filtdesc.width,
+                                              filtdesc.width);
+        auto f      = filter.get();
+        // Graph it
+        float scale          = normalize ? 1.0f / (*f)(0.0f, 0.0f) : 1.0f;
+        float color[3]       = { 0.25f * (i & 3), 0.25f * ((i >> 2) & 3),
+                                 0.25f * ((i >> 4) & 3) };
+        std::string filtname = filtdesc.name;
+        if (filtdesc.name != f->name())
+            filtname = Strutil::fmt::format("{} ({})", filtname, f->name());
+        ImageBufAlgo::render_text(graph, 10, 20 + i * 20, filtname, 16,
+                                  "" /*font name*/, cspan<float>(color));
+        for (int x = 0; x < graphxres; ++x) {
+            float xx = float(x - graphxzero) / graphunit;
+            float yy = (*f)(xx, 0.0f) * scale;
+            int y    = int(graphyzero - yy * graphunit);
+            if (x > 0)
+                ImageBufAlgo::render_line(graph, lastx, lasty, x, y,
+                                          cspan<float>(color));
+            lastx = x;
+            lasty = y;
+        }
+    }
+    graph.write("filters2d.tif");
+}
+
+
+
+void
+bench_1d()
+{
+    print("\nBenchmarking 1D filters\n");
+    Benchmarker bench;
+    bench.iterations(iterations);
+    bench.trials(ntrials);
+    for (int i = 0, e = Filter1D::num_filters(); i < e; ++i) {
+        FilterDesc filtdesc;
+        Filter1D::get_filterdesc(i, &filtdesc);
+        auto filter = Filter1D::create_shared(filtdesc.name, filtdesc.width);
+        auto f      = filter.get();
+        bench(filtdesc.name, [=]() { DoNotOptimize((*f)(0.25f)); });
+    }
+}
+
+
+
+void
+bench_2d()
+{
+    print("\nBenchmarking 2D filters\n");
+    Benchmarker bench;
+    bench.iterations(iterations);
+    bench.trials(ntrials);
+    for (int i = 0, e = Filter2D::num_filters(); i < e; ++i) {
+        FilterDesc filtdesc;
+        Filter2D::get_filterdesc(i, &filtdesc);
+        auto filter = Filter2D::create_shared(filtdesc.name, filtdesc.width,
+                                              filtdesc.width);
+        auto f      = filter.get();
+        bench(filtdesc.name, [=]() { DoNotOptimize((*f)(0.25f, 0.25f)); });
+    }
 }
 
 
@@ -65,53 +239,12 @@ main(int argc, char* argv[])
 
     getargs(argc, argv);
 
-    Benchmarker bench;
-    bench.iterations(iterations);
-    bench.trials(ntrials);
-    // bench.units (Benchmarker::Unit::ms);
-
-    ImageBuf graph(ImageSpec(graphxres, graphyres, 3, TypeDesc::UINT8));
-    float white[3] = { 1, 1, 1 };
-    float black[3] = { 0, 0, 0 };
-    ImageBufAlgo::fill(graph, white);
-    ImageBufAlgo::render_line(graph, 0, graphyzero, graphxres - 1, graphyzero,
-                              black);
-    ImageBufAlgo::render_line(graph, graphxzero, 0, graphxzero, graphyres - 1,
-                              black);
-    int lastx = 0, lasty = 0;
-    for (int i = 0, e = Filter1D::num_filters(); i < e; ++i) {
-        FilterDesc filtdesc;
-        Filter1D::get_filterdesc(i, &filtdesc);
-        Filter1D* f = Filter1D::create(filtdesc.name, filtdesc.width);
-        float scale = normalize ? 1.0f / (*f)(0.0f) : 1.0f;
-        // Graph it
-        float color[3] = { 0.25f * (i & 3), 0.25f * ((i >> 2) & 3),
-                           0.25f * ((i >> 4) & 3) };
-        ImageBufAlgo::render_text(graph, 10, 20 + i * 20, filtdesc.name, 16,
-                                  "" /*font name*/, color);
-        for (int x = 0; x < graphxres; ++x) {
-            float xx = float(x - graphxzero) / graphunit;
-            float yy = (*f)(xx)*scale;
-            int y    = int(graphyzero - yy * graphunit);
-            if (x > 0)
-                ImageBufAlgo::render_line(graph, lastx, lasty, x, y, color);
-            lastx = x;
-            lasty = y;
-        }
-
-        // Time it
-        const size_t ncalls = 100000;
-        bench.work(ncalls);
-        float ninv = (filtdesc.width / 2.0f) / ncalls;
-        bench(filtdesc.name, [=]() {
-            for (size_t i = 0; i < ncalls; ++i)
-                DoNotOptimize((*f)(i * ninv));
-        });
-
-        Filter1D::destroy(f);
+    test_1d();
+    test_2d();
+    if (graph) {
+        test_1d();
+        test_2d();
     }
-
-    graph.write("filters.tif");
-
-    return unit_test_failures != 0;
+    bench_1d();
+    bench_2d();
 }

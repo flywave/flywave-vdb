@@ -1,8 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
-
-#include <cstdio>
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/imagebufalgo.h>
@@ -20,31 +18,41 @@ namespace webp_pvt {
 class WebpInput final : public ImageInput {
 public:
     WebpInput() {}
-    virtual ~WebpInput() { close(); }
-    virtual const char* format_name() const override { return "webp"; }
-    virtual int supports(string_view feature) const override
+    ~WebpInput() override { close(); }
+    const char* format_name() const override { return "webp"; }
+    int supports(string_view feature) const override
     {
-        return (feature == "exif");
+        return feature == "exif" || feature == "ioproxy";
     }
-    virtual bool open(const std::string& name, ImageSpec& spec) override;
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool close() override;
-    virtual int current_subimage(void) const override { return m_subimage; }
+    bool valid_file(Filesystem::IOProxy* ioproxy) const override;
+    bool open(const std::string& name, ImageSpec& spec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
+    bool close() override;
+    int current_subimage(void) const override { return m_subimage; }
 
 private:
     std::string m_filename;
     std::unique_ptr<uint8_t[]> m_encoded_image;
-    std::unique_ptr<uint8_t> m_decoded_image;
+    std::unique_ptr<uint8_t[]> m_decoded_image;
     uint64_t m_image_size    = 0;
     long int m_scanline_size = 0;
     uint32_t m_demux_flags   = 0;
     int m_frame_count        = 1;
     WebPDemuxer* m_demux     = nullptr;
     WebPIterator m_iter;
-    int m_subimage      = -1;  // Subimage we're pointed to
-    int m_subimage_read = -1;  // Subimage stored in decoded_image
+    int m_subimage      = -1;                // Subimage we're pointed to
+    int m_subimage_read = -1;                // Subimage stored in decoded_image
+    bool m_keep_unassociated_alpha = false;  // Do not convert unassociated alpha
+
+    void init(void)
+    {
+        m_filename.clear();
+        ioproxy_clear();
+    }
 
     // Reposition the m_iter to the desired subimage, return true for
     // success and adjust m_subimage, false for failure.
@@ -73,67 +81,61 @@ private:
 
 
 bool
-WebpInput::open(const std::string& name, ImageSpec& spec)
+WebpInput::valid_file(Filesystem::IOProxy* ioproxy) const
+{
+    if (!ioproxy || ioproxy->mode() != Filesystem::IOProxy::Mode::Read)
+        return false;
+
+    uint8_t header[64] {};
+    const size_t numRead = ioproxy->pread(header, sizeof(header), 0);
+    return WebPGetInfo(header, numRead, nullptr, nullptr);
+}
+
+
+
+bool
+WebpInput::open(const std::string& name, ImageSpec& newspec)
+{
+    return open(name, newspec, ImageSpec());
+}
+
+
+
+bool
+WebpInput::open(const std::string& name, ImageSpec& spec,
+                const ImageSpec& config)
 {
     m_filename = name;
 
-    // Perform preliminary test on file type.
-    if (!Filesystem::is_regular(m_filename)) {
-        errorf("Not a regular file \"%s\"", m_filename);
+    ioproxy_retrieve_from_config(config);
+    if (!ioproxy_use_or_open(name))
         return false;
-    }
+    Filesystem::IOProxy* io = ioproxy();
 
     // Get file size and check we've got enough data to decode WebP.
-    m_image_size = Filesystem::file_size(name);
-    if (m_image_size == uint64_t(-1)) {
-        errorf("Failed to get size for \"%s\"", m_filename);
-        return false;
-    }
-    if (m_image_size < 12) {
-        errorf("File size is less than WebP header for file \"%s\"",
-               m_filename);
-        return false;
-    }
-    if (m_image_size > std::numeric_limits<size_t>::max()) {
-        errorf("Image size (%d) is too big to read", m_image_size);
-    }
-
-    FILE* file = Filesystem::fopen(m_filename, "rb");
-    if (!file) {
-        errorf("Could not open file \"%s\"", m_filename);
+    m_image_size = io->size();
+    if (m_image_size == size_t(-1)) {
+        errorfmt("Failed to get size for \"{}\"", m_filename);
         return false;
     }
 
     // Read header and verify we've got WebP image.
     std::vector<uint8_t> image_header;
     image_header.resize(std::min(m_image_size, (uint64_t)64), 0);
-    size_t numRead = fread(&image_header[0], sizeof(uint8_t),
-                           image_header.size(), file);
-    if (numRead != image_header.size()) {
-        errorf("Read failure for header of \"%s\" (expected %d bytes, read %d)",
-               m_filename, image_header.size(), numRead);
-        fclose(file);
+    if (!io->pread(image_header.data(), image_header.size(), 0)) {
         close();
         return false;
     }
 
-    int width = 0, height = 0;
-    if (!WebPGetInfo(&image_header[0], image_header.size(), &width, &height)) {
-        errorf("%s is not a WebP image file", m_filename);
-        fclose(file);
+    if (!valid_file(io)) {
+        errorfmt("{} is not a WebP image file", m_filename);
         close();
         return false;
     }
 
     // Read actual data and decode.
     m_encoded_image.reset(new uint8_t[m_image_size]);
-    fseek(file, 0, SEEK_SET);
-    numRead = fread(m_encoded_image.get(), sizeof(uint8_t), m_image_size, file);
-    fclose(file);
-    file = nullptr;
-    if (numRead != m_image_size) {
-        errorf("Read failure for \"%s\" (expected %d bytes, read %d)",
-               m_filename, m_image_size, numRead);
+    if (!io->pread(m_encoded_image.get(), m_image_size, 0)) {
         close();
         return false;
     }
@@ -142,7 +144,7 @@ WebpInput::open(const std::string& name, ImageSpec& spec)
     WebPData bitstream { m_encoded_image.get(), size_t(m_image_size) };
     m_demux = WebPDemux(&bitstream);
     if (!m_demux) {
-        errorf("Couldn't decode");
+        errorfmt("Couldn't decode");
         close();
         return false;
     }
@@ -160,13 +162,15 @@ WebpInput::open(const std::string& name, ImageSpec& spec)
 
     m_spec = ImageSpec(w, h, (m_demux_flags & ALPHA_FLAG) ? 4 : 3, TypeUInt8);
     m_scanline_size = m_spec.scanline_bytes();
-    m_spec.attribute("oiio:ColorSpace", "sRGB");  // webp is always sRGB
+    m_spec.set_colorspace("sRGB");  // webp is always sRGB
     if (m_demux_flags & ANIMATION_FLAG) {
         m_spec.attribute("oiio:Movie", 1);
         m_frame_count       = (int)WebPDemuxGetI(m_demux, WEBP_FF_FRAME_COUNT);
         uint32_t loop_count = WebPDemuxGetI(m_demux, WEBP_FF_LOOP_COUNT);
-        if (loop_count)
-            m_spec.attribute("webp:LoopCount", (int)loop_count);
+        if (loop_count) {
+            m_spec.attribute("oiio:LoopCount", (int)loop_count);
+            m_spec.attribute("webp:LoopCount", (int)loop_count);  // DEPRECATED
+        }
         // uint32_t bgcolor = WebPDemuxGetI(m_demux, WEBP_FF_BACKGROUND_COLOR    );
         // Strutil::print("  animated {} frames, loop {}, bgcolor={}\n",
         //                frame_count, loop_count, bgcolor);
@@ -191,15 +195,27 @@ WebpInput::open(const std::string& name, ImageSpec& spec)
     }
     if (m_demux_flags & ICCP_FLAG
         && WebPDemuxGetChunk(m_demux, "ICCP", 1, &chunk_iter)) {
-        // FIXME: This is where we would extract an ICC profile. Come back
-        // to this when I have found an example webp containing an ICC
-        // profile that I can use as a test case, otherwise I'm just
-        // guessing.
+        cspan<uint8_t> icc_span(chunk_iter.chunk.bytes, chunk_iter.chunk.size);
+        m_spec.attribute("ICCProfile",
+                         TypeDesc(TypeDesc::UINT8, icc_span.size_bytes()),
+                         icc_span.data());
+
+        std::string errormsg;
+        const bool ok = decode_icc_profile(icc_span, m_spec, errormsg);
         WebPDemuxReleaseChunkIterator(&chunk_iter);
+
+        if (!ok && OIIO::get_int_attribute("imageinput:strict")) {
+            errorfmt("Possible corrupt file, could not decode ICC profile: {}\n",
+                     errormsg);
+            return false;
+        }
     }
 
     // Make space for the decoded image
     m_decoded_image.reset(new uint8_t[m_spec.image_bytes()]);
+
+    if (config.get_int_attribute("oiio:UnassociatedAlpha", 0) == 1)
+        m_keep_unassociated_alpha = true;
 
     seek_subimage(0, 0);
     spec = m_spec;
@@ -236,7 +252,7 @@ WebpInput::read_subimage(int subimage, bool read)
     if (!read)
         return iter_to_subimage(subimage);
 
-    // If we're pointing to (and have read) the imediately previous frame,
+    // If we're pointing to (and have read) the immediately previous frame,
     // catch up.
     if (m_subimage == subimage - 1 && m_subimage_read == subimage - 1) {
         if (!iter_to_subimage(subimage))
@@ -303,16 +319,23 @@ WebpInput::read_current_subimage()
                                        m_decoded_image.get() + offset,
                                        m_spec.image_bytes() - offset,
                                        m_spec.scanline_bytes());
-            // WebP requires unassociated alpha, and it's sRGB.
-            // Handle this all by wrapping an IB around it.
-            ImageBuf fullbuf(m_spec, m_decoded_image.get());
-            ImageBufAlgo::premult(fullbuf, fullbuf);
+
+            // WebP is unassociated alpha and sRGB.
+            // Convert to the OIIO-native associated form if required.
+            if (!m_keep_unassociated_alpha) {
+                ImageBuf fullbuf(
+                    m_spec, span<std::byte>((std::byte*)m_decoded_image.get(),
+                                            m_spec.image_bytes()));
+                ImageBufAlgo::premult(fullbuf, fullbuf);
+            }
         }
     } else {
         // This subimage writes *atop* the prior image, we must composite
         ImageSpec fullspec(m_spec.width, m_spec.height, m_spec.nchannels,
                            m_spec.format);
-        ImageBuf fullbuf(fullspec, m_decoded_image.get());
+        ImageBuf fullbuf(fullspec,
+                         span<std::byte>((std::byte*)m_decoded_image.get(),
+                                         fullspec.image_bytes()));
         ImageSpec fragspec(m_iter.width, m_iter.height, 4, TypeUInt8);
         fragspec.x = m_iter.x_offset;
         fragspec.y = m_iter.y_offset;
@@ -321,10 +344,14 @@ WebpInput::read_current_subimage()
                                    (uint8_t*)fragbuf.localpixels(),
                                    fragspec.image_bytes(),
                                    fragspec.scanline_bytes());
-        // WebP requires unassociated alpha, and it's sRGB.
-        // Handle this all by wrapping an IB around it.
-        ImageBufAlgo::premult(fragbuf, fragbuf);
-        ImageBufAlgo::over(fullbuf, fragbuf, fullbuf);
+
+
+        // WebP is unassociated alpha and sRGB.
+        // Convert to the OIIO-native associated form if required.
+        if (!m_keep_unassociated_alpha) {
+            ImageBufAlgo::premult(fragbuf, fragbuf);
+            ImageBufAlgo::over(fullbuf, fragbuf, fullbuf);
+        }
     }
 
     if (!okptr) {
@@ -364,13 +391,15 @@ WebpInput::close()
     }
     m_decoded_image.reset();
     m_encoded_image.reset();
-    m_subimage = -1;
+    m_subimage                = -1;
+    m_keep_unassociated_alpha = false;
+    init();
     return true;
 }
 
 }  // namespace webp_pvt
 
-// Obligatory material to make this a recognizeable imageio plugin
+// Obligatory material to make this a recognizable imageio plugin
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT int webp_imageio_version = OIIO_PLUGIN_VERSION;
@@ -379,7 +408,7 @@ OIIO_EXPORT const char*
 webp_imageio_library_version()
 {
     int v = WebPGetDecoderVersion();
-    return ustring::sprintf("Webp %d.%d.%d", v >> 16, (v >> 8) & 255, v & 255)
+    return ustring::fmtformat("Webp {}.{}.{}", v >> 16, (v >> 8) & 255, v & 255)
         .c_str();
 }
 

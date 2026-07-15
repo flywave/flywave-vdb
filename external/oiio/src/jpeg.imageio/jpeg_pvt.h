@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -21,11 +21,26 @@ extern "C" {
 #include "jpeglib.h"
 }
 
+#if JPEG_LIB_VERSION < 80
+//#    error "Only libjpeg 8+ is supported (JPEG_LIB_VERSION >= 80)"
+#endif
+
+#ifdef JPEG_LIB_VERSION_MINOR
+#    define OIIO_JPEG_LIB_VERSION \
+        (JPEG_LIB_VERSION_MAJOR * 10 + JPEG_LIB_VERSION_MINOR)
+#else
+#    define OIIO_JPEG_LIB_VERSION JPEG_LIB_VERSION
+#endif
+
+#if defined(USE_UHDR)
+#    include <ultrahdr_api.h>
+#endif
+
 
 OIIO_PLUGIN_NAMESPACE_BEGIN
 
 
-#define MAX_DATA_BYTES_IN_MARKER 65519L
+#define MAX_DATA_BYTES_IN_MARKER 65519UL
 #define ICC_HEADER_SIZE 14
 #define ICC_PROFILE_ATTR "ICCProfile"
 
@@ -45,27 +60,21 @@ static const int JPEG_411_COMP[6] = { 4, 1, 1, 1, 1, 1 };
 class JpgInput final : public ImageInput {
 public:
     JpgInput() { init(); }
-    virtual ~JpgInput() { close(); }
-    virtual const char* format_name(void) const override { return "jpeg"; }
-    virtual int supports(string_view feature) const override
+    ~JpgInput() override { close(); }
+    const char* format_name(void) const override { return "jpeg"; }
+    int supports(string_view feature) const override
     {
         return (feature == "exif" || feature == "iptc" || feature == "ioproxy");
     }
-    virtual bool valid_file(const std::string& filename) const override
-    {
-        return valid_file(filename, nullptr);
-    }
-    virtual bool open(const std::string& name, ImageSpec& spec) override;
-    virtual bool open(const std::string& name, ImageSpec& spec,
-                      const ImageSpec& config) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool close() override;
-    virtual bool set_ioproxy(Filesystem::IOProxy* ioproxy) override
-    {
-        m_io = ioproxy;
-        return true;
-    }
+    bool valid_file(Filesystem::IOProxy* ioproxy) const override;
+
+    bool open(const std::string& name, ImageSpec& spec) override;
+    bool open(const std::string& name, ImageSpec& spec,
+              const ImageSpec& config) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
+    bool close() override;
+
     const std::string& filename() const { return m_filename; }
     void* coeffs() const { return m_coeffs; }
     struct my_error_mgr {
@@ -79,7 +88,6 @@ public:
     void jpegerror(my_error_ptr myerr, bool fatal = false);
 
 private:
-    FILE* m_fd;
     std::string m_filename;
     int m_next_scanline;   // Which scanline is the next to read?
     bool m_raw;            // Read raw coefficients, not scanlines
@@ -90,22 +98,26 @@ private:
     my_error_mgr m_jerr;
     jvirt_barray_ptr* m_coeffs;
     std::vector<unsigned char> m_cmyk_buf;  // For CMYK translation
-    Filesystem::IOProxy* m_io = nullptr;
-    std::unique_ptr<Filesystem::IOProxy> m_local_io;
-    std::unique_ptr<ImageSpec> m_config;  // Saved copy of configuration spec
+    std::unique_ptr<ImageSpec> m_config;    // Saved copy of configuration spec
+    bool m_is_uhdr;                         // Is interpreted as Ultra HDR image
+#if defined(USE_UHDR)
+    uhdr_codec_private_t* m_uhdr_dec;
+#endif
 
     void init()
     {
-        m_fd            = NULL;
         m_raw           = false;
         m_cmyk          = false;
         m_fatalerr      = false;
         m_decomp_create = false;
         m_coeffs        = NULL;
         m_jerr.jpginput = this;
-        m_io            = nullptr;
-        m_local_io.reset();
+        ioproxy_clear();
         m_config.reset();
+        m_is_uhdr = false;
+#if defined(USE_UHDR)
+        m_uhdr_dec = NULL;
+#endif
     }
 
     // Rummage through the JPEG "APP1" marker pointed to by buf, decoding
@@ -117,13 +129,9 @@ private:
 
     bool read_icc_profile(j_decompress_ptr cinfo, ImageSpec& spec);
 
-    bool valid_file(const std::string& filename, Filesystem::IOProxy* io) const;
+    bool read_uhdr(Filesystem::IOProxy* ioproxy);
 
-    void close_file()
-    {
-        m_local_io.reset();
-        init();
-    }
+    void close_file() { init(); }
 
     friend class JpgOutput;
 };

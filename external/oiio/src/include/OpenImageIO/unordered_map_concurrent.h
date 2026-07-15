@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #pragma once
@@ -455,10 +455,27 @@ public:
         Bin& bin(m_bins[b]);
         if (do_lock)
             bin.lock();
-        bin.map.erase(key, hash);
+        bin.map.erase(key);
         --m_size;
         if (do_lock)
             bin.unlock();
+    }
+
+    /// Removes all items from the map.
+    void clear()
+    {
+        if (empty())
+            return;
+        for (size_t b = 0; b < BINS; b++) {
+            BinMap_t map;
+            Bin& bin(m_bins[b]);
+            bin.lock();
+            if (!bin.map.empty()) {
+                bin.map.swap(map);
+                m_size -= map.size();
+            }
+            bin.unlock();
+        }
     }
 
     /// Return true if the entire map is empty.

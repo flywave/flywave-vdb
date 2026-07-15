@@ -1,11 +1,13 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+
+#include <OpenImageIO/half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/deepdata.h>
@@ -175,7 +177,7 @@ ImageBufAlgo::deepen(ImageBuf& dst, const ImageBuf& src, float zvalue, ROI roi,
         return false;
     }
 
-    float* pixel = OIIO_ALLOCA(float, nc);
+    span<float> pixel = OIIO_ALLOCA_SPAN(float, nc);
 
     // First, figure out which pixels get a sample and which do not
     for (int z = roi.zbegin; z < roi.zend; ++z)

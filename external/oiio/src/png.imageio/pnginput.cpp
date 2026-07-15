@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <cstdio>
@@ -14,29 +14,24 @@ OIIO_PLUGIN_NAMESPACE_BEGIN
 class PNGInput final : public ImageInput {
 public:
     PNGInput() { init(); }
-    virtual ~PNGInput() { close(); }
-    virtual const char* format_name(void) const override { return "png"; }
-    virtual int supports(string_view feature) const override
+    ~PNGInput() override { close(); }
+    const char* format_name(void) const override { return "png"; }
+    int supports(string_view feature) const override
     {
         return (feature == "ioproxy" || feature == "exif");
     }
-    virtual bool valid_file(const std::string& filename) const override;
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool open(const std::string& name, ImageSpec& newspec,
-                      const ImageSpec& config) override;
-    virtual bool close() override;
-    virtual int current_subimage(void) const override
+    bool valid_file(Filesystem::IOProxy* ioproxy) const override;
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool close() override;
+    int current_subimage(void) const override
     {
         lock_guard lock(*this);
         return m_subimage;
     }
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool set_ioproxy(Filesystem::IOProxy* ioproxy) override
-    {
-        m_io = ioproxy;
-        return true;
-    }
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
 
 private:
     std::string m_filename;            ///< Stash the filename
@@ -50,11 +45,11 @@ private:
     Imath::Color3f m_bg;               ///< Background color
     int m_next_scanline;
     bool m_keep_unassociated_alpha;  ///< Do not convert unassociated alpha
-    std::unique_ptr<Filesystem::IOProxy> m_io_local;
+    bool m_linear_premult;           ///< Do premult for sRGB images in linear
+    bool m_srgb   = false;           ///< It's an sRGB image (not gamma)
+    bool m_err    = false;
+    float m_gamma = 1.0f;
     std::unique_ptr<ImageSpec> m_config;  // Saved copy of configuration spec
-    Filesystem::IOProxy* m_io = nullptr;
-    int64_t m_io_offset       = 0;
-    bool m_err                = false;
 
     /// Reset everything to initial state
     ///
@@ -63,12 +58,15 @@ private:
         m_subimage = -1;
         m_png      = nullptr;
         m_info     = nullptr;
-        m_io       = nullptr;
         m_buf.clear();
         m_next_scanline           = 0;
         m_keep_unassociated_alpha = false;
-        m_err                     = false;
+        m_linear_premult = OIIO::get_int_attribute("png:linear_premult");
+        m_srgb           = false;
+        m_err            = false;
+        m_gamma          = 1.0;
         m_config.reset();
+        ioproxy_clear();
     }
 
     /// Helper function: read the image.
@@ -85,17 +83,20 @@ private:
     {
         PNGInput* pnginput = (PNGInput*)png_get_io_ptr(png_ptr);
         OIIO_DASSERT(pnginput);
-        size_t bytes = pnginput->m_io->read(data, length);
-        if (bytes != length) {
-            pnginput->errorf("Read error: requested %d got %d", length, bytes);
+        if (!pnginput->ioread(data, length)) {
             pnginput->m_err = true;
+            png_chunk_error(png_ptr, pnginput->geterror(false).c_str());
         }
     }
+
+    template<class T>
+    void associateAlpha(T* data, int size, int channels, int alpha_channel,
+                        bool srgb, float gamma);
 };
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageInput*
@@ -119,16 +120,14 @@ OIIO_PLUGIN_EXPORTS_END
 
 
 bool
-PNGInput::valid_file(const std::string& filename) const
+PNGInput::valid_file(Filesystem::IOProxy* ioproxy) const
 {
-    FILE* fd = Filesystem::fopen(filename, "rb");
-    if (!fd)
+    if (!ioproxy || ioproxy->mode() != Filesystem::IOProxy::Mode::Read)
         return false;
-    unsigned char sig[8];
-    bool ok = (fread(sig, 1, sizeof(sig), fd) == sizeof(sig)
-               && png_sig_cmp(sig, 0, 7) == 0);
-    fclose(fd);
-    return ok;
+
+    unsigned char sig[8] {};
+    const size_t numRead = ioproxy->pread(sig, sizeof(sig), 0);
+    return numRead == sizeof(sig) && png_sig_cmp(sig, 0, 8) == 0;
 }
 
 
@@ -139,28 +138,23 @@ PNGInput::open(const std::string& name, ImageSpec& newspec)
     m_filename = name;
     m_subimage = 0;
 
-    if (!m_io) {
-        // If no proxy was supplied, create a file reader
-        m_io = new Filesystem::IOFile(name, Filesystem::IOProxy::Mode::Read);
-        m_io_local.reset(m_io);
-    }
-    if (!m_io || m_io->mode() != Filesystem::IOProxy::Mode::Read) {
-        errorf("Could not open file \"%s\"", name);
+    if (!ioproxy_use_or_open(name))
         return false;
-    }
-    m_io->seek(0);
+    ioseek(0);
 
     unsigned char sig[8];
-    if (m_io->pread(sig, sizeof(sig), 0) != sizeof(sig)
-        || png_sig_cmp(sig, 0, 7)) {
-        errorf("Not a PNG file");
+    if (ioproxy()->pread(sig, sizeof(sig), 0) != sizeof(sig)
+        || png_sig_cmp(sig, 0, 8)) {
+        if (!has_error())
+            errorfmt("Not a PNG file");
         return false;  // Read failed
     }
 
     std::string s = PNG_pvt::create_read_struct(m_png, m_info, this);
     if (s.length()) {
         close();
-        errorf("%s", s);
+        if (!has_error())
+            errorfmt("{}", s);
         return false;
     }
 
@@ -170,10 +164,17 @@ PNGInput::open(const std::string& name, ImageSpec& newspec)
     bool ok = PNG_pvt::read_info(m_png, m_info, m_bit_depth, m_color_type,
                                  m_interlace_type, m_bg, m_spec,
                                  m_keep_unassociated_alpha);
-    if (!ok || m_err) {
+    if (!ok || m_err
+        || !check_open(m_spec, { 0, 1 << 20, 0, 1 << 20, 0, 1, 0, 4 })) {
         close();
         return false;
     }
+
+    m_gamma                = m_spec.get_float_attribute("oiio:Gamma", 1.0f);
+    string_view colorspace = m_spec.get_string_attribute("oiio:ColorSpace",
+                                                         "sRGB");
+    const ColorConfig& colorconfig(ColorConfig::default_colorconfig());
+    m_srgb = colorconfig.equivalent(colorspace, "sRGB");
 
     newspec         = spec();
     m_next_scanline = 0;
@@ -190,10 +191,10 @@ PNGInput::open(const std::string& name, ImageSpec& newspec,
     // Check 'config' for any special requests
     if (config.get_int_attribute("oiio:UnassociatedAlpha", 0) == 1)
         m_keep_unassociated_alpha = true;
-    m_io_local.reset();
-    auto ioparam = config.find_attribute("oiio:ioproxy", TypeDesc::PTR);
-    if (ioparam)
-        m_io = ioparam->get<Filesystem::IOProxy*>();
+    m_linear_premult = config.get_int_attribute("png:linear_premult",
+                                                OIIO::get_int_attribute(
+                                                    "png:linear_premult"));
+    ioproxy_retrieve_from_config(config);
     m_config.reset(new ImageSpec(config));  // save config spec
     return open(name, newspec);
 }
@@ -204,9 +205,10 @@ bool
 PNGInput::readimg()
 {
     std::string s = PNG_pvt::read_into_buffer(m_png, m_info, m_spec, m_buf);
-    if (s.length()) {
+    if (s.length() || m_err || has_error()) {
         close();
-        errorf("%s", s);
+        if (!has_error())
+            errorfmt("{}", s);
         return false;
     }
 
@@ -219,11 +221,6 @@ bool
 PNGInput::close()
 {
     PNG_pvt::destroy_read_struct(m_png, m_info);
-    if (m_io_local) {
-        // If we allocated our own ioproxy, close it.
-        m_io_local.reset();
-        m_io = nullptr;
-    }
     init();  // Reset to initial state
     return true;
 }
@@ -231,33 +228,50 @@ PNGInput::close()
 
 
 template<class T>
-static void
-associateAlpha(T* data, int size, int channels, int alpha_channel, float gamma)
+void
+PNGInput::associateAlpha(T* data, int size, int channels, int alpha_channel,
+                         bool srgb, float gamma)
 {
-    T max = std::numeric_limits<T>::max();
-    if (gamma == 1) {
-        for (int x = 0; x < size; ++x, data += channels)
-            for (int c = 0; c < channels; c++)
-                if (c != alpha_channel) {
-                    unsigned int f = data[c];
-                    data[c]        = (f * data[alpha_channel]) / max;
-                }
-    } else {  //With gamma correction
-        float inv_max = 1.0 / max;
+    // We need to transform to linear space, associate the alpha, and then
+    // transform back.
+    if (srgb && m_linear_premult) {
+        // sRGB with request to do premult in linear space
         for (int x = 0; x < size; ++x, data += channels) {
-            float alpha_associate = pow(data[alpha_channel] * inv_max, gamma);
-            // We need to transform to linear space, associate the alpha, and
-            // then transform back.  That is, if D = data[c], we want
-            //
-            // D' = max * ( (D/max)^(1/gamma) * (alpha/max) ) ^ gamma
-            //
-            // This happens to simplify to something which looks like
-            // multiplying by a nonlinear alpha:
-            //
-            // D' = D * (alpha/max)^gamma
-            for (int c = 0; c < channels; c++)
-                if (c != alpha_channel)
-                    data[c] = static_cast<T>(data[c] * alpha_associate);
+            DataArrayProxy<T, float> val(data);
+            float alpha = val[alpha_channel];
+            if (alpha != 1.0f) {
+                for (int c = 0; c < channels; c++) {
+                    if (c != alpha_channel) {
+                        float f = sRGB_to_linear(val[c]);
+                        val[c]  = linear_to_sRGB(f * alpha);
+                    }
+                }
+            }
+        }
+    } else if (gamma != 1.0f && m_linear_premult) {
+        // Gamma correction with request to do premult in linear space
+        float inv_gamma = 1.0f / gamma;
+        for (int x = 0; x < size; ++x, data += channels) {
+            DataArrayProxy<T, float> val(data);
+            float alpha = val[alpha_channel];
+            if (alpha != 1.0f) {
+                for (int c = 0; c < channels; c++)
+                    if (c != alpha_channel)
+                        val[c] = powf((powf(val[c], gamma)) * alpha, inv_gamma);
+            }
+        }
+    } else {
+        // Do the premult directly on the values. This is correct for the
+        // "gamma=1" case, and is also commonly what is needed for many sRGB
+        // images (even though it's technically wrong in that case).
+        for (int x = 0; x < size; ++x, data += channels) {
+            DataArrayProxy<T, float> val(data);
+            float alpha = val[alpha_channel];
+            if (alpha != 1.0f) {
+                for (int c = 0; c < channels; c++)
+                    if (c != alpha_channel)
+                        val[c] = val[c] * alpha;
+            }
         }
     }
 }
@@ -278,8 +292,10 @@ PNGInput::read_native_scanline(int subimage, int miplevel, int y, int /*z*/,
 
     if (m_interlace_type != 0) {
         // Interlaced.  Punt and read the whole image
-        if (m_buf.empty())
-            readimg();
+        if (m_buf.empty()) {
+            if (has_error() || !readimg())
+                return false;
+        }
         size_t size = spec().scanline_bytes();
         memcpy(data, &m_buf[0] + y * size, size);
     } else {
@@ -303,7 +319,7 @@ PNGInput::read_native_scanline(int subimage, int miplevel, int y, int /*z*/,
             // std::cerr << "reading scanline " << m_next_scanline << "\n";
             std::string s = PNG_pvt::read_next_scanline(m_png, data);
             if (s.length()) {
-                errorf("%s", s);
+                errorfmt("{}", s);
                 return false;
             }
             if (m_err)
@@ -315,13 +331,13 @@ PNGInput::read_native_scanline(int subimage, int miplevel, int y, int /*z*/,
     // PNG specifically dictates unassociated (un-"premultiplied") alpha.
     // Convert to associated unless we were requested not to do so.
     if (m_spec.alpha_channel != -1 && !m_keep_unassociated_alpha) {
-        float gamma = m_spec.get_float_attribute("oiio:Gamma", 1.0f);
         if (m_spec.format == TypeDesc::UINT16)
             associateAlpha((unsigned short*)data, m_spec.width,
-                           m_spec.nchannels, m_spec.alpha_channel, gamma);
+                           m_spec.nchannels, m_spec.alpha_channel, m_srgb,
+                           m_gamma);
         else
             associateAlpha((unsigned char*)data, m_spec.width, m_spec.nchannels,
-                           m_spec.alpha_channel, gamma);
+                           m_spec.alpha_channel, m_srgb, m_gamma);
     }
 
     return true;

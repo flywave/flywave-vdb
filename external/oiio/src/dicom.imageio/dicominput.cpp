@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
@@ -11,7 +11,10 @@
 
 #define HAVE_CONFIG_H /* Sometimes DCMTK seems to need this */
 #include <dcmtk/config/osconfig.h>
+OIIO_PRAGMA_WARNING_PUSH
+OIIO_GCC_PRAGMA(GCC diagnostic ignored "-Wformat-nonliteral")
 #include <dcmtk/dcmdata/dctk.h>
+OIIO_PRAGMA_WARNING_POP
 #include <dcmtk/dcmimage/dicopx.h>
 #include <dcmtk/dcmimage/diregist.h>
 #include <dcmtk/dcmimgle/dcmimage.h>
@@ -35,19 +38,19 @@ OIIO_PLUGIN_NAMESPACE_BEGIN
 class DICOMInput final : public ImageInput {
 public:
     DICOMInput() {}
-    virtual ~DICOMInput() { close(); }
-    virtual const char* format_name(void) const override { return "dicom"; }
-    virtual int supports(string_view /*feature*/) const override
+    ~DICOMInput() override { close(); }
+    const char* format_name(void) const override { return "dicom"; }
+    int supports(string_view /*feature*/) const override
     {
         return false;  // we don't support any optional features
     }
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool open(const std::string& name, ImageSpec& newspec,
-                      const ImageSpec& config) override;
-    virtual bool close() override;
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool close() override;
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
 
 private:
     std::unique_ptr<DicomImage> m_img;
@@ -157,7 +160,7 @@ DICOMInput::seek_subimage(int subimage, int miplevel)
         m_subimage = 0;
         if (m_img->getStatus() != EIS_Normal) {
             m_img.reset();
-            errorf("Unable to open DICOM file %s", m_filename);
+            errorfmt("Unable to open DICOM file {}", m_filename);
             return false;
         }
         m_framecount = m_img->getFrameCount();
@@ -165,7 +168,7 @@ DICOMInput::seek_subimage(int subimage, int miplevel)
     }
 
     if (subimage >= m_firstframe + m_framecount) {
-        errorf("Unable to seek to subimage %d", subimage);
+        errorfmt("Unable to seek to subimage {}", subimage);
         return false;
     }
 
@@ -174,7 +177,7 @@ DICOMInput::seek_subimage(int subimage, int miplevel)
         m_img->processNextFrames(1);
         if (m_img->getStatus() != EIS_Normal) {
             m_img.reset();
-            errorf("Unable to seek to subimage %d", subimage);
+            errorfmt("Unable to seek to subimage {}", subimage);
             return false;
         }
         ++m_subimage;
@@ -269,7 +272,8 @@ DICOMInput::read_metadata()
             std::string tagname = tag.getTagName();
             if (ignore_tags.find(tagname) != ignore_tags.end())
                 continue;
-            std::string name = Strutil::sprintf("dicom:%s", tag.getTagName());
+            std::string name = Strutil::fmt::format("dicom:{}",
+                                                    tag.getTagName());
             DcmEVR evr       = tag.getEVR();
             // VR codes explained:
             // http://dicom.nema.org/Dicom/2013/output/chtml/part05/sect_6.2.html

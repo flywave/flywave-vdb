@@ -20,6 +20,11 @@
 //
 // FarmHash, by Geoff Pike
 
+// Additional modifications for OpenImageIO:
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
+
 // clang-format off
 
 // https://github.com/google/farmhash
@@ -78,19 +83,13 @@
 // Make static inline 'const expr, if possible.  Also, try to make CUDA friendly
 // for device code.
 #undef STATIC_INLINE
-#if OIIO_CPLUSPLUS_VERSION >= 14
-#  define HASH_CAN_USE_CONSTEXPR 1
-#endif
-#define STATIC_INLINE OIIO_HOSTDEVICE inline OIIO_CONSTEXPR14
+#define HASH_CAN_USE_CONSTEXPR 1
+#define STATIC_INLINE OIIO_HOSTDEVICE inline constexpr
 
 // FARMHASH PORTABILITY LAYER: Runtime error if misconfigured
 
 #ifndef FARMHASH_DIE_IF_MISCONFIGURED
-#ifdef HASH_CAN_USE_CONSTEXPR
 #define FARMHASH_DIE_IF_MISCONFIGURED
-#else
-#define FARMHASH_DIE_IF_MISCONFIGURED do { *(char*)(len % 17) = 0; } while (0)
-#endif
 #endif
 
 // FARMHASH PORTABILITY LAYER: endianness and byteswapping functions
@@ -239,21 +238,77 @@ STATIC_INLINE uint32_t Fetch32(const char *p) {
 
 #else
 
-template <typename T>
-STATIC_INLINE T FetchType(const char *p) {
-  T result = 0;
-  for (size_t i = 0; i < sizeof(T); i++)
-      reinterpret_cast<char *>(&result)[i] = p[i];
-  return result;
+#if defined(__cpp_lib_bit_cast) && __cpp_lib_bit_cast >= 201806L
+// C++20 compiler with constexpr support std::bitcast
+STATIC_INLINE uint64_t Fetch64(const char *p) {
+  struct BlockOfBytes {
+    char bytes[8];
+  };
+  BlockOfBytes bob{p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]};
+  return std::bit_cast<uint64_t>(bob);
+}
+STATIC_INLINE uint32_t Fetch32(const char *p) {
+  struct BlockOfBytes {
+    char bytes[4];
+  };
+  BlockOfBytes bob{p[0],p[1],p[2],p[3]};
+  return std::bit_cast<uint32_t>(bob);
 }
 
+#else
+
+// constexpr supported for C++14,17 versions that manually load bytes and
+// bitshift into proper order for the unsigned integer.
+// NOTE: bigendian untested
 STATIC_INLINE uint64_t Fetch64(const char *p) {
-  return FetchType<uint64_t>(p); 
+    // Favor letting uint8_t construction to handle
+    // signed to unsigned conversion vs. uint64_t(p[0]&0xff)
+    uint8_t b0 = p[0];
+    uint8_t b1 = p[1];
+    uint8_t b2 = p[2];
+    uint8_t b3 = p[3];
+    uint8_t b4 = p[4];
+    uint8_t b5 = p[5];
+    uint8_t b6 = p[6];
+    uint8_t b7 = p[7];
+    return littleendian() ?
+        (uint64_t(b0))       | // LSB
+        (uint64_t(b1) <<  8) |
+        (uint64_t(b2) << 16) |
+        (uint64_t(b3) << 24) |
+        (uint64_t(b4) << 32) |
+        (uint64_t(b5) << 40) |
+        (uint64_t(b6) << 48) |
+        (uint64_t(b7) << 56)   // MSB
+      : // Big Endian byte order
+        (uint64_t(b0) << 56) |  // MSB
+        (uint64_t(b1) << 48) |
+        (uint64_t(b2) << 40) |
+        (uint64_t(b3) << 32) |
+        (uint64_t(b4) << 24) |
+        (uint64_t(b5) << 16) |
+        (uint64_t(b6) <<  8) |
+        (uint64_t(b7)) ;       // LSB
 }
 
 STATIC_INLINE uint32_t Fetch32(const char *p) {
-  return FetchType<uint32_t>(p); 
+    uint8_t b0 = p[0];
+    uint8_t b1 = p[1];
+    uint8_t b2 = p[2];
+    uint8_t b3 = p[3];
+    return littleendian() ?
+        (uint32_t(b0))       | // LSB
+        (uint32_t(b1) <<  8) |
+        (uint32_t(b2) << 16) |
+        (uint32_t(b3) << 24)   // MSB
+      : // Big Endian byte order
+        (uint32_t(b0) << 24) | // MSB
+        (uint32_t(b1) << 16) |
+        (uint32_t(b2) <<  8) |
+        (uint32_t(b3));        // LSB
 }
+#endif
+
 
 // devices don't seem to have bswap_64() or bswap_32()
 template<typename T>
@@ -2036,7 +2091,7 @@ STATIC_INLINE uint64_t Hash64(const char* s, size_t len) {
 // May change from time to time, may differ on different platforms, may differ
 // depending on NDEBUG.
 STATIC_INLINE size_t Hash(const char* s, size_t len) {
-  return sizeof(size_t) == 8 ? Hash64(s, len) : Hash32(s, len);
+  return sizeof(size_t) == 8 ? size_t(Hash64(s, len)) : size_t(Hash32(s, len));
 }
 
 // Hash function for a byte array.  For convenience, a 64-bit seed is also
@@ -2096,18 +2151,38 @@ STATIC_INLINE uint128_t Fingerprint128(const char* s, size_t len) {
 // }  // namespace NAMESPACE_FOR_HASH_FUNCTIONS
 } /*end namespace farmhash*/ 
 
+// Undefine any of the poorly namespaced things
 #undef Fetch
 #undef Rotate
 #undef Bswap
+#undef fmix
 #undef DebugTweak
 #undef uint128_t
 #undef Uint128
+#undef CopyUint128
 #undef Uint128Low64
 #undef Uint128High64
 #undef Hash128to64
 #undef Hash64WithSeeds
 #undef x86
 #undef x86_64
+#undef is_64bit
+#undef can_use_ssse3
+#undef can_use_sse41
+#undef can_use_sse42
+#undef can_use_aesni
+#undef can_use_avx
+#undef bswap_32
+#undef bswap_64
+#undef STATIC_INLINE
+#undef uint32_in_expected_order
+#undef uint64_in_expected_order
+#undef debug_mode
+#undef PERMUTE3
+#undef Mulc1
+#undef Mulc2
+#undef Murk
+#undef Chunk
 
 OIIO_NAMESPACE_END
 

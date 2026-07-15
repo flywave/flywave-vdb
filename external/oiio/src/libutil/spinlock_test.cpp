@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <functional>
@@ -44,6 +44,7 @@ time_lock_cycle()
     std::cout << "Cost of lock/unlock cycle under no contention:\n";
     spin_mutex sm;
     std::mutex m;
+    std::recursive_mutex rm;
     bench("spin_mutex", [&]() {
         sm.lock();
         sm.unlock();
@@ -51,6 +52,10 @@ time_lock_cycle()
     bench("std::mutex", [&]() {
         m.lock();
         m.unlock();
+    });
+    bench("std::recursive_mutex", [&]() {
+        rm.lock();
+        rm.unlock();
     });
 }
 
@@ -95,9 +100,9 @@ getargs(int argc, char* argv[])
     ap.arg("-v", &verbose)
       .help("Verbose mode");
     ap.arg("--threads %d", &numthreads)
-      .help(Strutil::sprintf("Number of threads (default: %d)", numthreads));
+      .help(Strutil::fmt::format("Number of threads (default: {})", numthreads));
     ap.arg("--iters %d", &iterations)
-      .help(Strutil::sprintf("Number of iterations (default: %d)", iterations));
+      .help(Strutil::fmt::format("Number of iterations (default: {})", iterations));
     ap.arg("--trials %d", &ntrials)
       .help("Number of trials");
     ap.arg("--wedge", &wedge)

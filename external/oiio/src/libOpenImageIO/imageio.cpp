@@ -1,11 +1,15 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cstdio>
 #include <cstdlib>
 
+#include <OpenImageIO/half.h>
+
+#include <OpenImageIO/color.h>
 #include <OpenImageIO/dassert.h>
+#include <OpenImageIO/filter.h>
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/hash.h>
 #include <OpenImageIO/imageio.h>
@@ -17,6 +21,7 @@
 #include <OpenImageIO/timer.h>
 #include <OpenImageIO/typedesc.h>
 
+#include "buildopts.h"
 #include "imageio_pvt.h"
 
 OIIO_NAMESPACE_BEGIN
@@ -24,7 +29,8 @@ OIIO_NAMESPACE_BEGIN
 static int
 threads_default()
 {
-    int n = Strutil::from_string<int>(Sysutil::getenv("OPENIMAGEIO_THREADS"));
+    int n = Strutil::from_string<int>(
+        Sysutil::getenv("OPENIMAGEIO_THREADS", Sysutil::getenv("CUE_THREADS")));
     if (n < 1)
         n = Sysutil::hardware_concurrency();
     return n;
@@ -32,26 +38,33 @@ threads_default()
 
 // Global private data
 namespace pvt {
-recursive_mutex imageio_mutex;
+std::recursive_mutex imageio_mutex;
 atomic_int oiio_threads(threads_default());
 atomic_int oiio_exr_threads(threads_default());
 atomic_int oiio_read_chunk(256);
+atomic_int oiio_try_all_readers(1);
+#ifndef OIIO_OPENEXR_CORE_DEFAULT
+#    define OIIO_OPENEXR_CORE_DEFAULT 0
+#endif
+// Should we use "Exr core C library"?
+int openexr_core(OIIO_OPENEXR_CORE_DEFAULT);
+int jpeg_com_attributes(1);
+int png_linear_premult(0);
 int tiff_half(0);
 int tiff_multithread(1);
+int dds_bc5normal(0);
+int limit_channels(1024);
+int limit_imagesize_MB(std::min(32 * 1024,
+                                int(Sysutil::physical_memory() >> 20)));
+int imageinput_strict(0);
+ustring font_searchpath(Sysutil::getenv("OPENIMAGEIO_FONTS"));
 ustring plugin_searchpath(OIIO_DEFAULT_PLUGIN_SEARCHPATH);
 std::string format_list;         // comma-separated list of all formats
 std::string input_format_list;   // comma-separated list of readable formats
 std::string output_format_list;  // comma-separated list of writable formats
 std::string extension_list;      // list of all extensions for all formats
 std::string library_list;        // list of all libraries for all formats
-static const char* oiio_debug_env = getenv("OPENIMAGEIO_DEBUG");
-#ifdef NDEBUG
-int oiio_print_debug(oiio_debug_env ? Strutil::stoi(oiio_debug_env) : 0);
-#else
-int oiio_print_debug(oiio_debug_env ? Strutil::stoi(oiio_debug_env) : 1);
-#endif
-int oiio_log_times = Strutil::from_string<int>(
-    Sysutil::getenv("OPENIMAGEIO_LOG_TIMES"));
+int oiio_log_times = Strutil::stoi(Sysutil::getenv("OPENIMAGEIO_LOG_TIMES"));
 std::vector<float> oiio_missingcolor;
 }  // namespace pvt
 
@@ -60,9 +73,8 @@ using namespace pvt;
 
 namespace {
 // Hidden global OIIO data.
-static spin_mutex attrib_mutex;
-static const int maxthreads  = 256;  // reasonable maximum for sanity check
-static FILE* oiio_debug_file = NULL;
+static std::recursive_mutex attrib_mutex;
+static const int maxthreads = 512;  // reasonable maximum for sanity check
 
 class TimingLog {
 public:
@@ -78,18 +90,20 @@ public:
             std::cout << report();
     }
 
-    // Call like a function to record times (but only if oiio_log_times > 0)
-    void operator()(string_view key, const Timer& timer)
+    // Call like a function to record times (but only if oiio_log_times > 0).
+    // The `count` parameter is the number of times the operation was invoked,
+    // as tallied by the timer (defaulting to 1).
+    void operator()(string_view key, const Timer& timer, int count = 1)
     {
         if (oiio_log_times) {
             auto t = timer();
             spin_lock lock(mutex);
             auto entry = timing_map.find(key);
             if (entry == timing_map.end())
-                timing_map[key] = std::make_pair(t, size_t(1));
+                timing_map[key] = std::make_pair(t, size_t(count));
             else {
                 entry->second.first += t;
-                entry->second.second += 1;
+                entry->second.second += count;
             }
         }
     }
@@ -104,10 +118,10 @@ public:
             double time         = item.second.first;
             double percall      = time / ncalls;
             bool use_ms_percall = (percall < 0.1);
-            out << Strutil::sprintf("%-25s%6d %7.3fs  (avg %6.2f%s)\n",
-                                    item.first, ncalls, time,
-                                    percall * (use_ms_percall ? 1000.0 : 1.0),
-                                    use_ms_percall ? "ms" : "s");
+            OIIO::print(out, "{:25s}{:6d} {:7.3f}s  (avg {:6.2f}{})\n",
+                        item.first, ncalls, time,
+                        percall * (use_ms_percall ? 1000.0 : 1.0),
+                        use_ms_percall ? "ms" : "s");
         }
         return out.str();
     }
@@ -157,7 +171,6 @@ hw_simd_caps()
     if (cpu_has_avx512dq())    caps.emplace_back ("avx512dq");
     if (cpu_has_avx512ifma())  caps.emplace_back ("avx512ifma");
     if (cpu_has_avx512pf())    caps.emplace_back ("avx512pf");
-    if (cpu_has_avx512er())    caps.emplace_back ("avx512er");
     if (cpu_has_avx512cd())    caps.emplace_back ("avx512cd");
     if (cpu_has_avx512bw())    caps.emplace_back ("avx512bw");
     if (cpu_has_avx512vl())    caps.emplace_back ("avx512vl");
@@ -189,10 +202,10 @@ oiio_simd_caps()
     if (OIIO_AVX512DQ_ENABLED)   caps.emplace_back ("avx512dq");
     if (OIIO_AVX512IFMA_ENABLED) caps.emplace_back ("avx512ifma");
     if (OIIO_AVX512PF_ENABLED)   caps.emplace_back ("avx512pf");
-    if (OIIO_AVX512ER_ENABLED)   caps.emplace_back ("avx512er");
     if (OIIO_AVX512CD_ENABLED)   caps.emplace_back ("avx512cd");
     if (OIIO_AVX512BW_ENABLED)   caps.emplace_back ("avx512bw");
     if (OIIO_AVX512VL_ENABLED)   caps.emplace_back ("avx512vl");
+    if (OIIO_SIMD_NEON)          caps.emplace_back ("neon");
     if (OIIO_FMA_ENABLED)        caps.emplace_back ("fma");
     if (OIIO_F16C_ENABLED)       caps.emplace_back ("f16c");
     // if (OIIO_POPCOUNT_ENABLED)   caps.emplace_back ("popcnt");
@@ -200,6 +213,69 @@ oiio_simd_caps()
     // clang-format on
 }
 
+
+static std::string
+oiio_build_compiler()
+{
+    using Strutil::fmt::format;
+
+    std::string comp;
+#if OIIO_INTEL_CLASSIC_COMPILER_VERSION
+    comp = format("Intel icc {}", OIIO_INTEL_CLASSIC_COMPILER_VERSION);
+#elif OIIO_INTEL_LLVM_COMPILER
+    comp = format("Intel icx {}.{}", __clang_major__, __clang_minor__);
+#elif OIIO_APPLE_CLANG_VERSION
+    comp = format("Apple clang {}.{}", __clang_major__, __clang_minor__);
+#elif OIIO_CLANG_VERSION
+    comp = format("clang {}.{}", __clang_major__, __clang_minor__);
+#elif OIIO_GNUC_VERSION
+    comp = format("gcc {}.{}", __GNUC__, __GNUC_MINOR__);
+#elif OIIO_MSVS_VERSION
+    comp = format("MSVS {}", OIIO_MSVS_VERSION);
+#else
+    comp = "unknown compiler?";
+#endif
+    return comp;
+}
+
+
+static std::string
+oiio_build_platform()
+{
+    std::string platform;
+#if defined(__linux__)
+    platform = "Linux";
+#elif defined(__APPLE__)
+    platform = "MacOS";
+#elif defined(_WIN32)
+    platform = "Windows";
+#elif defined(__MINGW32__)
+    platform = "MinGW";
+#elif defined(__FreeBSD__)
+    platform = "FreeBSD";
+#else
+    platform = "UnknownOS";
+#endif
+    platform += "/";
+#if defined(__x86_64__)
+    platform += "x86_64";
+#elif defined(__i386__)
+    platform += "i386";
+#elif defined(_M_ARM64) || defined(__aarch64__) || defined(__aarch64)
+    platform += "ARM";
+#else
+    platform = "unknown arch?";
+#endif
+    return platform;
+}
+
+
+
+void
+shutdown()
+{
+    default_thread_pool_shutdown();
+}
 
 
 int
@@ -210,30 +286,10 @@ openimageio_version()
 
 
 
-// To avoid thread oddities, we have the storage area buffering error
-// messages for append_error()/geterror() be thread-specific.
-static thread_local std::string error_msg;
-
-
 void
 pvt::append_error(string_view message)
 {
-    // Remove a single trailing newline
-    if (message.size() && message.back() == '\n')
-        message.remove_suffix(1);
-    OIIO_ASSERT(
-        error_msg.size() < 1024 * 1024 * 16
-        && "Accumulated error messages > 16MB. Try checking return codes!");
-    // If we are appending to existing error messages, separate them with
-    // a single newline.
-    if (error_msg.size() && error_msg.back() != '\n')
-        error_msg += '\n';
-    error_msg += message;
-
-    // Remove a single trailing newline
-    if (message.size() && message.back() == '\n')
-        message.remove_suffix(1);
-    error_msg = message;
+    Strutil::pvt::append_error(message);
 }
 
 
@@ -241,7 +297,7 @@ pvt::append_error(string_view message)
 bool
 has_error()
 {
-    return !error_msg.empty();
+    return Strutil::pvt::has_error();
 }
 
 
@@ -249,10 +305,7 @@ has_error()
 std::string
 geterror(bool clear)
 {
-    std::string e = error_msg;
-    if (clear)
-        error_msg.clear();
-    return e;
+    return Strutil::pvt::geterror(clear);
 }
 
 
@@ -260,26 +313,15 @@ geterror(bool clear)
 void
 debug(string_view message)
 {
-    recursive_lock_guard lock(pvt::imageio_mutex);
-    if (oiio_print_debug) {
-        if (!oiio_debug_file) {
-            const char* filename = getenv("OPENIMAGEIO_DEBUG_FILE");
-            oiio_debug_file = filename && filename[0] ? fopen(filename, "a")
-                                                      : stderr;
-            OIIO_ASSERT(oiio_debug_file);
-            if (!oiio_debug_file)
-                return;
-        }
-        Strutil::fprintf(oiio_debug_file, "OIIO DEBUG: %s", message);
-    }
+    Strutil::pvt::debug(message);
 }
 
 
 
 void
-pvt::log_time(string_view key, const Timer& timer)
+log_time(string_view key, const Timer& timer, int count)
 {
-    timing_log(key, timer);
+    timing_log(key, timer, count);
 }
 
 
@@ -299,9 +341,19 @@ attribute(string_view name, TypeDesc type, const void* val)
         default_thread_pool()->resize(ot - 1);
         return true;
     }
-    spin_lock lock(attrib_mutex);
+    if (Strutil::starts_with(name, "gpu:")
+        || Strutil::starts_with(name, "cuda:")) {
+        return pvt::gpu_attribute(name, type, val);
+    }
+
+    // Things below here need to buarded by the attrib_mutex
+    std::lock_guard lock(attrib_mutex);
     if (name == "read_chunk" && type == TypeInt) {
         oiio_read_chunk = *(const int*)val;
+        return true;
+    }
+    if (name == "font_searchpath" && type == TypeString) {
+        font_searchpath = ustring(*(const char**)val);
         return true;
     }
     if (name == "plugin_searchpath" && type == TypeString) {
@@ -312,12 +364,56 @@ attribute(string_view name, TypeDesc type, const void* val)
         oiio_exr_threads = OIIO::clamp(*(const int*)val, -1, maxthreads);
         return true;
     }
+    if (name == "openexr:core" && type == TypeInt) {
+        openexr_core = *(const int*)val;
+        return true;
+    }
+    if (name == "jpeg:com_attributes" && type == TypeInt) {
+        jpeg_com_attributes = *(const int*)val;
+        return true;
+    }
+    if (name == "png:linear_premult" && type == TypeInt) {
+        png_linear_premult = *(const int*)val;
+        return true;
+    }
     if (name == "tiff:half" && type == TypeInt) {
         tiff_half = *(const int*)val;
         return true;
     }
     if (name == "tiff:multithread" && type == TypeInt) {
         tiff_multithread = *(const int*)val;
+        return true;
+    }
+    if (name == "dds:bc5normal" && type == TypeInt) {
+        dds_bc5normal = *(const int*)val;
+        return true;
+    }
+    if (name == "limits:channels" && type == TypeInt) {
+        limit_channels = *(const int*)val;
+        return true;
+    }
+    if (name == "limits:imagesize_MB" && type == TypeInt) {
+        limit_imagesize_MB = *(const int*)val;
+        return true;
+    }
+    if (name == "oiio:print_uncaught_errors" && type == TypeInt) {
+        oiio_print_uncaught_errors = *(const int*)val;
+        return true;
+    }
+    if (name == "imagebuf:print_uncaught_errors" && type == TypeInt) {
+        imagebuf_print_uncaught_errors = *(const int*)val;
+        return true;
+    }
+    if (name == "imagebuf:use_imagecache" && type == TypeInt) {
+        imagebuf_use_imagecache = *(const int*)val;
+        return true;
+    }
+    if (name == "imageinput:strict" && type == TypeInt) {
+        imageinput_strict = *(const int*)val;
+        return true;
+    }
+    if (name == "use_tbb" && type == TypeInt) {
+        oiio_use_tbb = *(const int*)val;
         return true;
     }
     if (name == "debug" && type == TypeInt) {
@@ -330,17 +426,18 @@ attribute(string_view name, TypeDesc type, const void* val)
     }
     if (name == "missingcolor" && type.basetype == TypeDesc::FLOAT) {
         // missingcolor as float array
-        oiio_missingcolor.clear();
-        oiio_missingcolor.reserve(type.basevalues());
-        int n = type.basevalues();
-        for (int i = 0; i < n; ++i)
-            oiio_missingcolor[i] = ((const float*)val)[i];
+        oiio_missingcolor.assign((const float*)val,
+                                 (const float*)val + type.numelements());
         return true;
     }
     if (name == "missingcolor" && type == TypeString) {
         // missingcolor as string
         oiio_missingcolor = Strutil::extract_from_list_string<float>(
             *(const char**)val);
+        return true;
+    }
+    if (name == "try_all_readers" && type == TypeInt) {
+        oiio_try_all_readers = *(const int*)val;
         return true;
     }
 
@@ -352,13 +449,28 @@ attribute(string_view name, TypeDesc type, const void* val)
 bool
 getattribute(string_view name, TypeDesc type, void* val)
 {
+    using Strutil::fmt::format;
     if (name == "threads" && type == TypeInt) {
         *(int*)val = oiio_threads;
         return true;
     }
-    spin_lock lock(attrib_mutex);
+    if (name == "version" && type == TypeString) {
+        *(ustring*)val = ustring(OIIO_VERSION_STRING);
+        return true;
+    }
+    if (Strutil::starts_with(name, "gpu:")
+        || Strutil::starts_with(name, "cuda:")) {
+        return pvt::gpu_getattribute(name, type, val);
+    }
+
+    // Things below here need to buarded by the attrib_mutex
+    std::lock_guard lock(attrib_mutex);
     if (name == "read_chunk" && type == TypeInt) {
         *(int*)val = oiio_read_chunk;
+        return true;
+    }
+    if (name == "font_searchpath" && type == TypeString) {
+        *(ustring*)val = font_searchpath;
         return true;
     }
     if (name == "plugin_searchpath" && type == TypeString) {
@@ -395,16 +507,96 @@ getattribute(string_view name, TypeDesc type, void* val)
         *(ustring*)val = ustring(library_list);
         return true;
     }
+    if (name == "font_dir_list" && type == TypeString) {
+        *(ustring*)val = ustring(Strutil::join(font_dirs(), ";"));
+        return true;
+    }
+    if (name == "font_file_list" && type == TypeString) {
+        *(ustring*)val = ustring(Strutil::join(font_file_list(), ";"));
+        return true;
+    }
+    if (name == "font_list" && type == TypeString) {
+        *(ustring*)val = ustring(Strutil::join(font_list(), ";"));
+        return true;
+    }
+    if (name == "font_family_list" && type == TypeString) {
+        *(ustring*)val = ustring(Strutil::join(font_family_list(), ";"));
+        return true;
+    }
+    if (Strutil::starts_with(name, "font_style_list:") && type == TypeString) {
+        string_view family = name.substr(strlen("font_style_list:"));
+        *(ustring*)val = ustring(Strutil::join(font_style_list(family), ";"));
+        return true;
+    }
+    if (Strutil::starts_with(name, "font_filename:") && type == TypeString) {
+        std::vector<string_view> tokens;
+        Strutil::split(name, tokens, ":");
+        string_view family = tokens.size() >= 1 ? tokens[1] : string_view();
+        string_view style  = tokens.size() >= 2 ? tokens[2] : string_view();
+        *(ustring*)val     = ustring(font_filename(family, style));
+        return true;
+    }
+    if (name == "filter_list" && type == TypeString) {
+        std::vector<string_view> filternames;
+        for (int i = 0, e = Filter2D::num_filters(); i < e; ++i)
+            filternames.emplace_back(Filter2D::get_filterdesc(i).name);
+        *(ustring*)val = ustring(Strutil::join(filternames, ";"));
+        return true;
+    }
     if (name == "exr_threads" && type == TypeInt) {
         *(int*)val = oiio_exr_threads;
+        return true;
+    }
+    if (name == "openexr:core" && type == TypeInt) {
+        *(int*)val = openexr_core;
+        return true;
+    }
+    if (name == "jpeg:com_attributes" && type == TypeInt) {
+        *(int*)val = jpeg_com_attributes;
+        return true;
+    }
+    if (name == "png:linear_premult" && type == TypeInt) {
+        *(int*)val = png_linear_premult;
         return true;
     }
     if (name == "tiff:half" && type == TypeInt) {
         *(int*)val = tiff_half;
         return true;
     }
+    if (name == "limits:channels" && type == TypeInt) {
+        *(int*)val = limit_channels;
+        return true;
+    }
+    if (name == "limits:imagesize_MB" && type == TypeInt) {
+        *(int*)val = limit_imagesize_MB;
+        return true;
+    }
     if (name == "tiff:multithread" && type == TypeInt) {
         *(int*)val = tiff_multithread;
+        return true;
+    }
+    if (name == "dds:bc5normal" && type == TypeInt) {
+        *(int*)val = dds_bc5normal;
+        return true;
+    }
+    if (name == "oiio:print_uncaught_errors" && type == TypeInt) {
+        *(int*)val = oiio_print_uncaught_errors;
+        return true;
+    }
+    if (name == "imagebuf:print_uncaught_errors" && type == TypeInt) {
+        *(int*)val = imagebuf_print_uncaught_errors;
+        return true;
+    }
+    if (name == "imagebuf:use_imagecache" && type == TypeInt) {
+        *(int*)val = imagebuf_use_imagecache;
+        return true;
+    }
+    if (name == "imageinput:strict" && type == TypeInt) {
+        *(int*)val = imageinput_strict;
+        return true;
+    }
+    if (name == "use_tbb" && type == TypeInt) {
+        *(int*)val = oiio_use_tbb;
         return true;
     }
     if (name == "debug" && type == TypeInt) {
@@ -423,12 +615,28 @@ getattribute(string_view name, TypeDesc type, void* val)
         *(ustring*)val = ustring(hw_simd_caps());
         return true;
     }
-    if (name == "oiio:simd" && type == TypeString) {
+    if ((name == "build:simd" || name == "oiio:simd") && type == TypeString) {
         *(ustring*)val = ustring(oiio_simd_caps());
+        return true;
+    }
+    if (name == "build:compiler" && type == TypeString) {
+        *(ustring*)val = ustring(oiio_build_compiler());
+        return true;
+    }
+    if (name == "build:platform" && type == TypeString) {
+        *(ustring*)val = ustring(oiio_build_platform());
+        return true;
+    }
+    if (name == "build:dependencies" && type == TypeString) {
+        *(ustring*)val = ustring(OIIO_ALL_BUILD_DEPS_FOUND);
         return true;
     }
     if (name == "resident_memory_used_MB" && type == TypeInt) {
         *(int*)val = int(Sysutil::memory_used(true) >> 20);
+        return true;
+    }
+    if (name == "resident_memory_used_MB" && type == TypeFloat) {
+        *(float*)val = float(Sysutil::memory_used(true) >> 20);
         return true;
     }
     if (name == "missingcolor" && type.basetype == TypeDesc::FLOAT
@@ -445,6 +653,32 @@ getattribute(string_view name, TypeDesc type, void* val)
     if (name == "missingcolor" && type == TypeString) {
         // missingcolor as string
         *(ustring*)val = ustring(Strutil::join(oiio_missingcolor, ","));
+        return true;
+    }
+    if (name == "try_all_readers" && type == TypeInt) {
+        *(int*)val = oiio_try_all_readers;
+        return true;
+    }
+    if (name == "opencolorio_version" && type == TypeString) {
+        int v          = ColorConfig::OpenColorIO_version_hex();
+        *(ustring*)val = ustring::fmtformat("{}.{}.{}", v >> 24,
+                                            (v >> 16) & 0xff, (v >> 8) & 0xff);
+        return true;
+    }
+    if (name == "IB_local_mem_current" && type == TypeInt64) {
+        *(long long*)val = IB_local_mem_current;
+        return true;
+    }
+    if (name == "IB_local_mem_peak" && type == TypeInt64) {
+        *(long long*)val = IB_local_mem_peak;
+        return true;
+    }
+    if (name == "IB_total_open_time" && type == TypeFloat) {
+        *(float*)val = IB_total_open_time;
+        return true;
+    }
+    if (name == "IB_total_image_read_time" && type == TypeFloat) {
+        *(float*)val = IB_total_image_read_time;
         return true;
     }
     return false;
@@ -745,14 +979,13 @@ parallel_convert_image(int nchannels, int width, int height, int depth,
                            nchannels, width, height);
 
     int blocksize = std::max(1, height / nthreads);
-    parallel_for_chunked(
-        0, height, blocksize, [=](int /*id*/, int64_t ybegin, int64_t yend) {
-            convert_image(nchannels, width, yend - ybegin, depth,
-                          (const char*)src + src_ystride * ybegin, src_type,
-                          src_xstride, src_ystride, src_zstride,
-                          (char*)dst + dst_ystride * ybegin, dst_type,
-                          dst_xstride, dst_ystride, dst_zstride);
-        });
+    parallel_for_chunked(0, height, blocksize, [=](int64_t ybegin, int64_t yend) {
+        convert_image(nchannels, width, yend - ybegin, depth,
+                      (const char*)src + src_ystride * ybegin, src_type,
+                      src_xstride, src_ystride, src_zstride,
+                      (char*)dst + dst_ystride * ybegin, dst_type, dst_xstride,
+                      dst_ystride, dst_zstride);
+    });
     return true;
 }
 
@@ -798,11 +1031,11 @@ copy_image(int nchannels, int width, int height, int depth, const void* src,
 
 
 void
-add_dither(int nchannels, int width, int height, int depth, float* data,
-           stride_t xstride, stride_t ystride, stride_t zstride,
-           float ditheramplitude, int alpha_channel, int z_channel,
-           unsigned int ditherseed, int chorigin, int xorigin, int yorigin,
-           int zorigin)
+add_bluenoise(int nchannels, int width, int height, int depth, float* data,
+              stride_t xstride, stride_t ystride, stride_t zstride,
+              float ditheramplitude, int alpha_channel, int z_channel,
+              unsigned int ditherseed, int chorigin, int xorigin, int yorigin,
+              int zorigin)
 {
     ImageSpec::auto_stride(xstride, ystride, zstride, sizeof(float), nchannels,
                            width, height);
@@ -811,23 +1044,35 @@ add_dither(int nchannels, int width, int height, int depth, float* data,
         char* scanline = plane;
         for (int y = 0; y < height; ++y, scanline += ystride) {
             char* pixel = scanline;
-            uint32_t ba = (z + zorigin) * 1311 + yorigin + y;
-            uint32_t bb = ditherseed + (chorigin << 24);
-            uint32_t bc = xorigin;
             for (int x = 0; x < width; ++x, pixel += xstride) {
                 float* val = (float*)pixel;
-                for (int c = 0; c < nchannels; ++c, ++val, ++bc) {
-                    bjhash::bjmix(ba, bb, bc);
+                for (int c = 0; c < nchannels; ++c, ++val) {
                     int channel = c + chorigin;
                     if (channel == alpha_channel || channel == z_channel)
                         continue;
                     float dither
-                        = bc / float(std::numeric_limits<uint32_t>::max());
+                        = pvt::bluenoise_4chan_ptr(x + xorigin, y + yorigin,
+                                                   z + zorigin, channel & (~3),
+                                                   ditherseed)[channel & 3];
                     *val += ditheramplitude * (dither - 0.5f);
                 }
             }
         }
     }
+}
+
+
+
+void
+add_dither(int nchannels, int width, int height, int depth, float* data,
+           stride_t xstride, stride_t ystride, stride_t zstride,
+           float ditheramplitude, int alpha_channel, int z_channel,
+           unsigned int ditherseed, int chorigin, int xorigin, int yorigin,
+           int zorigin)
+{
+    add_bluenoise(nchannels, width, height, depth, data, xstride, ystride,
+                  zstride, ditheramplitude, alpha_channel, z_channel,
+                  ditherseed, chorigin, xorigin, yorigin, zorigin);
 }
 
 

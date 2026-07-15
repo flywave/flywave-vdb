@@ -1,17 +1,29 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <iomanip>
 #include <memory>
 
-#include <IlmImf/ImfTimeCode.h>  //For TimeCode support
+#include <OpenEXR/ImfTimeCode.h>  //For TimeCode support
 
 // Note: libdpx originally from: https://github.com/PatrickPalmer/dpx
 // But that seems not to be actively maintained.
+//
+// Nevertheless, because the contents of the libdpx subdirectory is "imported"
+// code, we have always strived to keep our copy as textually close to the
+// original as possible, to enable us to diff it against the original and keep
+// up with any changes (if there ever are any). So we exclude this file from
+// clang-format and try to keep changes as minimal as possible.
+//
+// At some point, we may want to consider just accepting that we forked long
+// ago and are probably the sole maintainers of this code, and just allow
+// ourselves to diverge from the original.
+
 #include "libdpx/DPX.h"
 #include "libdpx/DPXColorConverter.h"
+#include "libdpx/DPXHeader.h"
 
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/strutil.h>
@@ -23,28 +35,23 @@ OIIO_PLUGIN_NAMESPACE_BEGIN
 class DPXInput final : public ImageInput {
 public:
     DPXInput() { init(); }
-    virtual ~DPXInput() { close(); }
-    virtual const char* format_name(void) const override { return "dpx"; }
-    virtual int supports(string_view feature) const override
+    ~DPXInput() override { close(); }
+    const char* format_name(void) const override { return "dpx"; }
+    int supports(string_view feature) const override
     {
-        return (feature == "ioproxy");
+        return (feature == "ioproxy" || feature == "multiimage");
     }
-    virtual bool valid_file(const std::string& filename) const override;
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool open(const std::string& name, ImageSpec& newspec,
-                      const ImageSpec& config) override;
-    virtual bool close() override;
-    virtual int current_subimage(void) const override { return m_subimage; }
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool read_native_scanlines(int subimage, int miplevel, int ybegin,
-                                       int yend, int z, void* data) override;
-    virtual bool set_ioproxy(Filesystem::IOProxy* ioproxy) override
-    {
-        m_io = ioproxy;
-        return true;
-    }
+    bool valid_file(Filesystem::IOProxy* ioproxy) const override;
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool close() override;
+    int current_subimage(void) const override { return m_subimage; }
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
+    bool read_native_scanlines(int subimage, int miplevel, int ybegin, int yend,
+                               int z, void* data) override;
 
 private:
     int m_subimage;
@@ -53,9 +60,6 @@ private:
     std::vector<unsigned char> m_userBuf;
     bool m_rawcolor;
     std::vector<unsigned char> m_decodebuf;  // temporary decode buffer
-    std::unique_ptr<Filesystem::IOProxy> m_io_local;
-    Filesystem::IOProxy* m_io = nullptr;
-    int64_t m_io_offset       = 0;
 
     /// Reset everything to initial state
     ///
@@ -69,7 +73,7 @@ private:
         }
         m_userBuf.clear();
         m_rawcolor = false;
-        m_io       = nullptr;
+        ioproxy_clear();
     }
 
     /// Helper function - retrieve string for libdpx characteristic
@@ -91,7 +95,7 @@ private:
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageInput*
@@ -115,21 +119,14 @@ OIIO_PLUGIN_EXPORTS_END
 
 
 bool
-DPXInput::valid_file(const std::string& filename) const
+DPXInput::valid_file(Filesystem::IOProxy* ioproxy) const
 {
-    Filesystem::IOProxy* io
-        = new Filesystem::IOFile(filename, Filesystem::IOProxy::Mode::Read);
-    std::unique_ptr<Filesystem::IOProxy> io_uptr(io);
-    if (!io || io->mode() != Filesystem::IOProxy::Mode::Read)
+    if (!ioproxy || ioproxy->mode() != Filesystem::IOProxy::Mode::Read)
         return false;
 
-    std::unique_ptr<InStream> stream_uptr(new InStream(io));
-    if (!stream_uptr)
-        return false;
-
-    dpx::Reader dpx;
-    dpx.SetInStream(stream_uptr.get());
-    return dpx.ReadHeader();  // IOFile is automatically closed when destructed
+    dpx::U32 magic {};
+    const size_t numRead = ioproxy->pread(&magic, sizeof(magic), 0);
+    return numRead == sizeof(magic) && dpx::Header::ValidMagicCookie(magic);
 }
 
 
@@ -137,26 +134,18 @@ DPXInput::valid_file(const std::string& filename) const
 bool
 DPXInput::open(const std::string& name, ImageSpec& newspec)
 {
-    if (!m_io) {
-        // If no proxy was supplied, create a file reader
-        m_io = new Filesystem::IOFile(name, Filesystem::IOProxy::Mode::Read);
-        m_io_local.reset(m_io);
-    }
-    if (!m_io || m_io->mode() != Filesystem::IOProxy::Mode::Read) {
-        errorf("Could not open file \"%s\"", name);
+    if (!ioproxy_use_or_open(name))
         return false;
-    }
-    m_io_offset = m_io->tell();
 
-    m_stream = new InStream(m_io);
+    m_stream = new InStream(ioproxy());
     if (!m_stream) {
-        errorf("Could not open file \"%s\"", name);
+        errorfmt("Could not open file \"{}\"", name);
         return false;
     }
 
     m_dpx.SetInStream(m_stream);
     if (!m_dpx.ReadHeader()) {
-        errorf("Could not read header");
+        errorfmt("Could not read header");
         close();
         return false;
     }
@@ -179,9 +168,7 @@ DPXInput::open(const std::string& name, ImageSpec& newspec,
     m_rawcolor = config.get_int_attribute("dpx:RawColor")
                  || config.get_int_attribute("dpx:RawData")  // deprecated
                  || config.get_int_attribute("oiio:RawColor");
-    auto ioparam = config.find_attribute("oiio:ioproxy", TypeDesc::PTR);
-    if (ioparam)
-        m_io = ioparam->get<Filesystem::IOProxy*>();
+    ioproxy_retrieve_from_config(config);
     return open(name, newspec);
 }
 
@@ -216,7 +203,7 @@ DPXInput::seek_subimage(int subimage, int miplevel)
         break;
     case dpx::kFloat: typedesc = TypeDesc::FLOAT; break;
     case dpx::kDouble: typedesc = TypeDesc::DOUBLE; break;
-    default: errorf("Invalid component data size"); return false;
+    default: errorfmt("Invalid component data size"); return false;
     }
     m_spec = ImageSpec(m_dpx.header.Width(), m_dpx.header.Height(),
                        m_dpx.header.ImageElementComponentCount(subimage),
@@ -299,7 +286,7 @@ DPXInput::seek_subimage(int subimage, int miplevel)
     default: {
         for (int i = 0; i < m_dpx.header.ImageElementComponentCount(subimage);
              i++) {
-            std::string ch = Strutil::sprintf("channel%d", i);
+            std::string ch = Strutil::fmt::format("channel{}", i);
             m_spec.channelnames.push_back(ch);
         }
     }
@@ -321,19 +308,16 @@ DPXInput::seek_subimage(int subimage, int miplevel)
     }
     m_spec.attribute("Orientation", orientation);
 
+    m_spec.attribute("oiio:subimages", (int)m_dpx.header.ImageElementCount());
+
     // image linearity
     switch (m_dpx.header.Transfer(subimage)) {
-    case dpx::kLinear: m_spec.attribute("oiio:ColorSpace", "Linear"); break;
-    case dpx::kLogarithmic:
-        m_spec.attribute("oiio:ColorSpace", "KodakLog");
-        break;
-    case dpx::kITUR709: m_spec.attribute("oiio:ColorSpace", "Rec709"); break;
+    case dpx::kLinear: m_spec.set_colorspace("Linear"); break;
+    case dpx::kLogarithmic: m_spec.set_colorspace("KodakLog"); break;
+    case dpx::kITUR709: m_spec.set_colorspace("Rec709"); break;
     case dpx::kUserDefined:
         if (!std::isnan(m_dpx.header.Gamma()) && m_dpx.header.Gamma() != 0) {
-            float g = float(m_dpx.header.Gamma());
-            m_spec.attribute("oiio:ColorSpace",
-                             Strutil::sprintf("GammaCorrected%.2g", g));
-            m_spec.attribute("oiio:Gamma", g);
+            set_colorspace_rec709_gamma(m_spec, float(m_dpx.header.Gamma()));
             break;
         }
         // intentional fall-through
@@ -378,10 +362,12 @@ DPXInput::seek_subimage(int subimage, int miplevel)
     }
     if (m_dpx.header.ImageEncoding(subimage) == dpx::kRLE)
         m_spec.attribute("compression", "rle");
-    char buf[32 + 1];
-    m_dpx.header.Description(subimage, buf);
-    if (buf[0] && buf[0] != char(-1))
-        m_spec.attribute("ImageDescription", buf);
+    {
+        char desc[32 + 1];
+        m_dpx.header.Description(subimage, desc);
+        if (desc[0] && desc[0] != char(-1))
+            m_spec.attribute("ImageDescription", desc);
+    }
     m_spec.attribute("PixelAspectRatio",
                      m_dpx.header.AspectRatio(1)
                          ? (m_dpx.header.AspectRatio(0)
@@ -482,13 +468,13 @@ DPXInput::seek_subimage(int subimage, int miplevel)
                                      m_dpx.header.userBits };
         m_spec.attribute("smpte:TimeCode", TypeTimeCode, timecode);
 
-        // This attribute is dpx specific and is left in for backwards compatability.
+        // This attribute is dpx specific and is left in for backwards compatibility.
         // Users should utilise the new smpte:TimeCode attribute instead
         Imf::TimeCode tc(m_dpx.header.timeCode, m_dpx.header.userBits);
         m_spec.attribute("dpx:TimeCode", get_timecode_string(tc));
     }
 
-    // This attribute is dpx specific and is left in for backwards compatability.
+    // This attribute is dpx specific and is left in for backwards compatibility.
     // Users should utilise the new smpte:TimeCode attribute instead
     if (m_dpx.header.userBits != 0xFFFFFFFF)
         m_spec.attribute("dpx:UserBits", m_dpx.header.userBits);
@@ -502,9 +488,12 @@ DPXInput::seek_subimage(int subimage, int miplevel)
         date[19] = 0;
         m_spec.attribute("dpx:SourceDateTime", date);
     }
-    m_dpx.header.FilmEdgeCode(buf);
-    if (buf[0])
-        m_spec.attribute("dpx:FilmEdgeCode", buf);
+    {
+        char filmedge[17];
+        m_dpx.header.FilmEdgeCode(filmedge);
+        if (filmedge[0])
+            m_spec.attribute("dpx:FilmEdgeCode", filmedge);
+    }
 
     tmpstr.clear();
     switch (m_dpx.header.Signal()) {
@@ -545,7 +534,8 @@ DPXInput::seek_subimage(int subimage, int miplevel)
         // don't set the attribute at all
         break;
     default:
-        tmpstr = Strutil::sprintf("Undefined %d", (int)m_dpx.header.Signal());
+        tmpstr = Strutil::fmt::format("Undefined {}",
+                                      (int)m_dpx.header.Signal());
         break;
     }
     if (!tmpstr.empty())
@@ -576,18 +566,6 @@ DPXInput::seek_subimage(int subimage, int miplevel)
 bool
 DPXInput::close()
 {
-    if (m_io_local) {
-        // If we allocated our own ioproxy, close it.
-        m_io_local.reset();
-        m_io = nullptr;
-    }
-    // N.B. If we were passed an ioproxy from the user (m_io != nullptr, but
-    // m_io_local was not set), don't actually close it, it belongs to the
-    // caller. And in the case of an ImageCache file, it's possible that the
-    // IC won't close this ImageInput until after the owner of the IOProxy
-    // destroyed it. So don't mess with it here in close() at all, because
-    // we just can't be sure if it's still alive or not.
-
     init();  // Reset to initial state
     return true;
 }

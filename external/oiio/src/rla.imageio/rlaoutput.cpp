@@ -1,13 +1,13 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 
-#include <OpenImageIO/dassert.h>
+#include <OpenImageIO/color.h>
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
@@ -27,21 +27,19 @@ using namespace RLA_pvt;
 class RLAOutput final : public ImageOutput {
 public:
     RLAOutput();
-    virtual ~RLAOutput();
-    virtual const char* format_name(void) const override { return "rla"; }
-    virtual int supports(string_view feature) const override;
-    virtual bool open(const std::string& name, const ImageSpec& spec,
-                      OpenMode mode = Create) override;
-    virtual bool close() override;
-    virtual bool write_scanline(int y, int z, TypeDesc format, const void* data,
-                                stride_t xstride) override;
-    virtual bool write_tile(int x, int y, int z, TypeDesc format,
-                            const void* data, stride_t xstride,
-                            stride_t ystride, stride_t zstride) override;
+    ~RLAOutput() override;
+    const char* format_name(void) const override { return "rla"; }
+    int supports(string_view feature) const override;
+    bool open(const std::string& name, const ImageSpec& spec,
+              OpenMode mode = Create) override;
+    bool close() override;
+    bool write_scanline(int y, int z, TypeDesc format, const void* data,
+                        stride_t xstride) override;
+    bool write_tile(int x, int y, int z, TypeDesc format, const void* data,
+                    stride_t xstride, stride_t ystride,
+                    stride_t zstride) override;
 
 private:
-    std::string m_filename;  ///< Stash the filename
-    FILE* m_file;            ///< Open image handle
     std::vector<unsigned char> m_scratch;
     RLAHeader m_rla;                   ///< Wavefront RLA header
     std::vector<uint32_t> m_sot;       ///< Scanline offset table
@@ -52,7 +50,7 @@ private:
     // Initialize private members to pre-opened state
     void init(void)
     {
-        m_file = NULL;
+        ioproxy_clear();
         m_sot.clear();
     }
 
@@ -66,33 +64,27 @@ private:
     bool encode_channel(unsigned char* data, stride_t xstride,
                         TypeDesc chantype, int bits);
 
-    /// Helper - write, with error detection
-    bool fwrite(const void* buf, size_t itemsize, size_t nitems)
-    {
-        size_t n = ::fwrite(buf, itemsize, nitems, m_file);
-        if (n != nitems)
-            errorf("Write error: wrote %d records of %d", (int)n, (int)nitems);
-        return n == nitems;
-    }
 
     /// Helper: write buf[0..nitems-1], swap endianness if necessary
     template<typename T> bool write(const T* buf, size_t nitems = 1)
     {
         if (littleendian()
-            && (is_same<T, uint16_t>::value || is_same<T, int16_t>::value
-                || is_same<T, uint32_t>::value || is_same<T, int32_t>::value)) {
+            && (std::is_same<T, uint16_t>::value
+                || std::is_same<T, int16_t>::value
+                || std::is_same<T, uint32_t>::value
+                || std::is_same<T, int32_t>::value)) {
             T* newbuf = OIIO_ALLOCA(T, nitems);
             memcpy(newbuf, buf, nitems * sizeof(T));
             swap_endian(newbuf, nitems);
             buf = newbuf;
         }
-        return fwrite(buf, sizeof(T), nitems);
+        return iowrite(buf, sizeof(T), nitems);
     }
 };
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageOutput*
@@ -137,6 +129,8 @@ RLAOutput::supports(string_view feature) const
         return true;
     if (feature == "channelformats")
         return true;
+    if (feature == "ioproxy")
+        return true;
     // Support nothing else nonstandard
     return false;
 }
@@ -147,45 +141,19 @@ bool
 RLAOutput::open(const std::string& name, const ImageSpec& userspec,
                 OpenMode mode)
 {
-    if (mode != Create) {
-        errorf("%s does not support subimages or MIP levels", format_name());
+    if (!check_open(mode, userspec, { 0, 65535, 0, 65535, 0, 1, 0, 256 }))
         return false;
-        // FIXME -- the RLA format supports subimages, but our writer
-        // doesn't.  I'm not sure if it's worth worrying about for an
-        // old format that is so rarely used.  We'll come back to it if
-        // anybody actually encounters a multi-subimage RLA in the wild.
-    }
+    // FIXME -- the RLA format supports subimages, but our writer doesn't.
+    // I'm not sure if it's worth worrying about for an old format that is so
+    // rarely used.  We'll come back to it if anybody actually encounters a
+    // multi-subimage RLA in the wild.
 
-    close();            // Close any already-opened file
-    m_spec = userspec;  // Stash the spec
     if (m_spec.format == TypeDesc::UNKNOWN)
         m_spec.format = TypeDesc::UINT8;  // Default to uint8 if unknown
 
-    m_file = Filesystem::fopen(name, "wb");
-    if (!m_file) {
-        errorf("Could not open \"%s\"", name);
+    ioproxy_retrieve_from_config(m_spec);
+    if (!ioproxy_use_or_open(name))
         return false;
-    }
-
-    // Check for things this format doesn't support
-    if (m_spec.width < 1 || m_spec.height < 1) {
-        errorf("Image resolution must be at least 1x1, you asked for %d x %d",
-               m_spec.width, m_spec.height);
-        return false;
-    }
-    if (m_spec.width > 65535 || m_spec.height > 65535) {
-        errorf(
-            "Image resolution %d x %d too large for RLA (maxiumum 65535x65535)",
-            m_spec.width, m_spec.height);
-        return false;
-    }
-
-    if (m_spec.depth < 1)
-        m_spec.depth = 1;
-    else if (m_spec.depth > 1) {
-        errorf("%s does not support volume images (depth > 1)", format_name());
-        return false;
-    }
 
     m_dither = (m_spec.format == TypeDesc::UINT8)
                    ? m_spec.get_int_attribute("oiio:dither", 0)
@@ -210,7 +178,7 @@ RLAOutput::open(const std::string& name, const ImageSpec& userspec,
     int remaining = m_spec.nchannels;
     if (m_spec.channelformats.size()) {
         int streak;
-        // accomodate first 3 channels of the same type as colour ones
+        // accommodate first 3 channels of the same type as colour ones
         for (streak = 1; streak <= 3 && remaining > 0; ++streak, --remaining)
             if (m_spec.channelformats[streak] != m_spec.channelformats[0]
                 || m_spec.alpha_channel == streak || m_spec.z_channel == streak)
@@ -292,15 +260,21 @@ RLAOutput::open(const std::string& name, const ImageSpec& userspec,
     //           << m_rla.NumOfMatteChannels << " z " << m_rla.NumOfAuxChannels << "\n";
     m_rla.Revision = 0xFFFE;
 
-    std::string colorspace = m_spec.get_string_attribute("oiio:ColorSpace",
-                                                         "Unknown");
-    if (Strutil::iequals(colorspace, "Linear"))
+    const ColorConfig& colorconfig = ColorConfig::default_colorconfig();
+    string_view colorspace = m_spec.get_string_attribute("oiio:ColorSpace");
+    if (colorconfig.equivalent(colorspace, "linear")
+        || colorconfig.equivalent(colorspace, "scene_linear"))
         Strutil::safe_strcpy(m_rla.Gamma, "1.0", sizeof(m_rla.Gamma));
-    else if (Strutil::istarts_with(colorspace, "GammaCorrected")) {
-        float g = Strutil::from_string<float>(colorspace.c_str() + 14);
+    else if (colorconfig.equivalent(colorspace, "g22_rec709"))
+        Strutil::safe_strcpy(m_rla.Gamma, "2.2", sizeof(m_rla.Gamma));
+    else if (colorconfig.equivalent(colorspace, "g18_rec709"))
+        Strutil::safe_strcpy(m_rla.Gamma, "1.8", sizeof(m_rla.Gamma));
+    else if (Strutil::istarts_with(colorspace, "Gamma")) {
+        Strutil::parse_word(colorspace);
+        float g = Strutil::from_string<float>(colorspace);
         if (!(g >= 0.01f && g <= 10.0f /* sanity check */))
             g = m_spec.get_float_attribute("oiio:Gamma", 1.f);
-        safe_snprintf(m_rla.Gamma, sizeof(m_rla.Gamma), "%.10f", g);
+        safe_format_to(m_rla.Gamma, "{:.10}", g);
     }
 
     const ParamValue* p;
@@ -337,23 +311,17 @@ RLAOutput::open(const std::string& name, const ImageSpec& userspec,
 
     // the month number will be replaced with the 3-letter abbreviation
     time_t t = time(NULL);
-    strftime(m_rla.DateCreated, sizeof(m_rla.DateCreated), "%m  %d %H:%M %Y",
-             localtime(&t));
-    // nice little trick - stoi() will convert the month number to integer,
-    // which we then use to index this array of constants, and copy the
-    // abbreviation back into the date string
-    int m = clamp(Strutil::stoi(m_rla.DateCreated), 1, 12);
-    static const char months[12][4] = { "JAN", "FEB", "MAR", "APR",
-                                        "MAY", "JUN", "JUL", "AUG",
-                                        "SEP", "OCT", "NOV", "DEC" };
-    memcpy(m_rla.DateCreated, months[m - 1], 3);
+    struct tm localtm;
+    Sysutil::get_local_time(&t, &localtm);
+    strftime(m_rla.DateCreated, sizeof(m_rla.DateCreated), "%b %d %H:%M %Y",
+             &localtm);
 
     // FIXME: it appears that Wavefront have defined a set of aspect names;
     // I think it's safe not to care until someone complains
     STRING_FIELD(Aspect, "rla:Aspect");
 
     float aspect = m_spec.get_float_attribute("PixelAspectRatio", 1.f);
-    safe_snprintf(m_rla.AspectRatio, sizeof(m_rla.AspectRatio), "%.6f", aspect);
+    safe_format_to(m_rla.AspectRatio, "{:.6}", aspect);
     Strutil::safe_strcpy(m_rla.ColorChannel,
                          m_spec.get_string_attribute("rla:ColorChannel", "rgb"),
                          sizeof(m_rla.ColorChannel));
@@ -389,13 +357,15 @@ RLAOutput::set_chromaticity(const ParamValue* p, char* dst, size_t field_size,
     if (p && p->type().basetype == TypeDesc::FLOAT) {
         switch (p->type().aggregate) {
         case TypeDesc::VEC2:
-            safe_snprintf(dst, field_size, "%.4f %.4f", ((float*)p->data())[0],
-                          ((float*)p->data())[1]);
+            safe_format_to(dst, field_size, "{:.4} {:.4}",
+                           ((const float*)p->data())[0],
+                           ((const float*)p->data())[1]);
             break;
         case TypeDesc::VEC3:
-            safe_snprintf(dst, field_size, "%.4f %.4f %.4f",
-                          ((float*)p->data())[0], ((float*)p->data())[1],
-                          ((float*)p->data())[2]);
+            safe_format_to(dst, field_size, "{:.4} {:.4} {:.4}",
+                           ((const float*)p->data())[0],
+                           ((const float*)p->data())[1],
+                           ((const float*)p->data())[2]);
             break;
         }
     } else
@@ -407,7 +377,7 @@ RLAOutput::set_chromaticity(const ParamValue* p, char* dst, size_t field_size,
 bool
 RLAOutput::close()
 {
-    if (!m_file) {  // already closed
+    if (!ioproxy_opened()) {  // already closed
         init();
         return true;
     }
@@ -423,10 +393,8 @@ RLAOutput::close()
 
     // Now that all scanlines have been output, return to write the
     // correct scanline offset table to file and close the stream.
-    fseek(m_file, sizeof(RLAHeader), SEEK_SET);
-    write(&m_sot[0], m_sot.size());
-    fclose(m_file);
-    m_file = NULL;
+    ioseek(sizeof(RLAHeader));
+    write(m_sot.data(), m_sot.size());
 
     init();  // re-initialize
     return ok;
@@ -533,7 +501,7 @@ RLAOutput::encode_channel(unsigned char* data, stride_t xstride,
     m_rle[1]      = size & 255;
 
     // And write the channel to the file
-    return write(&m_rle[0], m_rle.size());
+    return write(m_rle.data(), m_rle.size());
 }
 
 
@@ -554,7 +522,7 @@ RLAOutput::write_scanline(int y, int z, TypeDesc format, const void* data,
 
     // store the offset to the scanline.  We'll swap_endian if necessary
     // when we go to actually write it.
-    m_sot[m_spec.height - 1 - (y - m_spec.y)] = (uint32_t)ftell(m_file);
+    m_sot[m_spec.height - 1 - (y - m_spec.y)] = (uint32_t)iotell();
 
     size_t pixelsize = m_spec.pixel_bytes(true /*native*/);
     int offset       = 0;
@@ -562,11 +530,10 @@ RLAOutput::write_scanline(int y, int z, TypeDesc format, const void* data,
         TypeDesc chantype = m_spec.channelformats.size()
                                 ? m_spec.channelformats[c]
                                 : m_spec.format;
-        int bits = (c < m_rla.NumOfColorChannels)
-                       ? m_rla.NumOfChannelBits
-                       : (c < (m_rla.NumOfColorChannels + m_rla.NumOfMatteBits))
-                             ? m_rla.NumOfMatteBits
-                             : m_rla.NumOfAuxBits;
+        int bits = (c < m_rla.NumOfColorChannels) ? m_rla.NumOfChannelBits
+                   : (c < (m_rla.NumOfColorChannels + m_rla.NumOfMatteBits))
+                       ? m_rla.NumOfMatteBits
+                       : m_rla.NumOfAuxBits;
         if (!encode_channel((unsigned char*)data + offset, pixelsize, chantype,
                             bits))
             return false;

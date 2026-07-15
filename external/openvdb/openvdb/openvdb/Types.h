@@ -10,7 +10,7 @@
 #include "TypeList.h" // backwards compat
 
 #ifdef OPENVDB_BUILDCONFIG_USE_IMATH_HALF
-#include <Half/half.h>
+#include <Imath/half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {

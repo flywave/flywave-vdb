@@ -1,5 +1,5 @@
 // Ceres Solver - A fast non-linear least squares minimizer
-// Copyright 2018 Google Inc. All rights reserved.
+// Copyright 2023 Google Inc. All rights reserved.
 // http://ceres-solver.org/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -38,8 +38,7 @@
 
 #include "glog/logging.h"
 
-namespace ceres {
-namespace internal {
+namespace ceres::internal {
 
 // A thread-safe multi-producer, multi-consumer queue for queueing items that
 // are typically handled asynchronously by multiple threads. The ConcurrentQueue
@@ -78,12 +77,12 @@ template <typename T>
 class ConcurrentQueue {
  public:
   // Defaults the queue to blocking on Wait calls.
-  ConcurrentQueue() : wait_(true) {}
+  ConcurrentQueue() = default;
 
   // Atomically push an element onto the queue.  If a thread was waiting for an
   // element, wake it up.
   void Push(const T& value) {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     queue_.push(value);
     work_pending_condition_.notify_one();
   }
@@ -93,7 +92,7 @@ class ConcurrentQueue {
   bool Pop(T* value) {
     CHECK(value != nullptr);
 
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     return PopUnlocked(value);
   }
 
@@ -114,14 +113,14 @@ class ConcurrentQueue {
   // exit Wait() without getting a value. All future Wait requests will return
   // immediately if no element is present until EnableWaiters is called.
   void StopWaiters() {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     wait_ = false;
     work_pending_condition_.notify_all();
   }
 
   // Enable threads to block on Wait calls.
   void EnableWaiters() {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> lock(mutex_);
     wait_ = true;
   }
 
@@ -149,11 +148,9 @@ class ConcurrentQueue {
   std::queue<T> queue_;
   // If true, signals that callers of Wait will block waiting to pop an
   // element off the queue.
-  bool wait_;
+  bool wait_{true};
 };
 
-
-}  // namespace internal
-}  // namespace ceres
+}  // namespace ceres::internal
 
 #endif  // CERES_INTERNAL_CONCURRENT_QUEUE_H_

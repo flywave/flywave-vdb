@@ -3,8 +3,8 @@
 # Utility script to download and build pugixml
 #
 # Copyright Contributors to the OpenImageIO project.
-# SPDX-License-Identifier: BSD-3-Clause
-# https://github.com/OpenImageIO/oiio
+# SPDX-License-Identifier: Apache-2.0
+# https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 # Exit the whole script if any command fails.
 set -ex
@@ -34,17 +34,18 @@ if [[ ! -e ${PUGIXML_SRC_DIR} ]] ; then
     git clone ${PUGIXML_REPO} ${PUGIXML_SRC_DIR}
 fi
 cd ${PUGIXML_SRC_DIR}
+
 echo "git checkout ${PUGIXML_VERSION} --force"
 git checkout ${PUGIXML_VERSION} --force
 
-mkdir -p ${PUGIXML_BUILD_DIR}
-cd ${PUGIXML_BUILD_DIR}
-time cmake -DCMAKE_BUILD_TYPE=Release \
-           -DCMAKE_INSTALL_PREFIX=${PUGIXML_INSTALL_DIR} \
-           -DBUILD_SHARED_LIBS=ON \
-           -DBUILD_TESTS=OFF \
-           ${PUGIXML_BUILD_OPTS} ..
-time cmake --build . --config Release --target install
+if [[ -z $DEP_DOWNLOAD_ONLY ]]; then
+    time cmake -S . -B ${PUGIXML_BUILD_DIR} -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX=${PUGIXML_INSTALL_DIR} \
+               -DBUILD_SHARED_LIBS=ON \
+               -DBUILD_TESTS=OFF \
+               ${PUGIXML_BUILD_OPTS} ..
+    time cmake --build ${PUGIXML_BUILD_DIR} --config Release --target install
+fi
 
 # ls -R ${PUGIXML_INSTALL_DIR}
 popd

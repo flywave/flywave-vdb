@@ -1,78 +1,85 @@
-# ----------------------------------------------------------------------------
-#  CMake file for openexr
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) Contributors to the OpenEXR Project.
+
+# We require this to get object library link library support
+cmake_minimum_required(VERSION 3.14)
+
+if(POLICY CMP0074)
+  # enable find_package(<Package>) to use <Package>_ROOT as a hint
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
+if(POLICY CMP0077)
+  # enable variables set outside to override options
+  cmake_policy(SET CMP0077 NEW)
+endif()
+
+#######################################
+# Create project and include cmake
+# configuration files
+#######################################
+
+file(READ "src/lib/OpenEXRCore/openexr_version.h" VERSION_H)
+string(REGEX MATCH "VERSION_MAJOR ([0-9]*)" _ ${VERSION_H})
+set(OPENEXR_VERSION_MAJOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "VERSION_MINOR ([0-9]*)" _ ${VERSION_H})
+set(OPENEXR_VERSION_MINOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "VERSION_PATCH ([0-9]*)" _ ${VERSION_H})
+set(OPENEXR_VERSION_PATCH ${CMAKE_MATCH_1})
+
+project(OpenEXR VERSION ${OPENEXR_VERSION_MAJOR}.${OPENEXR_VERSION_MINOR}.${OPENEXR_VERSION_PATCH} LANGUAGES C CXX)
+
+set(OPENEXR_VERSION_RELEASE_TYPE "" CACHE STRING "Extra version tag string for OpenEXR build, such as -dev, -beta1, etc.")
+
+set(OPENEXR_VERSION ${OpenEXR_VERSION})
+set(OPENEXR_VERSION_API "${OpenEXR_VERSION_MAJOR}_${OpenEXR_VERSION_MINOR}")
+
+# The SOVERSION (i.e. numerical component of SONAME) tracks the ABI
+# version. Increment this number whenever, and only when, the ABI changes in
+# non-backwards-compatible ways.
 #
-# ----------------------------------------------------------------------------
+# The OpenEXR project policy is to append the library version 
+# "major.minor.patch" to the SONAME to form the real shared library name.  
+# For example, in "libOpenEXR.so.31.3.2.0", "libOpenEXR.so.31" is the SONAME
+# and ".3.2.0" identifies the corresponding library release.
 
-project(openexr CXX)
+set(OPENEXR_LIB_SOVERSION 33)
+set(OPENEXR_LIB_VERSION "") # e.g. "31.3.2.0"
 
-macro(ocv_list_filterout lst regex)
-  foreach(item ${${lst}})
-    if(item MATCHES "${regex}")
-      list(REMOVE_ITEM ${lst} "${item}")
-    endif()
-  endforeach()
-endmacro()
+include_directories(
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/Imf
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/OpenEXR
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/IlmThread
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/OpenEXRUtil
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/OpenEXRCore
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/Iex
+  ${CMAKE_CURRENT_SOURCE_DIR}/../imath/src/
+  ${CMAKE_CURRENT_SOURCE_DIR}/../imath/src/Imath/
+  ${CMAKE_CURRENT_BINARY_DIR}/../imath
+  ${CMAKE_CURRENT_BINARY_DIR}/../openjph/include/
+)
 
-IF(UNIX)
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-shadow -Wno-self-assign -Wno-float-conversion -Wno-unused-function -Wno-implicit-function-declaration -Wno-unused-variable -Wno-unused-const-variable -Wno-switch -Wno-unknown-pragmas -Wno-enum-compare -Wno-unused-result  -Wno-tautological-compare -Wno-attributes -Wno-sign-compare -Wno-deprecated-declarations")
-IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable -Wno-tautological-compare -Wno-unused-const-variable")
-ENDIF()
-ENDIF()
+include(cmake/LibraryDefine.cmake)
+include(cmake/OpenEXRSetup.cmake)
+add_subdirectory(cmake)
+message(STATUS "Configure ${OPENEXR_PACKAGE_NAME}, library API version: ${OPENEXR_LIB_VERSION}")
 
-if(UNIX)
-  set(HAVE_PTHREAD 1)
-  if(APPLE)
-    set(HAVE_POSIX_SEMAPHORES 0)  # Unnamed semaphores are not supported: https://github.com/opencv/opencv/issues/9361
-  else()
-    include(CheckIncludeFile)
-    check_include_file(semaphore.h HAVE_POSIX_SEMAPHORES)
-  endif()
-endif()
+# Hint: This can be set to enable custom find_package
+# search paths, probably best to set it when configuring
+# on the command line to cmake instead of setting it
+# here.
+###set(CMAKE_PREFIX_PATH "/prefix")
 
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/IlmBaseConfig.h.cmakein"
-               "${CMAKE_CURRENT_BINARY_DIR}/IlmBaseConfig.h" @ONLY)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/OpenEXRConfig.h.cmakein"
-               "${CMAKE_CURRENT_BINARY_DIR}/OpenEXRConfig.h" @ONLY)
+#######################################
+# Add all source in subdirectories
+#######################################
 
-set(OPENEXR_INCLUDE_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/Half"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/Iex"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/IexMath"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/IlmThread"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/Imath"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/IlmImf"
-                          "${CMAKE_CURRENT_SOURCE_DIR}/IlmImfUtil"
-                          "${CMAKE_CURRENT_BINARY_DIR}/")
+# Include these two modules without enable/disable options
+add_subdirectory(src/lib)
 
-INCLUDE_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/../zlib"  ${OPENEXR_INCLUDE_PATHS})
+# Tell CMake where to find the OpenEXRConfig.cmake file. Makes it possible to call
+# find_package(OpenEXR) in downstream projects
+set(OpenEXR_DIR "${CMAKE_CURRENT_BINARY_DIR}/cmake" CACHE PATH "" FORCE)
 
-file(GLOB lib_srcs Half/half.cpp Iex/*.cpp IexMath/*.cpp IlmImfUtil/*.cpp IlmThread/*.cpp Imath/*.cpp IlmImf/*.cpp)
-file(GLOB lib_hdrs Half/*.h Iex/Iex*.h IexMath/*.h IlmThread/IlmThread*.h IlmImfUtil/*.h Imath/Imath*.h IlmImf/*.h)
-list(APPEND lib_hdrs "${CMAKE_CURRENT_BINARY_DIR}/IlmBaseConfig.h" "${CMAKE_CURRENT_BINARY_DIR}/OpenEXRConfig.h")
-
-ocv_list_filterout(lib_srcs IlmImf/b44ExpLogTable.cpp)
-ocv_list_filterout(lib_srcs IlmImf/dwaLookups.cpp)
-
-if(WIN32)
-  ocv_list_filterout(lib_srcs Posix.*cpp)
-else()
-  ocv_list_filterout(lib_srcs Win32.cpp)
-endif()
-
-source_group("Include" FILES ${lib_hdrs} )
-source_group("Src" FILES ${lib_srcs})
-
-if(MSVC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Qrestrict")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /Qrestrict")
-endif()
-
-add_library(IlmImf STATIC ${lib_hdrs} ${lib_srcs})
-target_link_libraries(IlmImf ${ZLIB_LIBRARIES})
-
-set(OPENEXR_INCLUDE_PATHS ${OPENEXR_INCLUDE_PATHS} PARENT_SCOPE)
-set(OPENEXR_VERSION "1.7.1" PARENT_SCOPE)
-
-IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
-	SET_TARGET_PROPERTIES(IlmImf PROPERTIES FOLDER external)
-ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)

@@ -224,12 +224,6 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "" CACHE STRING
 # Set the architectures for which to build.
 set(CMAKE_OSX_ARCHITECTURES ${IOS_ARCH} CACHE STRING "Build architecture for iOS")
 
-# Skip the platform compiler checks for cross compiling.
-set(CMAKE_CXX_COMPILER_FORCED TRUE)
-set(CMAKE_CXX_COMPILER_WORKS TRUE)
-set(CMAKE_C_COMPILER_FORCED TRUE)
-set(CMAKE_C_COMPILER_WORKS TRUE)
-
 # All iOS/Darwin specific settings - some may be redundant.
 set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".dylib")
@@ -263,7 +257,7 @@ endif()
 
 set(CMAKE_C_FLAGS
   "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -fobjc-abi-version=2 -fobjc-arc ${CMAKE_C_FLAGS}")
-# Hidden visibilty is required for C++ on iOS.
+# Hidden visibility is required for C++ on iOS.
 set(CMAKE_CXX_FLAGS
   "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden -fobjc-abi-version=2 -fobjc-arc ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fomit-frame-pointer -ffast-math ${CMAKE_CXX_FLAGS_RELEASE}")
@@ -303,7 +297,7 @@ endif (NOT DEFINED CMAKE_INSTALL_NAME_TOOL)
 
 # Set the find root to the iOS developer roots and to user defined paths.
 set(CMAKE_FIND_ROOT_PATH ${CMAKE_IOS_DEVELOPER_ROOT} ${CMAKE_OSX_SYSROOT}
-  ${CMAKE_PREFIX_PATH} CACHE string  "iOS find search path root" FORCE)
+  ${CMAKE_PREFIX_PATH} CACHE STRING  "iOS find search path root" FORCE)
 
 # Default to searching for frameworks first.
 set(CMAKE_FIND_FRAMEWORK FIRST)
@@ -315,9 +309,10 @@ set(CMAKE_SYSTEM_FRAMEWORK_PATH
   ${CMAKE_OSX_SYSROOT}/Developer/Library/Frameworks)
 
 # Only search the specified iOS SDK, not the remainder of the host filesystem.
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 # This little macro lets you set any XCode specific property.
 macro(set_xcode_property TARGET XCODE_PROPERTY XCODE_VALUE)
@@ -327,7 +322,6 @@ endmacro(set_xcode_property)
 
 # This macro lets you find executable programs on the host system.
 macro(find_host_package)
-  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
   set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY NEVER)
   set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE NEVER)
   set(IOS FALSE)
@@ -335,7 +329,6 @@ macro(find_host_package)
   find_package(${ARGN})
 
   set(IOS TRUE)
-  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
   set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
   set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 endmacro(find_host_package)

@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <cassert>
@@ -85,6 +85,8 @@ public:
     bool is_separator() const { return argspec() == "<SEPARATOR>"; }
     bool hidden() const { return m_hidden; }
 
+    bool always_run() const { return m_always_run; }
+
     bool had_error() const { return m_error; }
     void had_error(bool e) { m_error = e; }
 
@@ -98,7 +100,7 @@ private:
     std::string m_flag;          // just the -flag_foo part
     std::string m_name;          // just the 'flat_foo' part
     std::string m_dest;          // destination parameter name
-    std::string m_code;          // paramter types, eg "df"
+    std::string m_code;          // parameter types, eg "df"
     std::string m_help;
     OptionType m_type = None;
     int m_count       = 0;               // number of parameters
@@ -110,6 +112,7 @@ private:
     int m_repetitions            = 0;      // number of times on cmd line
     bool m_has_callback          = false;  // needs a callback?
     bool m_hidden                = false;  // hidden?
+    bool m_always_run            = false;  // always run?
     bool m_error                 = false;  // invalid option, had an error
     friend class ArgParse;
     friend class ArgParse::Arg;
@@ -134,11 +137,15 @@ public:
     bool m_print_defaults = false;
     bool m_add_help       = true;
     bool m_exit_on_error  = true;
+    bool m_running        = true;
     bool m_aborted        = false;
+    int m_current_arg;
+    int m_next_arg = -1;
     std::vector<std::unique_ptr<ArgOption>> m_option;
     callback_t m_preoption_help  = [](const ArgParse&, std::ostream&) {};
     callback_t m_postoption_help = [](const ArgParse&, std::ostream&) {};
     ParamValueList m_params;
+    std::string m_version;
 
     Impl(ArgParse& parent, int argc, const char** argv)
         : m_argparse(parent)
@@ -153,18 +160,17 @@ public:
     ArgOption* find_option(const char* name);
     int found(const char* option);  // number of times option was parsed
 
+    // Given an incorrect argument name `badarg`, return the closest match
+    // among the valid commands (that is within the threshold). Return an
+    // empty string if no other command has an edit distance within the
+    // threshold.
+    std::string closest_match(string_view badarg, size_t threshold = 2) const;
+
     // Error with std::fmt-like formatting
     template<typename... Args>
     void errorfmt(const char* fmt, const Args&... args) const
     {
         m_errmessage = Strutil::fmt::format(fmt, args...);
-    }
-
-    // Error with printf-like formatting
-    template<typename... Args>
-    void errorf(const char* fmt, const Args&... args) const
-    {
-        m_errmessage = Strutil::sprintf(fmt, args...);
     }
 };
 
@@ -436,8 +442,25 @@ ArgParse::parse_args(int xargc, const char** xargv)
 int
 ArgParse::Impl::parse_args(int xargc, const char** xargv)
 {
-    m_argc = xargc;
-    m_argv = xargv;
+    m_argc    = xargc;
+    m_argv    = xargv;
+    m_running = true;
+
+    // Add version option if requested
+    if (m_version.size() && !find_option("--version")) {
+        m_option.emplace(m_option.begin(),
+                         new ArgOption(m_argparse, "--version"));
+        m_option[0]->m_help   = "Print version and exit";
+        m_option[0]->m_action = [&](Arg& arg, cspan<const char*> myarg) {
+            Strutil::print("{}\n", m_version);
+            if (m_exit_on_error)
+                exit(EXIT_SUCCESS);
+            else {
+                m_argparse.abort();
+            }
+        };
+        m_option[0]->initialize();
+    }
 
     // Add help option if requested
     if (m_add_help && !find_option("--help")) {
@@ -456,7 +479,9 @@ ArgParse::Impl::parse_args(int xargc, const char** xargv)
     }
 
     bool any_option_encountered = false;
-    for (int i = 1; i < m_argc; i++) {
+    for (int i = 1; i < m_argc; ++i) {
+        m_current_arg = i;
+        m_next_arg    = -1;
         if (m_aborted)
             break;
         if (m_argv[i][0] == '-'
@@ -469,44 +494,53 @@ ArgParse::Impl::parse_args(int xargc, const char** xargv)
                 argname.erase(colon, std::string::npos);
             ArgOption* option = find_option(argname.c_str());
             if (!option) {
-                errorf("Invalid option \"%s\"", m_argv[i]);
+                std::string suggestion = closest_match(argname);
+                if (suggestion.size())
+                    errorfmt("Invalid option \"{}\" (did you mean {}?)",
+                             m_argv[i], suggestion);
+                else
+                    errorfmt("Invalid option \"{}\"", m_argv[i]);
                 return -1;
             }
 
             option->found_on_command_line();
 
             if (option->is_flag() || option->is_reverse_flag()) {
-                option->set_parameter(0, nullptr);
-                if (option->has_callback())
-                    option->invoke_callback(1, m_argv + i);
-                if (option->m_action) {
-                    option->m_action(*option, { m_argv + i, 1 });
-                } else {
-                    m_params[option->dest()] = option->is_flag() ? 1 : 0;
+                if (m_running || option->always_run()) {
+                    option->set_parameter(0, nullptr);
+                    if (option->has_callback())
+                        option->invoke_callback(1, m_argv + i);
+                    if (option->m_action) {
+                        option->m_action(*option, { m_argv + i, 1 });
+                    } else {
+                        m_params[option->dest()] = option->is_flag() ? 1 : 0;
+                    }
                 }
-                // else
             } else {
                 assert(option->is_regular());
                 int n = option->nargs();
                 assert(n >= 1);
                 for (int j = 0; j < n; j++) {
                     if (j + i + 1 >= m_argc) {
-                        errorf("Missing parameter %d from option \"%s\"", j + 1,
-                               option->flag());
+                        errorfmt("Missing parameter {} from option \"{}\"",
+                                 j + 1, option->flag());
                         return -1;
                     }
                     option->set_parameter(j, m_argv[i + j + 1]);
                 }
-                if (option->has_callback())
-                    option->invoke_callback(1 + n, m_argv + i);
-                if (option->m_action) {
-                    option->m_action(*option, { m_argv + i, n + 1 });
-                } else {
-                    m_params[option->dest()] = m_argv[i + 1];
+                if (m_running || option->always_run()) {
+                    if (option->has_callback())
+                        option->invoke_callback(1 + n, m_argv + i);
+                    if (option->m_action) {
+                        option->m_action(*option,
+                                         { m_argv + i, span_size_t(n + 1) });
+                    } else {
+                        m_params[option->dest()] = m_argv[i + 1];
+                    }
                 }
                 i += n;
             }
-        } else {
+        } else if (m_running) {
             // not an option nor an option parameter, glob onto global list,
             // or the preoption list if a preoption callback was given and
             // we haven't encountered any options yet.
@@ -521,14 +555,47 @@ ArgParse::Impl::parse_args(int xargc, const char** xargv)
                 else
                     m_global->invoke_callback(1, m_argv + i);
             } else {
-                errorf("Argument \"%s\" does not have an associated option",
-                       m_argv[i]);
+                errorfmt("Argument \"{}\" does not have an associated option",
+                         m_argv[i]);
                 return -1;
             }
+        }
+        if (m_next_arg >= 0) {
+            // The action we just took requested a different next arg.
+            i = m_next_arg - 1;
         }
     }
 
     return 0;
+}
+
+
+
+std::string
+ArgParse::Impl::closest_match(string_view argname, size_t threshold) const
+{
+    string_view badarg(argname);
+    Strutil::parse_while(badarg, "-");
+    std::string suggestion;
+    if (badarg.size() <= 1) {
+        // Single char args presumed to have no unique helpful suggestions,
+        // since they are edit distance of 1 from all other 1-char options.
+        return suggestion;
+    }
+    size_t closest = threshold;
+    for (auto&& opt : m_option) {
+        string_view optname = opt->name();
+        if (!optname.size())
+            continue;
+        auto howclose = Strutil::edit_distance(badarg, optname);
+        // Strutil::print("{} vs {} -> {}\n", badarg, optname, howclose);
+        if (howclose < closest) {
+            closest    = howclose;
+            suggestion = opt->flag();
+        }
+    }
+    // Strutil::print("suggesting '{}' with {}\n", suggestion, closest);
+    return suggestion;
 }
 
 
@@ -550,7 +617,7 @@ ArgParse::options(const char* intro, ...)
     m_impl->m_description += intro;
     for (const char* cur = va_arg(ap, char*); cur; cur = va_arg(ap, char*)) {
         if (m_impl->find_option(cur) && strcmp(cur, "<SEPARATOR>")) {
-            m_impl->errorf("Option \"%s\" is multiply defined", cur);
+            m_impl->errorfmt("Option \"{}\" is multiply defined", cur);
             return -1;
         }
 
@@ -766,6 +833,15 @@ ArgParse::Arg::hidden()
 
 
 
+ArgParse::Arg&
+ArgParse::Arg::always_run()
+{
+    static_cast<ArgOption*>(this)->m_always_run = true;
+    return *this;
+}
+
+
+
 ArgParse::Action
 ArgParse::do_nothing()
 {
@@ -882,6 +958,15 @@ ArgParse::add_help(bool add_help)
 
 
 ArgParse&
+ArgParse::add_version(string_view version)
+{
+    m_impl->m_version = version;
+    return *this;
+}
+
+
+
+ArgParse&
 ArgParse::exit_on_error(bool exit_on_error)
 {
     m_impl->m_exit_on_error = exit_on_error;
@@ -979,8 +1064,8 @@ ArgParse::print_help() const
                     std::cout << "\n    " << std::string(maxlen + 2, ' ');
                 std::string h = opt->help();
                 if (m_impl->m_print_defaults && cparams().contains(opt->dest()))
-                    h += Strutil::sprintf(" (default: %s)",
-                                          cparams()[opt->dest()].get());
+                    h += Strutil::fmt::format(" (default: {})",
+                                              cparams()[opt->dest()].get());
                 std::cout << Strutil::wordwrap(h, columns - 2,
                                                (int)maxlen + 2 + 4 + 2);
                 std::cout << '\n';
@@ -1065,6 +1150,22 @@ ArgParse::set_postoption_help(callback_t callback)
 
 
 void
+ArgParse::running(bool run)
+{
+    m_impl->m_running = run;
+}
+
+
+
+bool
+ArgParse::running() const
+{
+    return m_impl->m_running;
+}
+
+
+
+void
 ArgParse::abort(bool aborted)
 {
     m_impl->m_aborted = aborted;
@@ -1076,6 +1177,22 @@ bool
 ArgParse::aborted() const
 {
     return m_impl->m_aborted;
+}
+
+
+
+int
+ArgParse::current_arg() const
+{
+    return m_impl->m_current_arg;
+}
+
+
+
+void
+ArgParse::set_next_arg(int nextarg)
+{
+    m_impl->m_next_arg = nextarg;
 }
 
 OIIO_NAMESPACE_END

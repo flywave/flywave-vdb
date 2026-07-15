@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cstdio>
 #include <cstdlib>
@@ -142,35 +142,34 @@ operator<<(std::ostream& out, const Benchmarker& bench)
     range *= scale;
 
     if (bench.indent())
-        out << std::string(bench.indent(), ' ');
+        OIIO::print(out, "{}", std::string(bench.indent(), ' '));
     if (unit == int(Benchmarker::Unit::s))
-        out << Strutil::sprintf("%-16s: %s", bench.m_name,
-                                Strutil::timeintervalformat(avg, 2));
+        OIIO::print(out, "{:16}: {}", bench.m_name,
+                    Strutil::timeintervalformat(avg, 2));
     else
-        out << Strutil::sprintf("%-16s: %6.1f %s (+/-%4.1f%s), ", bench.name(),
-                                avg, unitname, stddev, unitname);
+        OIIO::print(out, "{:16}: {:6.1f} {} (+/- {:.1f}{}), ", bench.name(),
+                    avg, unitname, stddev, unitname);
     if (bench.avg() < 0.25e-9) {
         // Less than 1/4 ns iteration time is probably an error
-        out << "unreliable";
+        OIIO::print(out, "unreliable");
         return out;
     }
     if (bench.work() == 1)
-        out << Strutil::sprintf("%6.1f %c/s", (1.0f / ratescale) / bench.avg(),
-                                rateunit);
+        OIIO::print(out, "{:6.1f} {:c}/s", (1.0f / ratescale) / bench.avg(),
+                    rateunit);
     else
-        out << Strutil::sprintf("%6.1f %cvals/s, %.1f %ccalls/s",
-                                (bench.work() / ratescale) / bench.avg(),
-                                rateunit, (1.0f / ratescale) / bench.avg(),
-                                rateunit);
+        OIIO::print(out, "{:6.1f} {:c}vals/s, {:.1} {:c}calls/s",
+                    (bench.work() / ratescale) / bench.avg(), rateunit,
+                    (1.0f / ratescale) / bench.avg(), rateunit);
     if (bench.verbose() >= 2)
-        out << Strutil::sprintf(" (%dx%d, rng=%.1f%%, med=%.1f)",
-                                bench.trials(), bench.iterations(), unitname,
-                                (range / avg) * 100.0, bench.median() * scale);
+        OIIO::print(out, " ({}x{}, rng={:.1}%, med={:.1})", bench.trials(),
+                    bench.iterations(), unitname, (range / avg) * 100.0,
+                    bench.median() * scale);
 #if 0
     if (range > avg/10.0) {
         for (auto v : bench.m_times)
-            std::cout << v*scale/bench.iterations() << ' ';
-        std::cout << "\n";
+            OIIO::print(out, "{} ", v*scale/bench.iterations());
+        OIIO::print(out, "\n");
     }
 #endif
     return out;
@@ -186,9 +185,10 @@ timed_thread_wedge(function_view<void(int)> task, function_view<void()> pretask,
 {
     std::vector<double> times(threadcounts.size(), 0.0f);
     if (out)
-        (*out)
-            << "threads    time   speedup  efficient  its/thread   range (best of "
-            << ntrials << ")\n";
+        Strutil::print(
+            *out,
+            "threads    time   speedup  efficient  its/thread   range (best of {})\n",
+            ntrials);
     for (size_t i = 0; i < (size_t)threadcounts.size(); ++i) {
         int nthreads = threadcounts[i];
         if (nthreads > maxthreads)
@@ -204,16 +204,15 @@ timed_thread_wedge(function_view<void(int)> task, function_view<void()> pretask,
                 threads.join_all();
                 posttask();
             },
-            ntrials, &range);
+            ntrials, 1, &range);
         if (out) {
             double one_thread_time = times[0] * threadcounts[0];
             double ideal           = one_thread_time / nthreads;
             double speedup         = one_thread_time / times[i];
             double efficiency      = 100.0 * ideal / times[i];
-            Strutil::fprintf(*out,
-                             "%4d   %8.1f   %6.2fx    %6.2f%% %10d %8.2f\n",
-                             nthreads, times[i], speedup, efficiency, iters,
-                             range);
+            Strutil::print(
+                *out, "{:4}   {:8.1f}   {:6.2f}x    {:6.2f}% {:10} {:8.2f}\n",
+                nthreads, times[i], speedup, efficiency, iters, range);
         }
     }
     return times;

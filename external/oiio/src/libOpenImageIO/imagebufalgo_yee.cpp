@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 /// \file
@@ -9,6 +9,7 @@
 #include <cmath>
 #include <iostream>
 
+#include <OpenImageIO/Imath.h>
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imagebuf.h>
@@ -39,8 +40,7 @@ public:
     GaussianPyramid(ImageBuf& image)
     {
         level[0].swap(image);  // swallow the source as the top level
-        ImageBuf kernel;
-        ImageBufAlgo::make_kernel(kernel, "gaussian", 5, 5);
+        ImageBuf kernel = ImageBufAlgo::make_kernel("gaussian", 5, 5);
         for (int i = 1; i < PYRAMID_MAX_LEVELS; ++i)
             ImageBufAlgo::convolve(level[i], level[i - 1], kernel);
     }
@@ -55,6 +55,7 @@ public:
             return level[lev].getchannel(x, y, 0, 1);
     }
 
+#if 0 /* unused */
     ImageBuf& operator[](int lev)
     {
         OIIO_DASSERT(lev < PYRAMID_MAX_LEVELS);
@@ -66,6 +67,7 @@ public:
         OIIO_DASSERT(lev < PYRAMID_MAX_LEVELS);
         return level[lev].getchannel(x, y, 0, 1);
     }
+#endif
 
 private:
     ImageBuf level[PYRAMID_MAX_LEVELS];
@@ -78,11 +80,9 @@ private:
 inline Color3f
 AdobeRGBToXYZ_color(const Color3f& rgb)
 {
-    return Color3f(rgb[0] * 0.576700f + rgb[1] * 0.185556f + rgb[2] * 0.188212f,
-                   rgb[0] * 0.297361f + rgb[1] * 0.627355f
-                       + rgb[2] * 0.0752847f,
-                   rgb[0] * 0.0270328f + rgb[1] * 0.0706879f
-                       + rgb[2] * 0.991248f);
+    return Color3f(rgb.x * 0.576700f + rgb.y * 0.185556f + rgb.z * 0.188212f,
+                   rgb.x * 0.297361f + rgb.y * 0.627355f + rgb.z * 0.0752847f,
+                   rgb.x * 0.0270328f + rgb.y * 0.0706879f + rgb.z * 0.991248f);
 }
 
 
@@ -94,9 +94,9 @@ AdobeRGBToXYZ(ImageBuf& A, ROI roi, int nthreads)
         for (ImageBuf::Iterator<float> a(A, roi); !a.done(); ++a) {
             Color3f rgb(a[0], a[1], a[2]);
             Color3f XYZ = AdobeRGBToXYZ_color(rgb);
-            a[0]        = XYZ[0];
-            a[1]        = XYZ[1];
-            a[2]        = XYZ[2];
+            a[0]        = XYZ.x;
+            a[1]        = XYZ.y;
+            a[2]        = XYZ.z;
         }
     });
     return true;
@@ -106,23 +106,24 @@ AdobeRGBToXYZ(ImageBuf& A, ROI roi, int nthreads)
 
 /// Convert a color in XYZ space to LAB space.
 ///
-static Color3f
-XYZToLAB_color(const Color3f xyz)
+inline Color3f
+XYZToLAB_color(const Color3f& xyz)
 {
     // Reference white point
-    static const Color3f white(0.576700f + 0.185556f + 0.188212f,
-                               0.297361f + 0.627355f + 0.0752847f,
-                               0.0270328f + 0.0706879f + 0.991248f);
-    const float epsilon = 216.0f / 24389.0f;
-    const float kappa   = 24389.0f / 27.0f;
+    static const float white[3] = { 0.576700f + 0.185556f + 0.188212f,
+                                    0.297361f + 0.627355f + 0.0752847f,
+                                    0.0270328f + 0.0706879f + 0.991248f };
+    const float epsilon         = 216.0f / 24389.0f;
+    const float kappa           = 24389.0f / 27.0f;
 
-    Color3f r = xyz / white;
-    Color3f f;
+    float r[3] = { xyz.x / white[0], xyz.y / white[1], xyz.z / white[2] };
+    float f[3];
     for (int i = 0; i < 3; i++) {
-        if (r[i] > epsilon)
-            f[i] = powf(r[i], 1.0f / 3.0f);
+        float ri = r[i];  // NOSONAR
+        if (ri > epsilon)
+            f[i] = fast_cbrt(ri);  // powf(ri, 1.0f / 3.0f);
         else
-            f[i] = (kappa * r[i] + 16.0f) / 116.0f;
+            f[i] = (kappa * ri + 16.0f) / 116.0f;
     }
     return Color3f(116.0f * f[1] - 16.0f,    // L
                    500.0f * (f[0] - f[1]),   // A
@@ -138,9 +139,9 @@ XYZToLAB(ImageBuf& A, ROI roi, int nthreads)
         for (ImageBuf::Iterator<float> a(A, roi); !a.done(); ++a) {
             Color3f XYZ(a[0], a[1], a[2]);
             Color3f LAB = XYZToLAB_color(XYZ);
-            a[0]        = LAB[0];
-            a[1]        = LAB[1];
-            a[2]        = LAB[2];
+            a[0]        = LAB.x;
+            a[1]        = LAB.y;
+            a[2]        = LAB.z;
         }
     });
     return true;
@@ -227,8 +228,7 @@ ImageBufAlgo::compare_Yee(const ImageBuf& img0, const ImageBuf& img1,
     ImageBufAlgo::paste(aLAB, 0, 0, 0, 0, img0, roi, nthreads);
     AdobeRGBToXYZ(aLAB, ROI::All(), nthreads);  // contains XYZ now
     ImageBuf aLum;
-    int channelorder[] = { 1 };  // channel to copy
-    ImageBufAlgo::channels(aLum, aLAB, 1, channelorder);
+    ImageBufAlgo::channels(aLum, aLAB, 1, { 1 } /* channelorder */);
     ImageBufAlgo::mul(aLum, aLum, luminance, ROI::All(), nthreads);
     XYZToLAB(aLAB, ROI::All(), nthreads);  // now it's LAB
 
@@ -237,7 +237,7 @@ ImageBufAlgo::compare_Yee(const ImageBuf& img0, const ImageBuf& img1,
     ImageBufAlgo::paste(bLAB, 0, 0, 0, 0, img1, roi, nthreads);
     AdobeRGBToXYZ(bLAB, ROI::All(), nthreads);  // contains XYZ now
     ImageBuf bLum;
-    ImageBufAlgo::channels(bLum, bLAB, 1, channelorder);
+    ImageBufAlgo::channels(bLum, bLAB, 1, { 1 } /* channelorder */);
     ImageBufAlgo::mul(bLum, bLum, luminance, ROI::All(), nthreads);
     XYZToLAB(bLAB, ROI::All(), nthreads);  // now it's LAB
 

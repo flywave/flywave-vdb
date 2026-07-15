@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 // Filter results comparison
@@ -42,15 +42,15 @@ OIIO_NAMESPACE_BEGIN
 class FilterBox1D final : public Filter1D {
 public:
     FilterBox1D(float width)
-        : Filter1D(width)
+        : Filter1D(width > 0.0f ? width : 1.0f)
     {
     }
-    ~FilterBox1D(void) {}
-    float operator()(float x) const
+    ~FilterBox1D() override {}
+    float operator()(float x) const override
     {
         return (fabsf(x) <= m_w * 0.5f) ? 1.0f : 0.0f;
     }
-    string_view name(void) const { return "box"; }
+    string_view name() const override { return "box"; }
 };
 
 
@@ -58,18 +58,24 @@ public:
 class FilterBox2D final : public Filter2D {
 public:
     FilterBox2D(float width, float height)
-        : Filter2D(width, height)
+        : Filter2D(width > 0.0f ? width : 1.0f, height > 0.0f ? height : 1.0f)
     {
     }
-    ~FilterBox2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterBox2D() override {}
+    float operator()(float x, float y) const override
     {
         return (fabsf(x) <= m_w * 0.5f && fabsf(y) <= m_h * 0.5f) ? 1.0f : 0.0f;
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const { return fabsf(x) <= m_w * 0.5f ? 1.0f : 0.0f; }
-    float yfilt(float y) const { return fabsf(y) <= m_h * 0.5f ? 1.0f : 0.0f; }
-    string_view name(void) const { return "box"; }
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
+    {
+        return fabsf(x) <= m_w * 0.5f ? 1.0f : 0.0f;
+    }
+    float yfilt(float y) const override
+    {
+        return fabsf(y) <= m_h * 0.5f ? 1.0f : 0.0f;
+    }
+    string_view name() const override { return "box"; }
 };
 
 
@@ -77,13 +83,13 @@ public:
 class FilterTriangle1D final : public Filter1D {
 public:
     FilterTriangle1D(float width)
-        : Filter1D(width)
-        , m_rad_inv(2.0f / width)
+        : Filter1D(width > 0.0f ? width : 2.0f)
+        , m_rad_inv(2.0f / m_w)
     {
     }
-    ~FilterTriangle1D(void) {}
-    float operator()(float x) const { return tri1d(x * m_rad_inv); }
-    string_view name(void) const { return "triangle"; }
+    ~FilterTriangle1D() override {}
+    float operator()(float x) const override { return tri1d(x * m_rad_inv); }
+    string_view name() const override { return "triangle"; }
 
     static float tri1d(float x)
     {
@@ -92,7 +98,7 @@ public:
     }
 
 private:
-    float m_rad_inv;
+    const float m_rad_inv;
 };
 
 
@@ -100,30 +106,30 @@ private:
 class FilterTriangle2D final : public Filter2D {
 public:
     FilterTriangle2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wrad_inv(2.0f / width)
-        , m_hrad_inv(2.0f / height)
+        : Filter2D(width > 0.0f ? width : 2.0f, height > 0.0f ? height : 2.0f)
+        , m_wrad_inv(2.0f / m_w)
+        , m_hrad_inv(2.0f / m_h)
     {
     }
-    ~FilterTriangle2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterTriangle2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterTriangle1D::tri1d(x * m_wrad_inv)
                * FilterTriangle1D::tri1d(y * m_hrad_inv);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterTriangle1D::tri1d(x * m_wrad_inv);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterTriangle1D::tri1d(y * m_hrad_inv);
     }
-    string_view name(void) const { return "triangle"; }
+    string_view name() const override { return "triangle"; }
 
 private:
-    float m_wrad_inv, m_hrad_inv;
+    const float m_wrad_inv, m_hrad_inv;
 };
 
 
@@ -131,18 +137,18 @@ private:
 class FilterGaussian1D final : public Filter1D {
 public:
     FilterGaussian1D(float width)
-        : Filter1D(width)
-        , m_rad_inv(2.0f / width)
+        : Filter1D(width > 0.0f ? width : 3.0f)
+        , m_rad_inv(2.0f / m_w)
     {
     }
-    ~FilterGaussian1D(void) {}
-    float operator()(float x) const { return gauss1d(x * m_rad_inv); }
+    ~FilterGaussian1D() override {}
+    float operator()(float x) const override { return gauss1d(x * m_rad_inv); }
     static float gauss1d(float x)
     {
         x = fabsf(x);
         return (x < 1.0f) ? fast_exp(-2.0f * (x * x)) : 0.0f;
     }
-    string_view name(void) const { return "gaussian"; }
+    string_view name() const override { return "gaussian"; }
 
 private:
     float m_rad_inv;
@@ -153,30 +159,30 @@ private:
 class FilterGaussian2D final : public Filter2D {
 public:
     FilterGaussian2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wrad_inv(2.0f / width)
-        , m_hrad_inv(2.0f / height)
+        : Filter2D(width > 0.0f ? width : 3.0f, height > 0.0f ? height : 3.0f)
+        , m_wrad_inv(2.0f / m_w)
+        , m_hrad_inv(2.0f / m_h)
     {
     }
-    ~FilterGaussian2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterGaussian2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterGaussian1D::gauss1d(x * m_wrad_inv)
                * FilterGaussian1D::gauss1d(y * m_hrad_inv);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterGaussian1D::gauss1d(x * m_wrad_inv);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterGaussian1D::gauss1d(y * m_hrad_inv);
     }
-    string_view name(void) const { return "gaussian"; }
+    string_view name() const override { return "gaussian"; }
 
 private:
-    float m_wrad_inv, m_hrad_inv;
+    const float m_wrad_inv, m_hrad_inv;
 };
 
 
@@ -184,21 +190,21 @@ private:
 class FilterSharpGaussian1D final : public Filter1D {
 public:
     FilterSharpGaussian1D(float width)
-        : Filter1D(width)
-        , m_rad_inv(2.0f / width)
+        : Filter1D(width > 0.0f ? width : 2.0f)
+        , m_rad_inv(2.0f / m_w)
     {
     }
-    ~FilterSharpGaussian1D(void) {}
-    float operator()(float x) const { return gauss1d(x * m_rad_inv); }
+    ~FilterSharpGaussian1D() override {}
+    float operator()(float x) const override { return gauss1d(x * m_rad_inv); }
     static float gauss1d(float x)
     {
         x = fabsf(x);
         return (x < 1.0f) ? fast_exp(-4.0f * (x * x)) : 0.0f;
     }
-    string_view name(void) const { return "gaussian"; }
+    string_view name() const override { return "gaussian"; }
 
 private:
-    float m_rad_inv;
+    const float m_rad_inv;
 };
 
 
@@ -206,30 +212,30 @@ private:
 class FilterSharpGaussian2D final : public Filter2D {
 public:
     FilterSharpGaussian2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wrad_inv(2.0f / width)
-        , m_hrad_inv(2.0f / height)
+        : Filter2D(width > 0.0f ? width : 2.0f, height > 0.0f ? height : 2.0f)
+        , m_wrad_inv(2.0f / m_w)
+        , m_hrad_inv(2.0f / m_h)
     {
     }
-    ~FilterSharpGaussian2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterSharpGaussian2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterSharpGaussian1D::gauss1d(x * m_wrad_inv)
                * FilterSharpGaussian1D::gauss1d(y * m_hrad_inv);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterSharpGaussian1D::gauss1d(x * m_wrad_inv);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterSharpGaussian1D::gauss1d(y * m_hrad_inv);
     }
-    string_view name(void) const { return "gaussian"; }
+    string_view name() const override { return "gaussian"; }
 
 private:
-    float m_wrad_inv, m_hrad_inv;
+    const float m_wrad_inv, m_hrad_inv;
 };
 
 
@@ -238,12 +244,12 @@ class FilterCatmullRom1D final : public Filter1D {
 public:
     FilterCatmullRom1D(float width)
         : Filter1D(4.0f)
-        , m_scale(4.0f / width)
+        , m_scale(4.0f / (width > 0.0f ? width : 4.0f))
     {
     }
-    ~FilterCatmullRom1D(void) {}
-    float operator()(float x) const { return catrom1d(x * m_scale); }
-    string_view name(void) const { return "catmull-rom"; }
+    ~FilterCatmullRom1D() override {}
+    float operator()(float x) const override { return catrom1d(x * m_scale); }
+    string_view name() const override { return "catmull-rom"; }
 
     static float catrom1d(float x)
     {
@@ -256,7 +262,7 @@ public:
     }
 
 private:
-    float m_scale;
+    const float m_scale;
 };
 
 
@@ -264,30 +270,30 @@ private:
 class FilterCatmullRom2D final : public Filter2D {
 public:
     FilterCatmullRom2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wscale(4.0f / width)
-        , m_hscale(4.0f / height)
+        : Filter2D(width > 0.0f ? width : 4.0f, height > 0.0f ? height : 4.0f)
+        , m_wscale(4.0f / m_w)
+        , m_hscale(4.0f / m_h)
     {
     }
-    ~FilterCatmullRom2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterCatmullRom2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterCatmullRom1D::catrom1d(x * m_wscale)
                * FilterCatmullRom1D::catrom1d(y * m_hscale);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterCatmullRom1D::catrom1d(x * m_wscale);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterCatmullRom1D::catrom1d(y * m_hscale);
     }
-    string_view name(void) const { return "catmull-rom"; }
+    string_view name() const override { return "catmull-rom"; }
 
 private:
-    float m_wscale, m_hscale;
+    const float m_wscale, m_hscale;
 };
 
 
@@ -295,13 +301,13 @@ private:
 class FilterBlackmanHarris1D final : public Filter1D {
 public:
     FilterBlackmanHarris1D(float width)
-        : Filter1D(width)
-        , m_rad_inv(2.0f / width)
+        : Filter1D(width > 0.0f ? width : 3.0f)
+        , m_rad_inv(2.0f / m_w)
     {
     }
-    ~FilterBlackmanHarris1D(void) {}
-    float operator()(float x) const { return bh1d(x * m_rad_inv); }
-    string_view name(void) const { return "blackman-harris"; }
+    ~FilterBlackmanHarris1D() override {}
+    float operator()(float x) const override { return bh1d(x * m_rad_inv); }
+    string_view name() const override { return "blackman-harris"; }
     static float bh1d(float x)
     {
         if (x < -1.0f || x > 1.0f)  // Early out if outside filter range
@@ -331,7 +337,7 @@ public:
     }
 
 private:
-    float m_rad_inv;
+    const float m_rad_inv;
 };
 
 
@@ -339,30 +345,30 @@ private:
 class FilterBlackmanHarris2D final : public Filter2D {
 public:
     FilterBlackmanHarris2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wrad_inv(2.0f / width)
-        , m_hrad_inv(2.0f / height)
+        : Filter2D(width > 0.0f ? width : 3.0f, height > 0.0f ? height : 3.0f)
+        , m_wrad_inv(2.0f / m_w)
+        , m_hrad_inv(2.0f / m_h)
     {
     }
-    ~FilterBlackmanHarris2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterBlackmanHarris2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterBlackmanHarris1D::bh1d(x * m_wrad_inv)
                * FilterBlackmanHarris1D::bh1d(y * m_hrad_inv);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterBlackmanHarris1D::bh1d(x * m_wrad_inv);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterBlackmanHarris1D::bh1d(y * m_hrad_inv);
     }
-    string_view name(void) const { return "blackman-harris"; }
+    string_view name() const override { return "blackman-harris"; }
 
 private:
-    float m_wrad_inv, m_hrad_inv;
+    const float m_wrad_inv, m_hrad_inv;
 };
 
 
@@ -370,13 +376,13 @@ private:
 class FilterSinc1D final : public Filter1D {
 public:
     FilterSinc1D(float width)
-        : Filter1D(width)
-        , m_rad(width / 2.0f)
+        : Filter1D(width > 0.0f ? width : 4.0f)
+        , m_rad(m_w / 2.0f)
     {
     }
-    ~FilterSinc1D(void) {}
-    float operator()(float x) const { return sinc1d(x, m_rad); }
-    string_view name(void) const { return "sinc"; }
+    ~FilterSinc1D() override {}
+    float operator()(float x) const override { return sinc1d(x, m_rad); }
+    string_view name() const override { return "sinc"; }
 
     static float sinc1d(float x, float rad)
     {
@@ -388,7 +394,7 @@ public:
     }
 
 private:
-    float m_rad;
+    const float m_rad;
 };
 
 
@@ -396,24 +402,30 @@ private:
 class FilterSinc2D final : public Filter2D {
 public:
     FilterSinc2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wrad(width / 2.0f)
-        , m_hrad(height / 2.0f)
+        : Filter2D(width > 0.0f ? width : 4.0f, height > 0.0f ? height : 4.0f)
+        , m_wrad(m_w / 2.0f)
+        , m_hrad(m_h / 2.0f)
     {
     }
-    ~FilterSinc2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterSinc2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterSinc1D::sinc1d(x, m_wrad)
                * FilterSinc1D::sinc1d(y, m_hrad);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const { return FilterSinc1D::sinc1d(x, m_wrad); }
-    float yfilt(float y) const { return FilterSinc1D::sinc1d(y, m_hrad); }
-    string_view name(void) const { return "sinc"; }
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
+    {
+        return FilterSinc1D::sinc1d(x, m_wrad);
+    }
+    float yfilt(float y) const override
+    {
+        return FilterSinc1D::sinc1d(y, m_hrad);
+    }
+    string_view name() const override { return "sinc"; }
 
 private:
-    float m_wrad, m_hrad;
+    const float m_wrad, m_hrad;
 };
 
 
@@ -421,13 +433,13 @@ private:
 class FilterLanczos3_1D final : public Filter1D {
 public:
     FilterLanczos3_1D(float width)
-        : Filter1D(width)
-        , m_scale(6.0f / width)
+        : Filter1D(width > 0.0f ? width : 6.0f)
+        , m_scale(6.0f / m_w)
     {
     }
-    ~FilterLanczos3_1D(void) {}
-    float operator()(float x) const { return lanczos3(x * m_scale); }
-    string_view name(void) const { return "lanczos3"; }
+    ~FilterLanczos3_1D() override {}
+    float operator()(float x) const override { return lanczos3(x * m_scale); }
+    string_view name() const override { return "lanczos3"; }
 
     static float lanczos3(float x)
     {
@@ -462,7 +474,7 @@ public:
     }
 
 private:
-    float m_scale;
+    const float m_scale;
 };
 
 
@@ -470,30 +482,30 @@ private:
 class FilterLanczos3_2D final : public Filter2D {
 public:
     FilterLanczos3_2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wscale(6.0f / width)
-        , m_hscale(6.0f / height)
+        : Filter2D(width > 0.0f ? width : 6.0f, height > 0.0f ? height : 6.0f)
+        , m_wscale(6.0f / m_w)
+        , m_hscale(6.0f / m_h)
     {
     }
-    ~FilterLanczos3_2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterLanczos3_2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterLanczos3_1D::lanczos3(x * m_wscale)
                * FilterLanczos3_1D::lanczos3(y * m_hscale);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterLanczos3_1D::lanczos3(x * m_wscale);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterLanczos3_1D::lanczos3(y * m_hscale);
     }
-    string_view name(void) const { return "lanczos3"; }
+    string_view name() const override { return "lanczos3"; }
 
 protected:
-    float m_wscale, m_hscale;
+    const float m_wscale, m_hscale;
 };
 
 
@@ -501,30 +513,30 @@ protected:
 class FilterRadialLanczos3_2D final : public Filter2D {
 public:
     FilterRadialLanczos3_2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wscale(6.0f / width)
-        , m_hscale(6.0f / height)
+        : Filter2D(width > 0.0f ? width : 6.0f, height > 0.0f ? height : 6.0f)
+        , m_wscale(6.0f / m_w)
+        , m_hscale(6.0f / m_h)
     {
     }
-    float operator()(float x, float y) const
+    float operator()(float x, float y) const override
     {
         x *= m_wscale;
         y *= m_hscale;
         return FilterLanczos3_1D::lanczos3(sqrtf(x * x + y * y));
     }
-    bool separable(void) const { return false; }
-    float xfilt(float x) const
+    bool separable() const override { return false; }
+    float xfilt(float x) const override
     {
         return FilterLanczos3_1D::lanczos3(x * m_wscale);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterLanczos3_1D::lanczos3(y * m_hscale);
     }
-    string_view name(void) const { return "radial-lanczos3"; }
+    string_view name() const override { return "radial-lanczos3"; }
 
 protected:
-    float m_wscale, m_hscale;
+    const float m_wscale, m_hscale;
 };
 
 
@@ -532,13 +544,16 @@ protected:
 class FilterMitchell1D final : public Filter1D {
 public:
     FilterMitchell1D(float width)
-        : Filter1D(width)
-        , m_rad_inv(2.0f / width)
+        : Filter1D(width > 0.0f ? width : 4.0f)
+        , m_rad_inv(2.0f / m_w)
     {
     }
-    ~FilterMitchell1D(void) {}
-    float operator()(float x) const { return mitchell1d(x * m_rad_inv); }
-    string_view name(void) const { return "mitchell"; }
+    ~FilterMitchell1D() override {}
+    float operator()(float x) const override
+    {
+        return mitchell1d(x * m_rad_inv);
+    }
+    string_view name() const override { return "mitchell"; }
 
     static float mitchell1d(float x)
     {
@@ -563,7 +578,7 @@ public:
     }
 
 private:
-    float m_rad_inv;
+    const float m_rad_inv;
 };
 
 
@@ -571,30 +586,30 @@ private:
 class FilterMitchell2D final : public Filter2D {
 public:
     FilterMitchell2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wrad_inv(2.0f / width)
-        , m_hrad_inv(2.0f / height)
+        : Filter2D(width > 0.0f ? width : 4.0f, height > 0.0f ? height : 4.0f)
+        , m_wrad_inv(2.0f / m_w)
+        , m_hrad_inv(2.0f / m_h)
     {
     }
-    ~FilterMitchell2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterMitchell2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterMitchell1D::mitchell1d(x * m_wrad_inv)
                * FilterMitchell1D::mitchell1d(y * m_hrad_inv);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterMitchell1D::mitchell1d(x * m_wrad_inv);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterMitchell1D::mitchell1d(y * m_hrad_inv);
     }
-    string_view name(void) const { return "mitchell"; }
+    string_view name() const override { return "mitchell"; }
 
 private:
-    float m_wrad_inv, m_hrad_inv;
+    const float m_wrad_inv, m_hrad_inv;
 };
 
 
@@ -603,13 +618,13 @@ private:
 class FilterBSpline1D final : public Filter1D {
 public:
     FilterBSpline1D(float width)
-        : Filter1D(width)
-        , m_wscale(4.0f / width)
+        : Filter1D(width > 0.0f ? width : 4.0f)
+        , m_wscale(4.0f / m_w)
     {
     }
-    ~FilterBSpline1D(void) {}
-    float operator()(float x) const { return bspline1d(x * m_wscale); }
-    string_view name(void) const { return "b-spline"; }
+    ~FilterBSpline1D() override {}
+    float operator()(float x) const override { return bspline1d(x * m_wscale); }
+    string_view name() const override { return "b-spline"; }
 
     static float bspline1d(float x)
     {
@@ -623,7 +638,7 @@ public:
     }
 
 private:
-    float m_wscale;  // width scale factor
+    const float m_wscale;  // width scale factor
     static float b0(float t) { return t * t * t / 6.0f; }
     static float b1(float t)
     {
@@ -636,30 +651,30 @@ private:
 class FilterBSpline2D final : public Filter2D {
 public:
     FilterBSpline2D(float width, float height)
-        : Filter2D(width, height)
-        , m_wscale(4.0f / width)
-        , m_hscale(4.0f / height)
+        : Filter2D(width > 0.0f ? width : 4.0f, height > 0.0f ? height : 4.0f)
+        , m_wscale(4.0f / m_w)
+        , m_hscale(4.0f / m_h)
     {
     }
-    ~FilterBSpline2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterBSpline2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterBSpline1D::bspline1d(x * m_wscale)
                * FilterBSpline1D::bspline1d(y * m_hscale);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterBSpline1D::bspline1d(x * m_wscale);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterBSpline1D::bspline1d(y * m_hscale);
     }
-    string_view name(void) const { return "b-spline"; }
+    string_view name() const override { return "b-spline"; }
 
 private:
-    float m_wscale, m_hscale;
+    const float m_wscale, m_hscale;
 };
 
 
@@ -667,30 +682,33 @@ private:
 class FilterDisk2D final : public Filter2D {
 public:
     FilterDisk2D(float width, float height)
-        : Filter2D(width, height)
+        : Filter2D(width > 0.0f ? width : 1.0f, height > 0.0f ? height : 1.0f)
     {
     }
-    ~FilterDisk2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterDisk2D() override {}
+    float operator()(float x, float y) const override
     {
         x /= (m_w * 0.5f);
         y /= (m_h * 0.5f);
         return ((x * x + y * y) < 1.0f) ? 1.0f : 0.0f;
     }
-    string_view name(void) const { return "disk"; }
+    string_view name() const override { return "disk"; }
 };
 
 
 class FilterCubic1D : public Filter1D {
 public:
-    FilterCubic1D(float width)
-        : Filter1D(width)
-        , m_a(0.0f)
-        , m_rad_inv(2.0f / width)
+    FilterCubic1D(float width, float a = 0.0f)
+        : Filter1D(width > 0.0f ? width : 4.0f)
+        , m_a(a)
+        , m_rad_inv(2.0f / m_w)
     {
     }
-    ~FilterCubic1D(void) {}
-    float operator()(float x) const { return cubic(x * m_rad_inv, m_a); }
+    ~FilterCubic1D() override {}
+    float operator()(float x) const override
+    {
+        return cubic(x * m_rad_inv, m_a);
+    }
 
     static float cubic(float x, float a)
     {
@@ -708,44 +726,44 @@ public:
         // return (a + 2.0f) * x*x*x - (a + 3.0f) * x*x + 1.0f;
     }
 
-    virtual string_view name(void) const { return "cubic"; }
+    string_view name() const override { return "cubic"; }
 
 protected:
-    float m_a;
-    float m_rad_inv;
+    const float m_a;
+    const float m_rad_inv;
 };
 
 
 
 class FilterCubic2D : public Filter2D {
 public:
-    FilterCubic2D(float width, float height)
-        : Filter2D(width, height)
-        , m_a(0.0f)
-        , m_wrad_inv(2.0f / width)
-        , m_hrad_inv(2.0f / height)
+    FilterCubic2D(float width, float height, float a = 0.0f)
+        : Filter2D(width > 0.0f ? width : 4.0f, height > 0.0f ? height : 4.0f)
+        , m_a(a)
+        , m_wrad_inv(2.0f / m_w)
+        , m_hrad_inv(2.0f / m_h)
     {
     }
-    ~FilterCubic2D(void) {}
-    float operator()(float x, float y) const
+    ~FilterCubic2D() override {}
+    float operator()(float x, float y) const override
     {
         return FilterCubic1D::cubic(x * m_wrad_inv, m_a)
                * FilterCubic1D::cubic(y * m_hrad_inv, m_a);
     }
-    bool separable(void) const { return true; }
-    float xfilt(float x) const
+    bool separable() const override { return true; }
+    float xfilt(float x) const override
     {
         return FilterCubic1D::cubic(x * m_wrad_inv, m_a);
     }
-    float yfilt(float y) const
+    float yfilt(float y) const override
     {
         return FilterCubic1D::cubic(y * m_hrad_inv, m_a);
     }
-    virtual string_view name(void) const { return "cubic"; }
+    string_view name() const override { return "cubic"; }
 
 protected:
-    float m_a;
-    float m_wrad_inv, m_hrad_inv;
+    const float m_a;
+    const float m_wrad_inv, m_hrad_inv;
 };
 
 
@@ -753,24 +771,22 @@ protected:
 class FilterKeys1D final : public FilterCubic1D {
 public:
     FilterKeys1D(float width)
-        : FilterCubic1D(width)
+        : FilterCubic1D(width, -0.5f)
     {
-        m_a = -0.5f;
     }
-    ~FilterKeys1D(void) {}
-    virtual string_view name(void) const { return "keys"; }
+    ~FilterKeys1D() override {}
+    string_view name() const override { return "keys"; }
 };
 
 
 class FilterKeys2D final : public FilterCubic2D {
 public:
     FilterKeys2D(float width, float height)
-        : FilterCubic2D(width, height)
+        : FilterCubic2D(width, height, -0.5f)
     {
-        m_a = -0.5f;
     }
-    ~FilterKeys2D(void) {}
-    virtual string_view name(void) const { return "keys"; }
+    ~FilterKeys2D() override {}
+    string_view name() const override { return "keys"; }
 };
 
 
@@ -778,24 +794,22 @@ public:
 class FilterSimon1D final : public FilterCubic1D {
 public:
     FilterSimon1D(float width)
-        : FilterCubic1D(width)
+        : FilterCubic1D(width, -0.75f)
     {
-        m_a = -0.75f;
     }
-    ~FilterSimon1D(void) {}
-    virtual string_view name(void) const { return "simon"; }
+    ~FilterSimon1D() override {}
+    string_view name() const override { return "simon"; }
 };
 
 
 class FilterSimon2D final : public FilterCubic2D {
 public:
     FilterSimon2D(float width, float height)
-        : FilterCubic2D(width, height)
+        : FilterCubic2D(width, height, -0.75f)
     {
-        m_a = -0.75f;
     }
-    ~FilterSimon2D(void) {}
-    virtual string_view name(void) const { return "simon"; }
+    ~FilterSimon2D() override {}
+    string_view name() const override { return "simon"; }
 };
 
 
@@ -803,24 +817,22 @@ public:
 class FilterRifman1D final : public FilterCubic1D {
 public:
     FilterRifman1D(float width)
-        : FilterCubic1D(width)
+        : FilterCubic1D(width, -1.0f)
     {
-        m_a = -1.0f;
     }
-    ~FilterRifman1D(void) {}
-    virtual string_view name(void) const { return "rifman"; }
+    ~FilterRifman1D() override {}
+    string_view name() const override { return "rifman"; }
 };
 
 
 class FilterRifman2D final : public FilterCubic2D {
 public:
     FilterRifman2D(float width, float height)
-        : FilterCubic2D(width, height)
+        : FilterCubic2D(width, height, -1.0f)
     {
-        m_a = -1.0f;
     }
-    ~FilterRifman2D(void) {}
-    virtual string_view name(void) const { return "rifman"; }
+    ~FilterRifman2D() override {}
+    string_view name() const override { return "rifman"; }
 };
 
 
@@ -865,6 +877,15 @@ void
 Filter1D::get_filterdesc(int filternum, FilterDesc* filterdesc)
 {
     *filterdesc = get_filterdesc(filternum);
+}
+
+
+
+std::shared_ptr<const Filter1D>
+Filter1D::create_shared(string_view filtername, float width)
+{
+    return std::shared_ptr<const Filter1D>(create(filtername, width),
+                                           Filter1D::destroy);
 }
 
 
@@ -962,6 +983,15 @@ Filter2D::get_filterdesc(int filternum, FilterDesc* filterdesc)
 
 
 
+std::shared_ptr<const Filter2D>
+Filter2D::create_shared(string_view filtername, float width, float height)
+{
+    return std::shared_ptr<const Filter2D>(create(filtername, width, height),
+                                           Filter2D::destroy);
+}
+
+
+
 // Filter2D::create is the static method that, given a filter name,
 // width, and height, returns an allocated and instantiated filter of
 // the correct implementation.  If the name is not recognized, return
@@ -970,6 +1000,8 @@ Filter2D::get_filterdesc(int filternum, FilterDesc* filterdesc)
 Filter2D*
 Filter2D::create(string_view filtername, float width, float height)
 {
+    if (height <= 0.0f)
+        height = width;
     if (filtername == "box")
         return new FilterBox2D(width, height);
     if (filtername == "triangle")

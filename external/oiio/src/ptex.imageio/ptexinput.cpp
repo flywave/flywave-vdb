@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <Ptexture.h>
 
@@ -18,31 +18,31 @@ public:
     {
         init();
     }
-    virtual ~PtexInput() { close(); }
-    virtual const char* format_name(void) const override { return "ptex"; }
-    virtual int supports(string_view feature) const override
+    ~PtexInput() override { close(); }
+    const char* format_name(void) const override { return "ptex"; }
+    int supports(string_view feature) const override
     {
         return (feature == "arbitrary_metadata"
                 || feature == "exif"    // Because of arbitrary_metadata
                 || feature == "iptc");  // Because of arbitrary_metadata
     }
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool close() override;
-    virtual int current_subimage(void) const override
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool close() override;
+    int current_subimage(void) const override
     {
         lock_guard lock(*this);
         return m_subimage;
     }
-    virtual int current_miplevel(void) const override
+    int current_miplevel(void) const override
     {
         lock_guard lock(*this);
         return m_miplevel;
     }
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool read_native_tile(int subimage, int miplevel, int x, int y,
-                                  int z, void* data) override;
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
+    bool read_native_tile(int subimage, int miplevel, int x, int y, int z,
+                          void* data) override;
 
 private:
     PtexTexture* m_ptex;
@@ -66,11 +66,13 @@ private:
         m_subimage = -1;
         m_miplevel = -1;
     }
+
+    void get_ptex_metadata(PtexMetaData* pmeta);
 };
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageInput*
@@ -84,8 +86,8 @@ OIIO_EXPORT int ptex_imageio_version = OIIO_PLUGIN_VERSION;
 OIIO_EXPORT const char*
 ptex_imageio_library_version()
 {
-    return ustring::sprintf("Ptex %d.%d", PtexLibraryMajorVersion,
-                            PtexLibraryMinorVersion)
+    return ustring::fmtformat("Ptex {}.{}", PtexLibraryMajorVersion,
+                              PtexLibraryMinorVersion)
         .c_str();
 }
 
@@ -105,7 +107,7 @@ PtexInput::open(const std::string& name, ImageSpec& newspec)
             m_ptex->release();
             m_ptex = NULL;
         }
-        errorf("%s", perr.c_str());
+        errorfmt("{}", perr.c_str());
         return false;
     }
 
@@ -144,7 +146,7 @@ PtexInput::seek_subimage(int subimage, int miplevel)
     case Ptex::dt_uint16: format = TypeDesc::UINT16; break;
     case Ptex::dt_half: format = TypeDesc::HALF; break;
     case Ptex::dt_float: format = TypeDesc::FLOAT; break;
-    default: errorf("Ptex with unknown data format"); return false;
+    default: errorfmt("Ptex with unknown data format"); return false;
     }
 
     m_spec = ImageSpec(std::max(1, m_faceres.u() >> miplevel),
@@ -190,6 +192,29 @@ PtexInput::seek_subimage(int subimage, int miplevel)
         wrapmode += "periodic";
     m_spec.attribute("wrapmode", wrapmode);
 
+    // Add the arbitrary metadata. For Ptex, we only add full metadata to the
+    // first MIP level of the first subimage. The PTex format doesn't permit
+    // metadata to differ per-face anyway.
+    if (subimage == 0 && miplevel == 0) {
+        if (PtexMetaData* pmeta = m_ptex->getMetaData()) {
+            get_ptex_metadata(pmeta);
+            pmeta->release();
+        }
+    }
+
+    facedata->release();
+    return true;
+}
+
+
+
+void
+PtexInput::get_ptex_metadata(PtexMetaData* pmeta)
+{
+    if (!pmeta)
+        return;
+
+        // Helper macro to get metadata of a specific type
 #define GETMETA(pmeta, key, ptype, basetype, typedesc, value) \
     {                                                         \
         const ptype* v;                                       \
@@ -199,47 +224,40 @@ PtexInput::seek_subimage(int subimage, int miplevel)
         value    = (const void*)v;                            \
     }
 
-    PtexMetaData* pmeta = m_ptex->getMetaData();
-    if (pmeta) {
-        int n = pmeta->numKeys();
-        for (int i = 0; i < n; ++i) {
-            const char* key = NULL;
-            Ptex::MetaDataType ptype;
-            pmeta->getKey(i, key, ptype);
-            OIIO_DASSERT(key);
-            const char* vchar;
-            const void* value;
-            TypeDesc typedesc;
-            switch (ptype) {
-            case Ptex::mdt_string:
-                pmeta->getValue(key, vchar);
-                value    = &vchar;
-                typedesc = TypeDesc::STRING;
-                break;
-            case Ptex::mdt_int8:
-                GETMETA(pmeta, key, int8_t, TypeDesc::INT8, typedesc, value);
-                break;
-            case Ptex::mdt_int16:
-                GETMETA(pmeta, key, int16_t, TypeDesc::INT16, typedesc, value);
-                break;
-            case Ptex::mdt_int32:
-                GETMETA(pmeta, key, int32_t, TypeDesc::INT32, typedesc, value);
-                break;
-            case Ptex::mdt_float:
-                GETMETA(pmeta, key, float, TypeDesc::FLOAT, typedesc, value);
-                break;
-            case Ptex::mdt_double:
-                GETMETA(pmeta, key, double, TypeDesc::DOUBLE, typedesc, value);
-                break;
-            default: continue;
-            }
-            m_spec.attribute(key, typedesc, value);
+    int n = pmeta->numKeys();
+    for (int i = 0; i < n; ++i) {
+        const char* key = NULL;
+        Ptex::MetaDataType ptype;
+        pmeta->getKey(i, key, ptype);
+        OIIO_DASSERT(key);
+        const char* vchar;
+        const void* value;
+        TypeDesc typedesc;
+        switch (ptype) {
+        case Ptex::mdt_string:
+            pmeta->getValue(key, vchar);
+            value    = &vchar;
+            typedesc = TypeDesc::STRING;
+            break;
+        case Ptex::mdt_int8:
+            GETMETA(pmeta, key, int8_t, TypeDesc::INT8, typedesc, value);
+            break;
+        case Ptex::mdt_int16:
+            GETMETA(pmeta, key, int16_t, TypeDesc::INT16, typedesc, value);
+            break;
+        case Ptex::mdt_int32:
+            GETMETA(pmeta, key, int32_t, TypeDesc::INT32, typedesc, value);
+            break;
+        case Ptex::mdt_float:
+            GETMETA(pmeta, key, float, TypeDesc::FLOAT, typedesc, value);
+            break;
+        case Ptex::mdt_double:
+            GETMETA(pmeta, key, double, TypeDesc::DOUBLE, typedesc, value);
+            break;
+        default: continue;
         }
-        pmeta->release();
+        m_spec.attribute(key, typedesc, value);
     }
-
-    facedata->release();
-    return true;
 }
 
 

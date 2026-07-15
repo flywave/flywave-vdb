@@ -1,59 +1,63 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <vector>
 
-#include "openjpeg.h"
+#include <openjpeg.h>
+#include <opj_config.h>
 
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/fmath.h>
 #include <OpenImageIO/imageio.h>
 
+#ifndef OIIO_OPJ_VERSION
+#    if defined(OPJ_VERSION_MAJOR)
+// OpenJPEG >= 2.1 defines these symbols
+#        define OIIO_OPJ_VERSION                                 \
+            (OPJ_VERSION_MAJOR * 10000 + OPJ_VERSION_MINOR * 100 \
+             + OPJ_VERSION_BUILD)
+#    else
+// Older, assume it's the minimum of 2.0
+#        define OIIO_OPJ_VERSION 20000
+#    endif
+#endif
+
+#ifdef USE_OPENJPH
+#    include <openjph/ojph_arg.h>
+#    include <openjph/ojph_codestream.h>
+#    include <openjph/ojph_file.h>
+OIIO_PRAGMA_WARNING_PUSH
+OIIO_GCC_PRAGMA(GCC diagnostic ignored "-Wdelete-incomplete")
+#    include <openjph/ojph_mem.h>
+OIIO_PRAGMA_WARNING_POP
+#    include <openjph/ojph_params.h>
+#endif
 
 OIIO_PLUGIN_NAMESPACE_BEGIN
-
-
-static void
-openjpeg_error_callback(const char* msg, void* data)
-{
-    if (ImageOutput* input = (ImageOutput*)data) {
-        if (!msg || !msg[0])
-            msg = "Unknown OpenJpeg error";
-        input->errorf("%s", msg);
-    }
-}
-
-
-static void
-openjpeg_dummy_callback(const char* /*msg*/, void* /*data*/)
-{
-}
-
 
 
 class Jpeg2000Output final : public ImageOutput {
 public:
     Jpeg2000Output() { init(); }
-    virtual ~Jpeg2000Output() { close(); }
-    virtual const char* format_name(void) const override { return "jpeg2000"; }
-    virtual int supports(string_view feature) const override
+    ~Jpeg2000Output() override { close(); }
+    const char* format_name(void) const override { return "jpeg2000"; }
+    int supports(string_view feature) const override
     {
-        return (feature == "alpha");
+        return feature == "alpha" || feature == "ioproxy" || feature == "tiles";
         // FIXME: we should support Exif/IPTC, but currently don't.
     }
-    virtual bool open(const std::string& name, const ImageSpec& spec,
-                      OpenMode mode = Create) override;
-    virtual bool close() override;
-    virtual bool write_scanline(int y, int z, TypeDesc format, const void* data,
-                                stride_t xstride) override;
-    virtual bool write_tile(int x, int y, int z, TypeDesc format,
-                            const void* data, stride_t xstride,
-                            stride_t ystride, stride_t zstride) override;
+    bool open(const std::string& name, const ImageSpec& spec,
+              OpenMode mode = Create) override;
+    bool close() override;
+    bool write_scanline(int y, int z, TypeDesc format, const void* data,
+                        stride_t xstride) override;
+    bool write_tile(int x, int y, int z, TypeDesc format, const void* data,
+                    stride_t xstride, stride_t ystride,
+                    stride_t zstride) override;
 
 private:
     std::string m_filename;
-    FILE* m_file;
     opj_cparameters_t m_compression_parameters;
     opj_image_t* m_image;
     opj_codec_t* m_codec;
@@ -65,11 +69,11 @@ private:
 
     void init(void)
     {
-        m_file          = NULL;
         m_image         = NULL;
         m_codec         = NULL;
         m_stream        = NULL;
         m_convert_alpha = true;
+        ioproxy_clear();
     }
 
     opj_image_t* create_jpeg2000_image();
@@ -103,10 +107,42 @@ private:
     void setup_compression_params();
 
     OPJ_PROG_ORDER get_progression_order(const std::string& progression_order);
+
+    static OPJ_SIZE_T StreamWrite(void* p_buffer, OPJ_SIZE_T p_nb_bytes,
+                                  void* p_user_data)
+    {
+        auto in = static_cast<Jpeg2000Output*>(p_user_data);
+        auto r  = in->ioproxy()->write(p_buffer, p_nb_bytes);
+        return r ? OPJ_SIZE_T(r) : OPJ_SIZE_T(-1);
+    }
+
+    static OPJ_BOOL StreamSeek(OPJ_OFF_T p_nb_bytes, void* p_user_data)
+    {
+        auto in = static_cast<Jpeg2000Output*>(p_user_data);
+        return in->ioseek(p_nb_bytes, SEEK_SET);
+    }
+
+    static OPJ_OFF_T StreamSkip(OPJ_OFF_T p_nb_bytes, void* p_user_data)
+    {
+        auto in = static_cast<Jpeg2000Output*>(p_user_data);
+        return in->ioseek(p_nb_bytes, SEEK_CUR) ? p_nb_bytes : OPJ_SIZE_T(-1);
+    }
+
+    static void StreamFree(void* p_user_data) {}
+
+    static void openjpeg_error_callback(const char* msg, void* data)
+    {
+        if (ImageOutput* output = (ImageOutput*)data) {
+            output->errorfmt("{}",
+                             msg && msg[0] ? msg : "Unknown OpenJpeg error");
+        }
+    }
+
+    static void openjpeg_dummy_callback(const char* /*msg*/, void* /*data*/) {}
 };
 
 
-// Obligatory material to make this a recognizeable imageio plugin
+// Obligatory material to make this a recognizable imageio plugin
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageOutput*
@@ -125,49 +161,25 @@ bool
 Jpeg2000Output::open(const std::string& name, const ImageSpec& spec,
                      OpenMode mode)
 {
-    if (mode != Create) {
-        errorf("%s does not support subimages or MIP levels", format_name());
+    if (!check_open(mode, spec, { 0, 1 << 20, 0, 1 << 20, 0, 1, 0, 4 },
+                    uint64_t(OpenChecks::Disallow2Channel)))
         return false;
-    }
 
     m_filename = name;
-    m_spec     = spec;
 
-    // Check for things this format doesn't support
-    if (m_spec.width < 1 || m_spec.height < 1) {
-        errorf("Image resolution must be at least 1x1, you asked for %d x %d",
-               m_spec.width, m_spec.height);
-        return false;
-    }
-    if (m_spec.depth < 1)
-        m_spec.depth = 1;
-    if (m_spec.depth > 1) {
-        errorf("%s does not support volume images (depth > 1)", format_name());
-        return false;
-    }
-
-    if (m_spec.nchannels != 1 && m_spec.nchannels != 3
-        && m_spec.nchannels != 4) {
-        errorf("%s does not support %d-channel images\n", format_name(),
-               m_spec.nchannels);
-        return false;
-    }
-
-    // If not uint8 or uint16, default to uint8
+    // If not uint8 or uint16, default to uint16
     if (m_spec.format != TypeDesc::UINT8 && m_spec.format != TypeDesc::UINT16)
-        m_spec.set_format(TypeDesc::UINT8);
+        m_spec.set_format(TypeDesc::UINT16);
 
-    m_dither = (m_spec.format == TypeDesc::UINT8)
-                   ? m_spec.get_int_attribute("oiio:dither", 0)
-                   : 0;
+    m_dither        = (m_spec.format == TypeDesc::UINT8)
+                          ? m_spec.get_int_attribute("oiio:dither", 0)
+                          : 0;
     m_convert_alpha = m_spec.alpha_channel != -1
                       && !m_spec.get_int_attribute("oiio:UnassociatedAlpha", 0);
 
-    m_file = Filesystem::fopen(m_filename, "wb");
-    if (m_file == NULL) {
-        errorf("Could not open \"%s\"", m_filename);
+    ioproxy_retrieve_from_config(m_spec);
+    if (!ioproxy_use_or_open(name))
         return false;
-    }
 
     // If user asked for tiles -- which this format doesn't support, emulate
     // it by buffering the whole image.
@@ -217,7 +229,7 @@ Jpeg2000Output::write_scanline(int y, int z, TypeDesc format, const void* data,
 {
     y -= m_spec.y;
     if (y > m_spec.height) {
-        errorf("Attempt to write too many scanlines to %s", m_filename);
+        errorfmt("Attempt to write too many scanlines to {}", m_filename);
         return false;
     }
 
@@ -287,10 +299,7 @@ Jpeg2000Output::close()
     }
     destroy_compressor();
     destroy_stream();
-    if (m_file) {
-        fclose(m_file);
-        m_file = NULL;
-    }
+    init();
     return ok;
 }
 
@@ -309,23 +318,31 @@ Jpeg2000Output::save_image()
 
     opj_setup_encoder(m_codec, &m_compression_parameters, m_image);
 
-#if defined(OPJ_VERSION_MAJOR)
-    // OpenJpeg >= 2.1
-    m_stream = opj_stream_create_default_file_stream(m_filename.c_str(), false);
-#else
-    // OpenJpeg 2.0: need to open a stream ourselves
-    m_file   = Filesystem::fopen(m_filename, "wb");
-    m_stream = opj_stream_create_default_file_stream(m_file, false);
+#if OIIO_OPJ_VERSION >= 20400
+    // Set up multithread in OpenJPEG library -- added in OpenJPEG 2.2,
+    // but it doesn't seem reliably safe until 2.4.
+    int nthreads = threads();
+    if (!nthreads)
+        nthreads = OIIO::get_int_attribute("threads");
+    opj_codec_set_threads(m_codec, nthreads);
 #endif
+
+    m_stream = opj_stream_default_create(false /* is_input */);
     if (!m_stream) {
-        errorf("Failed write jpeg2000::save_image");
+        errorfmt("Failed write jpeg2000::save_image");
         return false;
     }
+
+    opj_stream_set_user_data(m_stream, this, StreamFree);
+    opj_stream_set_seek_function(m_stream, StreamSeek);
+    opj_stream_set_skip_function(m_stream, StreamSkip);
+    opj_stream_set_write_function(m_stream, StreamWrite);
+    // opj_stream_set_user_data_length(m_stream, ioproxy()->size());
 
     if (!opj_start_compress(m_codec, m_image, m_stream)
         || !opj_encode(m_codec, m_stream)
         || !opj_end_compress(m_codec, m_stream)) {
-        errorf("Failed write jpeg2000::save_image");
+        errorfmt("Failed write jpeg2000::save_image");
         return false;
     }
 
@@ -351,8 +368,8 @@ Jpeg2000Output::create_jpeg2000_image()
              || m_spec.format == TypeDesc::INT8)
         precision = 8;
 
-    const int MAX_COMPONENTS = 4;
-    opj_image_cmptparm_t component_params[MAX_COMPONENTS];
+    const int MAX_J2K_COMPONENTS = 4;
+    opj_image_cmptparm_t component_params[MAX_J2K_COMPONENTS];
     init_components(component_params, precision);
 
     m_image = opj_image_create(m_spec.nchannels, &component_params[0],
@@ -398,7 +415,10 @@ Jpeg2000Output::init_components(opj_image_cmptparm_t* components, int precision)
         components[i].w    = m_spec.width;
         components[i].h    = m_spec.height;
         components[i].prec = precision;
-        components[i].bpp  = precision;
+#if OIIO_OPJ_VERSION < 20500
+        // bpp field is deprecated starting with OpenJPEG 2.5
+        components[i].bpp = precision;
+#endif
         components[i].sgnd = 0;
     }
 }
@@ -552,5 +572,185 @@ Jpeg2000Output::get_progression_order(const std::string& progression_order)
         return OPJ_CPRL;
     return OPJ_PROG_UNKNOWN;
 }
+
+
+#ifdef USE_OPENJPH
+
+
+struct size_list_interpreter : public ojph::cli_interpreter::arg_inter_base {
+    size_list_interpreter(const int max_num_elements, int& num_elements,
+                          ojph::size* list)
+        : max_num_eles(max_num_elements)
+        , sizelist(list)
+        , num_eles(num_elements)
+    {
+    }
+
+    virtual void operate(const char* str)
+    {
+        const char* next_char = str;
+        num_eles              = 0;
+        do {
+            if (num_eles) {
+                if (*next_char != ',')  //separate sizes by a comma
+                    throw "sizes in a sizes list must be separated by a comma";
+                next_char++;
+            }
+
+            char* endptr;
+            sizelist[num_eles].w = (ojph::ui32)strtoul(next_char, &endptr, 10);
+            if (endptr == next_char)
+                throw "size number is improperly formatted";
+            next_char = endptr;
+            if (*next_char != ',')
+                throw "size must have a "
+                      ","
+                      " between the two numbers";
+            next_char++;
+            sizelist[num_eles].h = (ojph::ui32)strtoul(next_char, &endptr, 10);
+            if (endptr == next_char)
+                throw "number is improperly formatted";
+            next_char = endptr;
+
+
+            ++num_eles;
+        } while (*next_char == ',' && num_eles < max_num_eles);
+        if (num_eles < max_num_eles) {
+            if (*next_char)
+                throw "size elements must separated by a "
+                      ","
+                      "";
+        } else if (*next_char)
+            throw "there are too many elements in the size list";
+    }
+
+    const int max_num_eles;
+    ojph::size* sizelist;
+    int& num_eles;
+};
+
+
+
+void
+Jpeg2000Output::create_jph_image()
+{
+    m_jph_stream        = std::make_unique<ojph::codestream>();
+    ojph::param_siz siz = m_jph_stream->access_siz();
+    siz.set_image_extent(ojph::point(m_spec.width, m_spec.height));
+
+
+    // TODO
+    /*
+    OPJ_COLOR_SPACE color_space = OPJ_CLRSPC_SRGB;
+    if (m_spec.nchannels == 1)
+        color_space = OPJ_CLRSPC_GRAY;
+    */
+
+    int precision          = 16;
+    const ParamValue* prec = m_spec.find_attribute("oiio:BitsPerSample",
+                                                   TypeDesc::INT);
+    bool is_signed         = false;
+
+    if (prec)
+        precision = *(int*)prec->data();
+
+    switch (m_spec.format.basetype) {
+    case TypeDesc::INT8:
+    case TypeDesc::UINT8:
+        precision = 8;
+        is_signed = false;
+        break;
+    case TypeDesc::FLOAT:
+    case TypeDesc::HALF:
+    case TypeDesc::DOUBLE:
+        throw "OpenJPH::Write Double is not currently supported.";
+    default: break;
+    }
+
+    output_depth = m_spec.get_int_attribute("jph:bit_depth", precision);
+
+    siz.set_num_components(m_spec.nchannels);
+    ojph::point subsample(1, 1);  // Default subsample
+    for (int c = 0; c < m_spec.nchannels; ++c)
+        siz.set_component(static_cast<ojph::ui32>(c), subsample, output_depth,
+                          is_signed);
+
+    ojph::size tile_size(0, 0);
+    ojph::point tile_offset(0, 0);
+    ojph::point image_offset(0, 0);
+    siz.set_image_offset(image_offset);
+    siz.set_tile_size(tile_size);
+    siz.set_tile_offset(tile_offset);
+    ojph::param_cod cod = m_jph_stream->access_cod();
+
+    std::string block_args = m_spec.get_string_attribute("jph:block_size",
+                                                         "64,64");
+    std::stringstream ss(block_args);
+    char comma;
+    int block_size_x, block_size_y;
+    ss >> block_size_x >> comma >> block_size_y;
+
+    cod.set_block_dims(block_size_x, block_size_y);
+    cod.set_color_transform(true);
+
+    int num_precincts            = -1;
+    const int max_precinct_sizes = 33;  //maximum number of decompositions is 32
+    ojph::size precinct_size[max_precinct_sizes];
+    std::string precinct_size_args
+        = m_spec.get_string_attribute("jph:precincts", "undef");
+    if (precinct_size_args != "undef") {
+        size_list_interpreter sizelist(max_precinct_sizes, num_precincts,
+                                       precinct_size);
+        sizelist.operate(precinct_size_args.c_str());
+
+        if (num_precincts != -1)
+            cod.set_precinct_size(num_precincts, precinct_size);
+    }
+
+    std::string progression_order
+        = m_spec.get_string_attribute("jph:prog_order", "RPCL");
+
+    cod.set_progression_order(progression_order.c_str());
+
+    cod.set_reversible(true);
+
+    float qstep = m_spec.get_float_attribute("jph:qstep", -1);
+
+    if (qstep > 0) {
+        cod.set_reversible(false);
+        m_jph_stream->access_qcd().set_irrev_quant(qstep);
+    }
+
+    cod.set_num_decomposition(m_spec.get_int_attribute("jph:num_decomps", 5));
+    m_jph_stream->set_planar(false);
+    m_jph_image = std::make_unique<ojph::j2c_outfile>();
+    m_jph_image->open(m_filename.c_str());
+    m_jph_stream->write_headers(m_jph_image.get());  //, "test comment", 1);
+}
+
+
+
+template<typename T>
+void
+Jpeg2000Output::write_jph_scanline(int y, int /*z*/, const void* data)
+{
+    int bits                 = sizeof(T) * 8;
+    const T* scanline        = static_cast<const T*>(data);
+    ojph::ui32 next_comp     = 0;
+    ojph::line_buf* cur_line = m_jph_stream->exchange(NULL, next_comp);
+    for (int c = 0; c < m_spec.nchannels; ++c) {
+        assert(c == next_comp);
+        for (int i = 0, j = c; i < m_spec.width; i++) {
+            unsigned int val = scanline[j];
+            j += m_spec.nchannels;
+            if (bits != output_depth)
+                val = bit_range_convert(val, bits, output_depth);
+            cur_line->i32[i] = val;
+        }
+        cur_line = m_jph_stream->exchange(cur_line, next_comp);
+    }
+}
+
+#endif
 
 OIIO_PLUGIN_NAMESPACE_END

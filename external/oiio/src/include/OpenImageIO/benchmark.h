@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 // clang-format off
 
@@ -15,6 +15,15 @@
 #include <OpenImageIO/timer.h>
 
 
+#if (((OIIO_GNUC_VERSION && NDEBUG) || OIIO_CLANG_VERSION >= 30500 || OIIO_APPLE_CLANG_VERSION >= 70000 || defined(__INTEL_COMPILER)  || defined(__INTEL_LLVM_COMPILER)) \
+      && (defined(__x86_64__) || defined(__i386__))) \
+    || defined(_MSC_VER)
+#define OIIO_DONOTOPT_FORECINLINE OIIO_FORCEINLINE
+#else
+#define OIIO_DONOTOPT_FORECINLINE inline
+#endif
+
+
 OIIO_NAMESPACE_BEGIN
 
 /// DoNotOptimize(val) is a helper function for timing benchmarks that fools
@@ -23,10 +32,10 @@ OIIO_NAMESPACE_BEGIN
 /// May not work on all platforms. References:
 /// * Chandler Carruth's CppCon 2015 talk
 /// * Folly https://github.com/facebook/folly/blob/master/folly/Benchmark.h
-/// * Google Benchmark https://github.com/google/benchmark/blob/master/include/benchmark/benchmark_api.h
+/// * Google Benchmark https://github.com/google/benchmark/blob/main/include/benchmark/benchmark.h
 
 template <class T>
-T const& DoNotOptimize (T const &val);
+OIIO_DONOTOPT_FORECINLINE T const& DoNotOptimize (T const &val);
 
 
 /// clobber_all_memory() is a helper function for timing benchmarks that
@@ -45,7 +54,7 @@ OIIO_FORCEINLINE void clobber_all_memory();
 /// of what's in p. This is helpful for benchmarking, to help erase any
 /// preconceptions the optimizer has about what might be in a variable.
 
-void OIIO_API clobber (void* p);
+void OIIO_UTIL_API clobber (void* p);
 OIIO_FORCEINLINE void clobber (const void* p) { clobber ((void*)p); }
 
 template<typename T>
@@ -120,10 +129,10 @@ OIIO_FORCEINLINE void clobber (T& p, Ts&... ps)
 /// * Beware of the compiler constant folding operations in your code --
 ///   do not pass constants unless you want to benchmark its performance on
 ///   known constants, and it is probably smart to ensure that all variables
-///   acccessed by your code should be passed to clobber() before running
+///   accessed by your code should be passed to clobber() before running
 ///   the benchmark, to confuse the compiler into not assuming its value.
 
-class OIIO_API Benchmarker {
+class OIIO_UTIL_API Benchmarker {
 public:
     Benchmarker() {}
 
@@ -295,7 +304,7 @@ private:
     void compute_stats(std::vector<double>& times, size_t iterations);
     double iteration_overhead();
 
-    friend OIIO_API std::ostream& operator<<(std::ostream& out,
+    friend OIIO_UTIL_API std::ostream& operator<<(std::ostream& out,
                                              const Benchmarker& bench);
 };
 
@@ -309,6 +318,9 @@ private:
 /// DEPRECATED(1.8): This may be considered obsolete, probably the
 /// Benchmarker class is a better solution.
 template<typename FUNC>
+#ifndef OIIO_INTERNAL
+OIIO_DEPRECATED("use Benchmarker instead")
+#endif
 double
 time_trial(FUNC func, int ntrials = 1, int nrepeats = 1, double* range = NULL)
 {
@@ -329,14 +341,6 @@ time_trial(FUNC func, int ntrials = 1, int nrepeats = 1, double* range = NULL)
     if (range)
         *range = maxtime - mintime;
     return mintime;
-}
-
-/// Version without repeats.
-template<typename FUNC>
-double
-time_trial(FUNC func, int ntrials, double* range)
-{
-    return time_trial(func, ntrials, 1, range);
 }
 
 
@@ -361,7 +365,7 @@ time_trial(FUNC func, int ntrials, double* range)
 // Return value:
 //     A vector<double> containing the best time (of the trials) for each
 //     thread count. This can be discarded.
-OIIO_API std::vector<double>
+OIIO_UTIL_API std::vector<double>
 timed_thread_wedge (function_view<void(int)> task,
                     function_view<void()> pretask,
                     function_view<void()> posttask,
@@ -373,7 +377,7 @@ timed_thread_wedge (function_view<void(int)> task,
 // Simplified timed_thread_wedge without pre- and post-tasks, using
 // std::out for output, with a default set of thread counts, and not needing
 // to return the vector of times.
-OIIO_API void
+OIIO_UTIL_API void
 timed_thread_wedge (function_view<void(int)> task,
                     int maxthreads, int total_iterations, int ntrials,
                     cspan<int> threadcounts = {1,2,4,8,12,16,24,32,48,64,128});
@@ -388,11 +392,12 @@ timed_thread_wedge (function_view<void(int)> task,
 
 
 namespace pvt {
-void OIIO_API use_char_ptr (char const volatile *);
+void OIIO_UTIL_API use_char_ptr (char const volatile *);
 }
 
 
-#if ((OIIO_GNUC_VERSION && NDEBUG) || OIIO_CLANG_VERSION >= 30500 || OIIO_APPLE_CLANG_VERSION >= 70000 || defined(__INTEL_COMPILER)) && (defined(__x86_64__) || defined(__i386__))
+#if ((OIIO_GNUC_VERSION && NDEBUG) || OIIO_CLANG_VERSION >= 30500 || OIIO_APPLE_CLANG_VERSION >= 70000 || defined(__INTEL_COMPILER)  || defined(__INTEL_LLVM_COMPILER)) \
+     && (defined(__x86_64__) || defined(__i386__))
 
 // Major non-MS compilers on x86/x86_64: use asm trick to indicate that
 // the value is needed.

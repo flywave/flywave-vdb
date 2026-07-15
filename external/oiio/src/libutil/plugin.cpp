@@ -1,13 +1,22 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
+
+#include <OpenImageIO/platform.h>
+
+OIIO_PRAGMA_WARNING_PUSH
+OIIO_CLANG_PRAGMA(clang diagnostic ignored "-Wdeprecated-declarations")
+// Force include of locale header with deprecated warnings turned off to
+// combat clang18 vs unicode deprecation warnings.
+#include <locale>
+OIIO_PRAGMA_WARNING_POP
 
 #include <cstdlib>
 #include <string>
 
-#include <OpenImageIO/platform.h>
-
-#ifndef _WIN32
+#ifdef _WIN32
+#    include <windows.h>
+#else
 #    include <dlfcn.h>
 #endif
 
@@ -48,7 +57,7 @@ Plugin::plugin_extension(void)
 Handle
 dlopen(const char* plugin_filename, int)
 {
-    std::wstring w = Strutil::utf8_to_utf16(plugin_filename);
+    std::wstring w = Strutil::utf8_to_utf16wstring(plugin_filename);
     return LoadLibraryW(w.c_str());
 }
 

@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <OpenImageIO/Imath.h>
 #include <OpenImageIO/dassert.h>
@@ -14,12 +14,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Dense.h>
 
-// Try to use the long form/abi version string introduced in 5.0
-#if OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER <= 4
-#    define OIIO_OPENVDB_VERSION OPENVDB_LIBRARY_VERSION_STRING
-#else
-#    define OIIO_OPENVDB_VERSION OPENVDB_LIBRARY_ABI_VERSION_STRING
-#endif
 
 
 OIIO_PLUGIN_NAMESPACE_BEGIN
@@ -65,23 +59,23 @@ class OpenVDBInput final : public ImageInput {
 
 public:
     OpenVDBInput() { init(); }
-    virtual ~OpenVDBInput() { close(); }
+    ~OpenVDBInput() override { close(); }
 
-    virtual const char* format_name(void) const override { return "openvdb"; }
-    virtual int supports(string_view feature) const override
+    const char* format_name(void) const override { return "openvdb"; }
+    int supports(string_view feature) const override
     {
-        return (feature == "arbitrary_metadata");
+        return (feature == "arbitrary_metadata" || feature == "multiimage");
     }
-    virtual bool valid_file(const std::string& filename) const override;
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool close() override;
-    virtual int current_subimage(void) const override;
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool seek_subimage_nolock(int subimage, int miplevel);
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool read_native_tile(int subimage, int miplevel, int x, int y,
-                                  int z, void* data) override;
+    bool valid_file(const std::string& filename) const override;
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool close() override;
+    int current_subimage(void) const override;
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool seek_subimage_nolock(int subimage, int miplevel);
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
+    bool read_native_tile(int subimage, int miplevel, int x, int y, int z,
+                          void* data) override;
 
     ImageSpec spec(int subimage, int miplevel) override;
     ImageSpec spec_dimensions(int subimage, int miplevel) override;
@@ -281,7 +275,6 @@ public:
     }
     openvdb::io::File* operator->() { return m_file.get(); };
     operator bool() const { return m_file.get() != nullptr; }
-    void reset() { m_file.reset(); }
 };
 
 
@@ -296,7 +289,7 @@ openVDB(const std::string& filename, const ImageInput* errReport)
     if (!f)
         return nullptr;
 
-    // Endianess of OPENVDB_MAGIC isn't clear, so just leave as is
+    // Endianness of OPENVDB_MAGIC isn't clear, so just leave as is
     int32_t magic;
     static_assert(sizeof(magic) == sizeof(OPENVDB_MAGIC),
                   "Magic type not the same size");
@@ -321,13 +314,13 @@ openVDB(const std::string& filename, const ImageInput* errReport)
             return file;
 
     } catch (const std::exception& e) {
-        errReport->errorf("Could not open '%s': %s", filename, e.what());
+        errReport->errorfmt("Could not open '{}': {}", filename, e.what());
         return nullptr;
     } catch (...) {
         errhint = "Unknown exception thrown";
     }
 
-    errReport->errorf("Could not open '%s': %s", filename, errhint);
+    errReport->errorfmt("Could not open '{}': {}", filename, errhint);
     return nullptr;
 }
 
@@ -530,11 +523,14 @@ OpenVDBInput::open(const std::string& filename, ImageSpec& newspec)
         }
     } catch (const std::exception& e) {
         init();  // Reset to initial state
-        errorf("Could not open '%s': %s", filename, e.what());
+        errorfmt("Could not open '{}': {}", filename, e.what());
         return false;
     }
     m_name       = filename;
     m_nsubimages = (int)m_layers.size();
+
+    for (auto& lr : m_layers)
+        lr.spec.attribute("oiio:subimages", m_nsubimages);
 
     bool ok = seek_subimage(0, 0);
     newspec = ImageInput::spec();
@@ -557,6 +553,10 @@ bool
 OpenVDBInput::read_native_tile(int subimage, int miplevel, int x, int y, int z,
                                void* data)
 {
+    OIIO_PRAGMA_WARNING_PUSH
+#if OIIO_GNUC_VERSION >= 120100
+    OIIO_GCC_ONLY_PRAGMA(GCC diagnostic ignored "-Wstringop-overflow")
+#endif
     lock_guard lock(*this);
     if (!seek_subimage_nolock(subimage, miplevel))
         return false;
@@ -574,11 +574,12 @@ OpenVDBInput::read_native_tile(int subimage, int miplevel, int x, int y, int z,
     default: break;
     }
     return false;
+    OIIO_PRAGMA_WARNING_POP
 }
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageInput*
@@ -594,7 +595,7 @@ OIIO_EXPORT int openvdb_imageio_version = OIIO_PLUGIN_VERSION;
 OIIO_EXPORT const char*
 openvdb_imageio_library_version()
 {
-    return "OpenVDB " OIIO_OPENVDB_VERSION;
+    return "OpenVDB " OPENVDB_LIBRARY_ABI_VERSION_STRING;
 }
 
 OIIO_PLUGIN_EXPORTS_END

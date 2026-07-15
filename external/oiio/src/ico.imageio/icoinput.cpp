@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <cstdio>
@@ -23,22 +23,27 @@ using namespace ICO_pvt;
 class ICOInput final : public ImageInput {
 public:
     ICOInput() { init(); }
-    virtual ~ICOInput() { close(); }
-    virtual const char* format_name(void) const override { return "ico"; }
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool close() override;
-    virtual int current_subimage(void) const override
+    ~ICOInput() override { close(); }
+    const char* format_name(void) const override { return "ico"; }
+    int supports(string_view feature) const override
+    {
+        return (feature == "ioproxy" || feature == "multiimage");
+    }
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool close() override;
+    int current_subimage(void) const override
     {
         lock_guard lock(*this);
         return m_subimage;
     }
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
 
 private:
     std::string m_filename;            ///< Stash the filename
-    FILE* m_file;                      ///< Open image handle
     ico_header m_ico;                  ///< ICO header
     std::vector<unsigned char> m_buf;  ///< Buffer the image pixels
     int m_subimage;                    ///< What subimage are we looking at?
@@ -58,31 +63,32 @@ private:
     void init()
     {
         m_subimage = -1;
-        m_file     = NULL;
         m_png      = NULL;
         m_info     = NULL;
         memset(&m_ico, 0, sizeof(m_ico));
         m_buf.clear();
+        ioproxy_clear();
     }
 
     /// Helper function: read the image.
     ///
     bool readimg();
 
-    /// Helper: read, with error detection
-    ///
-    bool fread(void* buf, size_t itemsize, size_t nitems)
+    // Callback for PNG that reads from an IOProxy.
+    static void PngReadCallback(png_structp png_ptr, png_bytep data,
+                                png_size_t length)
     {
-        size_t n = ::fread(buf, itemsize, nitems, m_file);
-        if (n != nitems)
-            errorf("Read error");
-        return n == nitems;
+        ICOInput* icoinput = (ICOInput*)png_get_io_ptr(png_ptr);
+        OIIO_DASSERT(icoinput);
+        if (!icoinput->ioread(data, length)) {
+            png_chunk_error(png_ptr, icoinput->geterror(false).c_str());
+        }
     }
 };
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageInput*
@@ -103,20 +109,26 @@ OIIO_EXPORT const char* ico_input_extensions[] = { "ico", nullptr };
 
 OIIO_PLUGIN_EXPORTS_END
 
-
-
 bool
 ICOInput::open(const std::string& name, ImageSpec& newspec)
 {
+    ImageSpec emptyconfig;
+    return open(name, newspec, emptyconfig);
+}
+
+bool
+ICOInput::open(const std::string& name, ImageSpec& newspec,
+               const ImageSpec& config)
+{
     m_filename = name;
 
-    m_file = Filesystem::fopen(name, "rb");
-    if (!m_file) {
-        errorf("Could not open file \"%s\"", name);
+    ioproxy_retrieve_from_config(config);
+    if (!ioproxy_use_or_open(name))
         return false;
-    }
 
-    if (!fread(&m_ico, 1, sizeof(m_ico)))
+    ioseek(0);
+
+    if (!ioread(&m_ico, 1, sizeof(m_ico)))
         return false;
 
     if (bigendian()) {
@@ -126,7 +138,7 @@ ICOInput::open(const std::string& name, ImageSpec& newspec)
         swap_endian(&m_ico.count);
     }
     if (m_ico.reserved != 0 || m_ico.type != 1) {
-        errorf("File failed ICO header check");
+        errorfmt("File failed ICO header check");
         return false;
     }
 
@@ -163,10 +175,9 @@ ICOInput::seek_subimage(int subimage, int miplevel)
     m_subimage = subimage;
 
     // read subimage header
-    fseek(m_file, sizeof(ico_header) + m_subimage * sizeof(ico_subimage),
-          SEEK_SET);
+    ioseek(sizeof(ico_header) + m_subimage * sizeof(ico_subimage), SEEK_SET);
     ico_subimage subimg;
-    if (!fread(&subimg, 1, sizeof(subimg)))
+    if (!ioread(&subimg, 1, sizeof(subimg)))
         return false;
 
     if (bigendian()) {
@@ -179,16 +190,29 @@ ICOInput::seek_subimage(int subimage, int miplevel)
         swap_endian(&subimg.numColours);
     }
 
-    fseek(m_file, subimg.ofs, SEEK_SET);
+    // some sanity checking
+    if (subimg.bpp != 1 && subimg.bpp != 4 && subimg.bpp != 8
+        && subimg.bpp != 16 && subimg.bpp != 24 && subimg.bpp != 32) {
+        errorfmt("Unsupported image color depth, probably corrupt file");
+        return false;
+    }
+    if (subimg.reserved != 0) {
+        errorfmt(
+            "Probably corrupt file (clue: header 'reserved' value should always be 0)",
+            subimg.reserved);
+        return false;
+    }
+
+    ioseek(subimg.ofs, SEEK_SET);
 
     // test for a PNG icon
     char temp[8];
-    if (!fread(temp, 1, sizeof(temp)))
+    if (!ioread(temp, 1, sizeof(temp)))
         return false;
     if (temp[1] == 'P' && temp[2] == 'N' && temp[3] == 'G') {
         // standard PNG initialization
         if (png_sig_cmp((png_bytep)temp, 0, 7)) {
-            errorf("Subimage failed PNG signature check");
+            errorfmt("Subimage failed PNG signature check");
             return false;
         }
 
@@ -196,13 +220,14 @@ ICOInput::seek_subimage(int subimage, int miplevel)
 
         std::string s = PNG_pvt::create_read_struct(m_png, m_info, this);
         if (s.length()) {
-            errorf("%s", s);
+            errorfmt("{}", s);
             return false;
         }
 
         //std::cerr << "[ico] reading PNG info\n";
+        // Tell libpng to use our read callback to read from the IOProxy
+        png_set_read_fn(m_png, this, PngReadCallback);
 
-        png_init_io(m_png, m_file);
         png_set_sig_bytes(m_png, 8);  // already read 8 bytes
 
         PNG_pvt::read_info(m_png, m_info, m_bpp, m_color_type, m_interlace_type,
@@ -215,10 +240,10 @@ ICOInput::seek_subimage(int subimage, int miplevel)
 
     // otherwise it's a plain, ol' windoze DIB (device-independent bitmap)
     // roll back to where we began and read in the DIB header
-    fseek(m_file, subimg.ofs, SEEK_SET);
+    ioseek(subimg.ofs, SEEK_SET);
 
     ico_bitmapinfo bmi;
-    if (!fread(&bmi, 1, sizeof(bmi)))
+    if (!ioread(&bmi, 1, sizeof(bmi)))
         return false;
     if (bigendian()) {
         // ICOs are little endian
@@ -243,7 +268,7 @@ ICOInput::seek_subimage(int subimage, int miplevel)
         && m_bpp != 8
         /*&& m_bpp != 16*/
         && m_bpp != 24 && m_bpp != 32) {
-        errorf("Unsupported image color depth, probably corrupt file");
+        errorfmt("Unsupported image color depth, probably corrupt file");
         return false;
     }
     m_offset        = subimg.ofs;
@@ -279,7 +304,7 @@ ICOInput::readimg()
         //std::cerr << "[ico] PNG buffer size = " << m_buf.size () << "\n";
 
         if (s.length()) {
-            errorf("%s", s);
+            errorfmt("{}", s);
             return false;
         }
 
@@ -297,7 +322,7 @@ ICOInput::readimg()
     std::vector<ico_palette_entry> palette(m_palette_size);
     if (m_bpp < 16) {  // >= 16-bit icons are unpaletted
         for (int i = 0; i < m_palette_size; i++)
-            if (!fread(&palette[i], 1, sizeof(ico_palette_entry)))
+            if (!ioread(&palette[i], 1, sizeof(ico_palette_entry)))
                 return false;
     }
 
@@ -308,21 +333,32 @@ ICOInput::readimg()
     std::vector<unsigned char> scanline(slb);
     ico_palette_entry* pe;
     int k;
+    int index;
     for (int y = m_spec.height - 1; y >= 0; y--) {
-        if (!fread(&scanline[0], 1, slb))
+        if (!ioread(&scanline[0], 1, slb))
             return false;
         for (int x = 0; x < m_spec.width; x++) {
             k = y * m_spec.width * 4 + x * 4;
             // fill the buffer
             switch (m_bpp) {
             case 1:
-                pe = &palette[(scanline[x / 8] & (1 << (7 - x % 8))) != 0];
+                index = ((scanline[x / 8] & (1 << (7 - x % 8))) != 0);
+                if (index >= m_palette_size) {
+                    errorfmt("Possible corruption: index exceeds palette size");
+                    return false;
+                }
+                pe           = &palette[index];
                 m_buf[k + 0] = pe->r;
                 m_buf[k + 1] = pe->g;
                 m_buf[k + 2] = pe->b;
                 break;
             case 4:
-                pe           = &palette[(scanline[x / 2] & 0xF0) >> 4];
+                index = ((scanline[x / 2] & 0xF0) >> 4);
+                if (index >= m_palette_size) {
+                    errorfmt("Possible corruption: index exceeds palette size");
+                    return false;
+                }
+                pe           = &palette[index];
                 m_buf[k + 0] = pe->r;
                 m_buf[k + 1] = pe->g;
                 m_buf[k + 2] = pe->b;
@@ -341,7 +377,12 @@ ICOInput::readimg()
                           << "\n";*/
                 break;
             case 8:
-                pe           = &palette[scanline[x]];
+                index = scanline[x];
+                if (index >= m_palette_size) {
+                    errorfmt("Possible corruption: index exceeds palette size");
+                    return false;
+                }
+                pe           = &palette[index];
                 m_buf[k + 0] = pe->r;
                 m_buf[k + 1] = pe->g;
                 m_buf[k + 2] = pe->b;
@@ -382,7 +423,7 @@ ICOInput::readimg()
               + (4 - ((m_spec.width + 7) / 8) % 4) % 4;  // padding
         scanline.resize(slb);
         for (int y = m_spec.height - 1; y >= 0; y--) {
-            if (!fread(&scanline[0], 1, slb))
+            if (!ioread(&scanline[0], 1, slb))
                 return false;
             for (int x = 0; x < m_spec.width; x += 8) {
                 for (int b = 0; b < 8; b++) {  // bit
@@ -406,10 +447,6 @@ ICOInput::close()
 {
     if (m_png && m_info)
         PNG_pvt::destroy_read_struct(m_png, m_info);
-    if (m_file) {
-        fclose(m_file);
-        m_file = NULL;
-    }
 
     init();  // Reset to initial state
     return true;

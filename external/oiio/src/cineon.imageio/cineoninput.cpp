@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 
@@ -19,12 +19,12 @@ OIIO_PLUGIN_NAMESPACE_BEGIN
 class CineonInput final : public ImageInput {
 public:
     CineonInput() { init(); }
-    virtual ~CineonInput() { close(); }
-    virtual const char* format_name(void) const override { return "cineon"; }
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool close() override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
+    ~CineonInput() override { close(); }
+    const char* format_name(void) const override { return "cineon"; }
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool close() override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
 
 private:
     InStream* m_stream = nullptr;
@@ -50,7 +50,7 @@ private:
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageInput*
@@ -79,13 +79,13 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
     // open the image
     m_stream = new InStream();
     if (!m_stream->Open(name.c_str())) {
-        errorf("Could not open file \"%s\"", name);
+        errorfmt("Could not open file \"{}\"", name);
         return false;
     }
 
     m_cin.SetInStream(m_stream);
     if (!m_cin.ReadHeader()) {
-        errorf("Could not read header");
+        errorfmt("Could not read header");
         return false;
     }
 
@@ -101,19 +101,18 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
     case 2: typedesc = TypeDesc::UINT16; break;
     case 3:
     case 4: typedesc = TypeDesc::UINT32; break;
-    default: errorf("Unsupported bit depth %d", maxbits); return false;
+    default: errorfmt("Unsupported bit depth {}", maxbits); return false;
     }
     m_spec = ImageSpec(m_cin.header.Width(), m_cin.header.Height(),
                        m_cin.header.NumberOfElements(), typedesc);
     // fill channel names
     m_spec.channelnames.clear();
     int gscount = 0, rcount = 0, gcount = 0, bcount = 0;
-    char buf[3];
     for (int i = 0; i < m_cin.header.NumberOfElements(); i++) {
         switch (m_cin.header.ImageDescriptor(i)) {
         case cineon::kGrayscale:
             if (++gscount > 1) {
-                std::string ch = Strutil::sprintf("I%d", gscount);
+                std::string ch = Strutil::fmt::format("I{}", gscount);
                 m_spec.channelnames.push_back(ch);
             } else
                 m_spec.channelnames.emplace_back("I");
@@ -121,7 +120,7 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
         case cineon::kPrintingDensityRed:
         case cineon::kRec709Red:
             if (++gscount > 1) {
-                std::string ch = Strutil::sprintf("R%d", rcount);
+                std::string ch = Strutil::fmt::format("R{}", rcount);
                 m_spec.channelnames.push_back(ch);
             } else
                 m_spec.channelnames.emplace_back("R");
@@ -129,7 +128,7 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
         case cineon::kPrintingDensityGreen:
         case cineon::kRec709Green:
             if (++gcount > 1) {
-                std::string ch = Strutil::sprintf("G%d", gcount);
+                std::string ch = Strutil::fmt::format("G{}", gcount);
                 m_spec.channelnames.push_back(ch);
             } else
                 m_spec.channelnames.emplace_back("G");
@@ -137,14 +136,14 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
         case cineon::kPrintingDensityBlue:
         case cineon::kRec709Blue:
             if (++bcount > 1) {
-                std::string ch = Strutil::sprintf("B%d", bcount);
+                std::string ch = Strutil::fmt::format("B{}", bcount);
                 m_spec.channelnames.push_back(ch);
             } else
                 m_spec.channelnames.emplace_back("B");
             break;
         default:
-            std::string ch = Strutil::sprintf("channel%d",
-                                              m_spec.channelnames.size());
+            std::string ch = Strutil::fmt::format("channel{}",
+                                                  m_spec.channelnames.size());
             m_spec.channelnames.push_back(ch);
             break;
         }
@@ -170,7 +169,7 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
     // This is not very smart, but it seems that as a practical matter,
     // all Cineon files are log. So ignore the gamma field and just set
     // the color space to KodakLog.
-    m_spec.attribute("oiio:ColorSpace", "KodakLog");
+    m_spec.set_colorspace("KodakLog");
 #else
     // image linearity
     // FIXME: making this more robust would require the per-channel transfer
@@ -178,19 +177,18 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
     switch (m_cin.header.ImageDescriptor(0)) {
     case cineon::kRec709Red:
     case cineon::kRec709Green:
-    case cineon::kRec709Blue: m_spec.attribute("oiio:ColorSpace", "Rec709");
+    case cineon::kRec709Blue: m_spec.set_colorspace("Rec709");
     default:
         // either grayscale or printing density
         if (!std::isinf(m_cin.header.Gamma()) && m_cin.header.Gamma() != 0.0f)
             // actual gamma value is read later on
-            m_spec.attribute("oiio:ColorSpace",
-                             Strutil::sprintf("GammaCorrected%.2g", g));
+            set_colorspace_rec709_gamma(m_spec, float(m_cin.header.Gamma()));
         break;
     }
 
     // gamma exponent
     if (!std::isinf(m_cin.header.Gamma()) && m_cin.header.Gamma() != 0.0f)
-        m_spec.attribute("oiio:Gamma", (float)m_cin.header.Gamma());
+        set_colorspace_rec709_gamma(m_spec, float(m_cin.header.Gamma()));
 #endif
 
     // general metadata
@@ -201,8 +199,9 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
         // libcineon's date/time format is pretty close to OIIO's (libcineon
         // uses %Y:%m:%d:%H:%M:%S%Z)
         m_spec.attribute("DateTime",
-                         Strutil::sprintf("%s %s", m_cin.header.creationDate,
-                                          m_cin.header.creationTime));
+                         Strutil::fmt::format("{} {}",
+                                              m_cin.header.creationDate,
+                                              m_cin.header.creationTime));
         // FIXME: do something about the time zone
     }
 
@@ -332,13 +331,16 @@ CineonInput::open(const std::string& name, ImageSpec& newspec)
         // libcineon's date/time format is pretty close to OIIO's (libcineon
         // uses %Y:%m:%d:%H:%M:%S%Z)
         m_spec.attribute("DateTime",
-                         Strutil::sprintf("%s %s", m_cin.header.sourceDate,
-                                          m_cin.header.sourceTime));
+                         Strutil::fmt::format("{} {}", m_cin.header.sourceDate,
+                                              m_cin.header.sourceTime));
         // FIXME: do something about the time zone
     }
-    m_cin.header.FilmEdgeCode(buf);
-    if (buf[0])
-        m_spec.attribute("cineon:FilmEdgeCode", buf);
+    {
+        char filmedge[17];
+        m_cin.header.FilmEdgeCode(filmedge, sizeof(filmedge));
+        if (filmedge[0])
+            m_spec.attribute("cineon:FilmEdgeCode", filmedge);
+    }
 
     // read in user data
     if (m_cin.header.UserSize() != 0 && m_cin.header.UserSize() != 0xFFFFFFFF) {

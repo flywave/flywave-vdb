@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -38,101 +38,19 @@
 #    include <malloc.h>  // for alloca
 #endif
 
-#if defined(_WIN32)
-#    ifndef WIN32_LEAN_AND_MEAN
-#        define WIN32_LEAN_AND_MEAN
-#    endif
-#    ifndef VC_EXTRALEAN
-#        define VC_EXTRALEAN
-#    endif
-#    ifndef NOMINMAX
-#        define NOMINMAX
-#    endif
-#    include <windows.h>
-#endif
-
 #ifdef _MSC_VER
 #    include <intrin.h>
 #endif
 
+// Avoid min and max being defined for any subsequent include of windows.h
+#ifdef _WIN32
+#    ifndef NOMINMAX
+#        define NOMINMAX
+#    endif
+#endif
+
 #include <OpenImageIO/oiioversion.h>
 #include <OpenImageIO/export.h>
-
-// Detect which C++ standard we're using, and handy macros.
-// See https://en.cppreference.com/w/cpp/compiler_support
-//
-// OIIO_CPLUSPLUS_VERSION : which C++ standard is compiling (11, 14, ...)
-// OIIO_CONSTEXPR14 :
-// OIIO_CONSTEXPR17 :
-// OIIO_CONSTEXPR20 : constexpr for C++ >= the designated version, otherwise
-//                    nothing (this is useful for things that can only be
-//                    constexpr for particular versions or greater).
-// OIIO_INLINE_CONSTEXPR : inline constexpr variables, added in C++17. For
-//                         older C++, just constexpr.
-//
-// Note: oiioversion.h defines OIIO_BUILD_CPP11, OIIO_BUILD_CPP14,
-// OIIO_BUILD_CPP17, or OIIO_BUILD_CPP20 to be 1 if OIIO itself was *built*
-// using C++11, C++14, C++17, or C++20, respectively. In contrast,
-// OIIO_CPLUSPLUS_VERSION defined below will be set to the right number for
-// the C++ standard being compiled RIGHT NOW. These two things may be the
-// same when compiling OIIO, but they may not be the same if another
-// package is compiling against OIIO and using these headers (OIIO may be
-// C++11 but the client package may be newer, or vice versa -- use these two
-// symbols to differentiate these cases, when important).
-#if (__cplusplus >= 202001L)
-#    define OIIO_CPLUSPLUS_VERSION 20
-#    define OIIO_CONSTEXPR14 constexpr
-#    define OIIO_CONSTEXPR17 constexpr
-#    define OIIO_CONSTEXPR20 constexpr
-#    define OIIO_INLINE_CONSTEXPR inline constexpr
-#elif (__cplusplus >= 201703L)
-#    define OIIO_CPLUSPLUS_VERSION 17
-#    define OIIO_CONSTEXPR14 constexpr
-#    define OIIO_CONSTEXPR17 constexpr
-#    define OIIO_CONSTEXPR20 /* not constexpr before C++20 */
-#    define OIIO_INLINE_CONSTEXPR inline constexpr
-#elif (__cplusplus >= 201402L) || (defined(_MSC_VER) && _MSC_VER >= 1914)
-#    define OIIO_CPLUSPLUS_VERSION 14
-#    define OIIO_CONSTEXPR14 constexpr
-#    define OIIO_CONSTEXPR17 /* not constexpr before C++17 */
-#    define OIIO_CONSTEXPR20 /* not constexpr before C++20 */
-#    define OIIO_INLINE_CONSTEXPR constexpr
-#elif (__cplusplus >= 201103L) || (defined(_MSC_VER) && _MSC_VER >= 1900)
-#    define OIIO_CPLUSPLUS_VERSION 11
-#    define OIIO_CONSTEXPR14 /* not constexpr before C++14 */
-#    define OIIO_CONSTEXPR17 /* not constexpr before C++17 */
-#    define OIIO_CONSTEXPR20 /* not constexpr before C++20 */
-#    define OIIO_INLINE_CONSTEXPR constexpr
-#else
-#    error "This version of OIIO is meant to work only with C++11 and above"
-#endif
-
-// DEPRECATED(1.8): use C++11 constexpr
-#define OIIO_CONSTEXPR constexpr
-#define OIIO_CONSTEXPR_OR_CONST constexpr
-
-// DEPRECATED(1.8): use C++11 noexcept
-#define OIIO_NOEXCEPT noexcept
-
-
-// In C++20 (and some compilers before that), __has_cpp_attribute can
-// test for understand of [[attr]] tests.
-#ifndef __has_cpp_attribute
-#    define __has_cpp_attribute(x) 0
-#endif
-
-// On gcc & clang, __has_attribute can test for __attribute__((attr))
-#ifndef __has_attribute
-#    define __has_attribute(x) 0
-#endif
-
-// In C++17 (and some compilers before that), __has_include("blah.h") or
-// __has_include(<blah.h>) can test for presence of an include file.
-#ifndef __has_include
-#    define __has_include(x) 0
-#endif
-
-
 
 // Detect which compiler and version we're using
 
@@ -141,9 +59,14 @@
 //   __clang__ is defined for all clang varieties (generic and Apple)
 //   __apple_build_version__ is only defined for Apple clang
 //   __INTEL_COMPILER is defined only for icc
+//   __INTEL_LLVM_COMPILER is defined only for icx
 //   _MSC_VER is defined for MSVS compiler (not gcc/clang/icc even on Windows)
 //   _WIN32 is defined on Windows regardless of compiler
-//   __CUDACC__ is defined for nvcc and clang during Cuda compilation.
+//   __CUDACC__   is defined any time we are compiling a module for Cuda
+//                (both for the host pass and the device pass). "Do this
+//                when using nvcc or clang with ptx target."
+//   __CUDA_ARCH__  is only defined when doing the device pass. "Do this only
+//                for code that will actually run on the GPU."
 
 
 // Define OIIO_GNUC_VERSION to hold an encoded gcc version (e.g. 40802 for
@@ -157,8 +80,8 @@
 // Define OIIO_CLANG_VERSION to hold an encoded generic Clang version (e.g.
 // 30402 for clang 3.4.2), or 0 if not a generic Clang release.
 // N.B. This will be 0 for the clang Apple distributes (which has different
-// version numbers entirely).
-#if defined(__clang__) && !defined(__apple_build_version__)
+// version numbers entirely) and for the Intel clang-based compiler.
+#if defined(__clang__) && !defined(__apple_build_version__) && !defined(__INTEL_LLVM_COMPILER)
 #  define OIIO_CLANG_VERSION (10000*__clang_major__ + 100*__clang_minor__ + __clang_patchlevel__)
 #else
 #  define OIIO_CLANG_VERSION 0
@@ -167,46 +90,140 @@
 // Define OIIO_APPLE_CLANG_VERSION to hold an encoded Apple Clang version
 // (e.g. 70002 for clang 7.0.2), or 0 if not an Apple Clang release.
 #if defined(__clang__) && defined(__apple_build_version__)
+#  if defined(__INTEL_LLVM_COMPILER)
+#    error Not expected for __INTEL_LLVM_COMPILER to be defined with an __apple_build_version__
+     // The classic Intel(r) C++ Compiler on OSX may still define __clang__.
+     // Combine with testing OIIO_INTEL_COMPILER to further differentiate if
+     // needed.
+#  endif
 #  define OIIO_APPLE_CLANG_VERSION (10000*__clang_major__ + 100*__clang_minor__ + __clang_patchlevel__)
 #else
 #  define OIIO_APPLE_CLANG_VERSION 0
 #endif
 
-// Define OIIO_INTEL_COMPILER_VERSION to hold an encoded Intel compiler
-// version (e.g. 1900), or 0 if not an Intel compiler.
+// Define OIIO_INTEL_CLASSIC_COMPILER_VERSION to hold an encoded Intel
+// compiler version (e.g. 1900), or 0 if not an Intel compiler.
 #if defined(__INTEL_COMPILER)
-#  define OIIO_INTEL_COMPILER_VERSION __INTEL_COMPILER
+#  define OIIO_INTEL_CLASSIC_COMPILER_VERSION __INTEL_COMPILER
 #else
-#  define OIIO_INTEL_COMPILER_VERSION 0
+#  define OIIO_INTEL_CLASSIC_COMPILER_VERSION 0
 #endif
 
-// Intel's compiler on OSX may still define __clang__ and we have need to
-// know when using a true clang compiler.
+// DEPRECATED(2.4) phase out OIIO_NON_INTEL_CLANG for OIIO_INTEL_LLVM_COMPILER.
+// We're keeping the old one for a while for back compatibility.
 #if !defined(__INTEL_COMPILER) && defined(__clang__)
 #  define OIIO_NON_INTEL_CLANG  __clang__
 #else
 #  define OIIO_NON_INTEL_CLANG  0
 #endif
 
+// Define OIIO_INTEL_LLVM_COMPILER to hold an encoded Intel(r) LLVM Compiler
+// version (e.g. 20220000), or 0 if not an Intel(r) LLVM Compiler.
+// Define OIIO_INTEL_CLANG_VERSION to hold the encoded Clang version the
+// Intel(r) LLVM Compiler is based on (e.g. 140000), or 0 if not an Intel(r)
+// LLVM compiler.
+#if defined(__INTEL_LLVM_COMPILER)
+#  define OIIO_INTEL_LLVM_COMPILER __INTEL_LLVM_COMPILER
+#  define OIIO_INTEL_CLANG_VERSION (10000*__clang_major__ + 100*__clang_minor__ + __clang_patchlevel__)
+#else
+#  define OIIO_INTEL_LLVM_COMPILER 0
+#  define OIIO_INTEL_CLANG_VERSION 0
+#endif
+
+// Define OIIO_ANY_CLANG to 0 or 1 to indicate if any Clang based compiler is
+// in use.
+#if defined(__clang__)
+#  define OIIO_ANY_CLANG 1
+#else
+#  define OIIO_ANY_CLANG 0
+#endif
+
 // Tests for MSVS versions, always 0 if not MSVS at all.
+// https://learn.microsoft.com/en-us/cpp/overview/compiler-versions
 #if defined(_MSC_VER)
-#  if _MSC_VER < 1900
-#    error "This version of OIIO is meant to work only with Visual Studio 2015 or later"
-#  endif
+#  define OIIO_MSVS_VERSION       _MSC_VER
 #  define OIIO_MSVS_AT_LEAST_2013 (_MSC_VER >= 1800)
 #  define OIIO_MSVS_BEFORE_2013   (_MSC_VER <  1800)
 #  define OIIO_MSVS_AT_LEAST_2015 (_MSC_VER >= 1900)
 #  define OIIO_MSVS_BEFORE_2015   (_MSC_VER <  1900)
 #  define OIIO_MSVS_AT_LEAST_2017 (_MSC_VER >= 1910)
 #  define OIIO_MSVS_BEFORE_2017   (_MSC_VER <  1910)
+#  define OIIO_MSVS_AT_LEAST_2019 (_MSC_VER >= 1920)
+#  define OIIO_MSVS_BEFORE_2019   (_MSC_VER <  1920)
+#  define OIIO_MSVS_AT_LEAST_2022 (_MSC_VER >= 1930)
+#  define OIIO_MSVS_BEFORE_2022   (_MSC_VER <  1930)
+#  if OIIO_MSVS_BEFORE_2017
+#    error "This version of OIIO is meant to work only with Visual Studio 2017 or later"
+#  endif
 #else
+#  define OIIO_MSVS_VERSION       0
 #  define OIIO_MSVS_AT_LEAST_2013 0
 #  define OIIO_MSVS_BEFORE_2013   0
 #  define OIIO_MSVS_AT_LEAST_2015 0
 #  define OIIO_MSVS_BEFORE_2015   0
 #  define OIIO_MSVS_AT_LEAST_2017 0
 #  define OIIO_MSVS_BEFORE_2017   0
+#  define OIIO_MSVS_AT_LEAST_2019 0
+#  define OIIO_MSVS_BEFORE_2019   0
+#  define OIIO_MSVS_AT_LEAST_2022 0
+#  define OIIO_MSVS_BEFORE_2022   0
 #endif
+
+
+// Detect which C++ standard we're using, and handy macros.
+// See https://en.cppreference.com/w/cpp/compiler_support
+//
+// OIIO_CPLUSPLUS_VERSION : which C++ standard is compiling (14, 17, ...)
+// OIIO_CONSTEXPR14 :
+// OIIO_CONSTEXPR17 :
+// OIIO_CONSTEXPR20 : constexpr for C++ >= the designated version, otherwise
+//                    nothing (this is useful for things that can only be
+//                    constexpr for particular versions or greater).
+// OIIO_INLINE_CONSTEXPR : inline constexpr variables, added in C++17. For
+//                         older C++, static constexpr.
+//
+// Note: oiioversion.h defines OIIO_BUILD_CPP (set to 17, 20, etc.)
+// reflecting what OIIO itself was *built* with.  In contrast,
+// OIIO_CPLUSPLUS_VERSION defined below will be set to the right number for
+// the C++ standard being compiled RIGHT NOW. These two things may be the
+// same when compiling OIIO, but they may not be the same if another
+// package is compiling against OIIO and using these headers (OIIO may be
+// C++17 but the client package may be newer, or vice versa -- use these two
+// symbols to differentiate these cases, when important).
+#if (__cplusplus >= 202302L)
+#    define OIIO_CPLUSPLUS_VERSION 23
+#    define OIIO_CONSTEXPR20 constexpr
+#    define OIIO_CONSTEXPR23 constexpr
+#    define OIIO_INLINE_CONSTEXPR inline constexpr
+#elif (__cplusplus >= 202001L)
+#    define OIIO_CPLUSPLUS_VERSION 20
+#    define OIIO_CONSTEXPR20 constexpr
+#    define OIIO_CONSTEXPR23 /* not constexpr before C++23 */
+#    define OIIO_INLINE_CONSTEXPR inline constexpr
+#elif (__cplusplus >= 201703L) || (defined(_MSC_VER) && _MSC_VER >= 1914)
+#    define OIIO_CPLUSPLUS_VERSION 17
+#    define OIIO_CONSTEXPR20 /* not constexpr before C++20 */
+#    define OIIO_CONSTEXPR23 /* not constexpr before C++23 */
+#    define OIIO_INLINE_CONSTEXPR inline constexpr
+#else
+#    error "This version of OIIO is meant to work only with C++17 and above"
+#endif
+
+// DEPRECATED(3.0): use C++17 constexpr
+#define OIIO_CONSTEXPR17 constexpr
+
+
+// In C++20 (and some compilers before that), __has_cpp_attribute can
+// test for understand of [[attr]] tests.
+#ifndef __has_cpp_attribute
+#    define __has_cpp_attribute(x) 0
+#endif
+
+// On gcc & clang, __has_attribute can test for __attribute__((attr))
+#ifndef __has_attribute
+#    define __has_attribute(x) 0
+#endif
+
 
 
 // Pragma control
@@ -217,6 +234,8 @@
 // OIIO_GCC_PRAGMA(x) -- pragma on gcc/clang/icc only
 // OIIO_CLANG_PRAGMA(x) -- pragma on clang only (not gcc or icc)
 // OIIO_MSVS_PRAGMA(x) -- pragma on MSVS only
+// OIIO_INTEL_PRAGMA(x) -- pragma on Intel icc compiler only
+// OIIO_INTEL_LLVM_PRAGMA(x) -- pragma on Intel icx compiler only
 
 // Generic pragma definition
 #if defined(_MSC_VER)
@@ -227,7 +246,7 @@
     #define OIIO_PRAGMA(UnQuotedPragma) _Pragma(#UnQuotedPragma)
 #endif
 
-#if defined(__GNUC__) /* gcc, clang, icc */
+#if defined(__GNUC__) /* gcc, clang, icc, icx */
 #    define OIIO_PRAGMA_WARNING_PUSH    OIIO_PRAGMA(GCC diagnostic push)
 #    define OIIO_PRAGMA_WARNING_POP     OIIO_PRAGMA(GCC diagnostic pop)
 #    define OIIO_PRAGMA_VISIBILITY_PUSH OIIO_PRAGMA(GCC visibility push(default))
@@ -240,6 +259,16 @@
 #        define OIIO_CLANG_PRAGMA(UnQuotedPragma)
 #        define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
 #    endif
+#    if defined(__INTEL_COMPILER)
+#        define OIIO_INTEL_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
+#    else
+#        define OIIO_INTEL_PRAGMA(UnQuotedPragma)
+#    endif
+#    if defined(__INTEL_LLVM_COMPILER)
+#        define OIIO_INTEL_LLVM_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
+#    else
+#        define OIIO_INTEL_LLVM_PRAGMA(UnQuotedPragma)
+#    endif
 #    define OIIO_MSVS_PRAGMA(UnQuotedPragma)
 #elif defined(_MSC_VER)
 #    define OIIO_PRAGMA_WARNING_PUSH __pragma(warning(push))
@@ -249,6 +278,8 @@
 #    define OIIO_GCC_PRAGMA(UnQuotedPragma)
 #    define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma)
 #    define OIIO_CLANG_PRAGMA(UnQuotedPragma)
+#    define OIIO_INTEL_PRAGMA(UnQuotedPragma)
+#    define OIIO_INTEL_LLVM_PRAGMA(UnQuotedPragma)
 #    define OIIO_MSVS_PRAGMA(UnQuotedPragma) OIIO_PRAGMA(UnQuotedPragma)
 #else
 #    define OIIO_PRAGMA_WARNING_PUSH
@@ -258,6 +289,8 @@
 #    define OIIO_GCC_PRAGMA(UnQuotedPragma)
 #    define OIIO_GCC_ONLY_PRAGMA(UnQuotedPragma)
 #    define OIIO_CLANG_PRAGMA(UnQuotedPragma)
+#    define OIIO_INTEL_PRAGMA(UnQuotedPragma)
+#    define OIIO_INTEL_LLVM_PRAGMA(UnQuotedPragma)
 #    define OIIO_MSVS_PRAGMA(UnQuotedPragma)
 #endif
 
@@ -344,7 +377,7 @@
 #endif
 
 
-// OIIO_FORCELINE is a function attribute that attempts to make the function
+// OIIO_FORCEINLINE is a function attribute that attempts to make the function
 // always inline. On many compilers regular 'inline' is only advisory. Put
 // this attribute before the function return type, just like you would use
 // 'inline'.
@@ -360,7 +393,7 @@
 
 // OIIO_PURE_FUNC is a function attribute that assures the compiler that the
 // function does not write to any non-local memory other than its return
-// value and has no side effects. This can ebable additional compiler
+// value and has no side effects. This can enable additional compiler
 // optimizations by knowing that calling the function cannot possibly alter
 // any other memory. This declaration goes after the function declaration:
 //   int blah (int arg) OIIO_PURE_FUNC;
@@ -386,18 +419,11 @@
 #    define OIIO_CONST_FUNC
 #endif
 
-// OIIO_MAYBE_UNUSED is a function or variable attribute that assures the
-// compiler that it's fine for the item to appear to be unused.
-#if OIIO_CPLUSPLUS_VERSION >= 17 || __has_cpp_attribute(maybe_unused)
-#    define OIIO_MAYBE_UNUSED [[maybe_unused]]
-#elif defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER) || __has_attribute(unused)
-#    define OIIO_MAYBE_UNUSED __attribute__((unused))
-#else
-#    define OIIO_MAYBE_UNUSED
-#endif
-
-// DEPRECATED(1.9) name:
-#define OIIO_UNUSED_OK OIIO_MAYBE_UNUSED
+// OIIO_MAYBE_UNUSED is an annotator for function or variable attribute that
+// assures the compiler that it's fine for the item to appear to be unused.
+// Consider this deprecated (as of OIIO 3.0), you should favor C++17's
+// [[maybe_unused]] attribute.
+#define OIIO_MAYBE_UNUSED [[maybe_unused]]
 
 // OIIO_RESTRICT is a parameter attribute that indicates a promise that the
 // parameter definitely will not alias any other parameters in such a way
@@ -410,26 +436,26 @@
 
 
 // OIIO_DEPRECATED before a function declaration marks it as deprecated in
-// a way that will generate compile warnings if it is called.
-#if OIIO_CPLUSPLUS_VERSION >= 14 || __has_cpp_attribute(deprecated)
-#    define OIIO_DEPRECATED(msg) [[deprecated(msg)]]
-#elif defined(__GNUC__) || defined(__clang__) || __has_attribute(deprecated)
-#    define OIIO_DEPRECATED(msg) __attribute__((deprecated(msg)))
-#elif defined(_MSC_VER)
-#    define OIIO_DEPRECATED(msg) __declspec(deprecated(msg))
-#else
-#    define OIIO_DEPRECATED(msg)
-#endif
+// a way that will generate compile warnings if it is called. This should
+// itself be considered deprecated (as of OIIO 3.0) and code should use
+// [[deprecated(msg)]] instead.
+#define OIIO_DEPRECATED(msg) [[deprecated(msg)]]
 
+// OIIO_DEPRECATED_EXTERNAL marks things deprecated for downstream apps, but
+// still is allowed for internal use. Generally, this is used when we want to
+// deprecate for users but can't quite extract it internally yet.
+#ifndef OIIO_INTERNAL
+#  define OIIO_DEPRECATED_EXTERNAL(msg) [[deprecated(msg)]]
+#else
+#  define OIIO_DEPRECATED_EXTERNAL(msg)
+#endif
 
 // OIIO_FALLTHROUGH at the end of a `case` label's statements documents that
 // the switch statement case is intentionally falling through to the code
 // for the next case.
-#if OIIO_CPLUSPLUS_VERSION >= 17 || __has_cpp_attribute(fallthrough)
-#    define OIIO_FALLTHROUGH [[fallthrough]]
-#else
-#    define OIIO_FALLTHROUGH
-#endif
+// Consider this deprecated (as of OIIO 3.0), you should favor C++17's
+// [[fallthrough]] attribute.
+#define OIIO_FALLTHROUGH [[fallthrough]]
 
 
 // OIIO_NODISCARD following a function declaration documents that the
@@ -446,10 +472,22 @@
 // false positives that you can't easily get rid of.
 // This should work for any clang >= 3.3 and gcc >= 4.8, which are
 // guaranteed by our minimum requirements.
-#if defined(__clang__) || defined(__GNUC__) || __has_attribute(no_sanitize_address)
+#if defined(__clang__) || (OIIO_GNUC_VERSION > 90000 && !defined(__INTEL_COMPILER)) \
+                       || __has_attribute(no_sanitize_address)
 #    define OIIO_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
 #else
 #    define OIIO_NO_SANITIZE_ADDRESS
+#endif
+
+
+// OIIO_NO_SANITIZE_UNDEFINED can be used to mark a function that you don't
+// want undefined behavior sanitizer to catch. Only use this if you know there
+// are false positives that you can't easily get rid of.
+#if defined(__clang__) || (OIIO_GNUC_VERSION > 90000 && !defined(__INTEL_COMPILER)) \
+                       || __has_attribute(no_sanitize)
+#    define OIIO_NO_SANITIZE_UNDEFINED __attribute__((no_sanitize("undefined")))
+#else
+#    define OIIO_NO_SANITIZE_UNDEFINED
 #endif
 
 
@@ -467,8 +505,19 @@
 // function decorators needed when compiling for CUDA devices.
 #ifdef __CUDACC__
 #    define OIIO_HOSTDEVICE __host__ __device__
+#    define OIIO_DEVICE __device__
 #else
 #    define OIIO_HOSTDEVICE
+#    define OIIO_DEVICE
+#endif
+
+
+// OIIO_DEVICE_CONSTEXPR is like OIIO_HOSTDEVICE, but it's `constexpr` only on
+// the Cuda device side, and merely inline (not constexpr) on the host side.
+#ifdef __CUDA_ARCH__
+#    define OIIO_DEVICE_CONSTEXPR __device__ constexpr
+#else
+#    define OIIO_DEVICE_CONSTEXPR /*__host__*/ inline
 #endif
 
 
@@ -526,7 +575,7 @@ inline void cpuid (int info[4], int infoType, int extra)
 {
     // Implementation cribbed from Halide (http://halide-lang.org), which
     // cribbed it from ISPC (https://github.com/ispc/ispc).
-#if (defined(_WIN32) || defined(__i386__) || defined(__x86_64__))
+#if (defined(_M_X64) || defined(_M_IX86) || defined(_M_AMD64) || defined(__i386__) || defined(__x86_64__))
 # ifdef _MSC_VER
     __cpuidex(info, infoType, extra);
 # elif defined(__x86_64__)
@@ -563,7 +612,7 @@ inline bool cpu_has_avx512f() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<16)) !
 inline bool cpu_has_avx512dq() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<17)) != 0; }
 inline bool cpu_has_avx512ifma() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<21)) != 0; }
 inline bool cpu_has_avx512pf() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<26)) != 0; }
-inline bool cpu_has_avx512er() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<27)) != 0; }
+inline bool cpu_has_avx512er() { return false; /* knights landing only */ }
 inline bool cpu_has_avx512cd() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<28)) != 0; }
 inline bool cpu_has_avx512bw() {int i[4]; cpuid(i,7,0); return (i[1] & (1<<30)) != 0; }
 inline bool cpu_has_avx512vl() {int i[4]; cpuid(i,7,0); return (i[1] & (0x80000000 /*1<<31*/)) != 0; }
@@ -577,7 +626,10 @@ template <typename T, class... Args>
 inline T* aligned_new(Args&&... args) {
     static_assert(alignof(T) > alignof(void*), "Type doesn't seem to be over-aligned, aligned_new is not required");
     void* ptr = aligned_malloc(sizeof(T), alignof(T));
+    OIIO_PRAGMA_WARNING_PUSH
+    OIIO_INTEL_PRAGMA(warning disable 873)
     return ptr ? new (ptr) T(std::forward<Args>(args)...) : nullptr;
+    OIIO_PRAGMA_WARNING_POP
 }
 
 template <typename T>
@@ -589,19 +641,14 @@ inline void aligned_delete(T* t) {
 }
 
 
-
-#if OIIO_CPLUSPLUS_VERSION >= 14
-    using std::enable_if_t;    // Use C++14 std::enable_if_t
-#else
-    // Define enable_if_t for C++11
-    template <bool B, class T = void>
-    using enable_if_t = typename std::enable_if<B, T>::type;
-#endif
+// DEPRECATED(2.6)
+using std::enable_if_t;
 
 // An enable_if helper to be used in template parameters which results in
 // much shorter symbols: https://godbolt.org/z/sWw4vP
 // Borrowed from fmtlib.
-#define OIIO_ENABLE_IF(...) OIIO::enable_if_t<(__VA_ARGS__), int> = 0
-
+#ifndef OIIO_ENABLE_IF
+#   define OIIO_ENABLE_IF(...) std::enable_if_t<(__VA_ARGS__), int> = 0
+#endif
 
 OIIO_NAMESPACE_END

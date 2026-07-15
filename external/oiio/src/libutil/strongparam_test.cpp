@@ -1,6 +1,6 @@
 // Copyright Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <OpenImageIO/strongparam.h>
@@ -8,9 +8,14 @@
 
 using namespace OIIO;
 
-
 OIIO_STRONG_PARAM_TYPE(Meters, float);
 OIIO_STRONG_PARAM_TYPE(Seconds, float);
+
+// Note: if you don't like using those macros, the following achieves roughly
+// equivalent declarations:
+//
+//     using Meters = StrongParam<struct MetersTag, float>;
+//     using Seconds = StrongParam<struct SecondsTag, float>;
 
 
 float

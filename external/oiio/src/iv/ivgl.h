@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #ifndef OPENIMAGEIO_IVGL_H
@@ -15,15 +15,12 @@
 #    pragma warning(disable : 4127 4512)
 #endif
 
-// Thanks, Apple, dammit:
-#define GL_SILENCE_DEPRECATION 1
-
 // included to remove std::min/std::max errors
 #include <OpenImageIO/platform.h>
 
 #include <vector>
 
-#include <QOpenGLFunctions>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLWidget>
 
 #include <OpenImageIO/imagebuf.h>
@@ -34,9 +31,7 @@ using namespace OIIO;
 class IvImage;
 class ImageViewer;
 
-
-
-class IvGL final : public QOpenGLWidget, protected QOpenGLFunctions {
+class IvGL : public QOpenGLWidget, protected QOpenGLExtraFunctions {
     Q_OBJECT
 public:
     IvGL(QWidget* parent, ImageViewer& viewer);
@@ -81,6 +76,13 @@ public:
     /// widget boundaries)
     void get_focus_window_pixel(int& x, int& y);
 
+    /// Which image pixel is in the given mouse position?
+    ///
+    void get_given_image_pixel(int& x, int& y, int mouseX, int mouseY);
+
+    /// What are the min/max/avg values of each channel in the selected area?
+    void update_area_probe_text();
+
     /// Returns true if OpenGL is capable of loading textures in the sRGB color
     /// space.
     bool is_srgb_capable(void) const { return m_use_srgb; }
@@ -105,7 +107,6 @@ protected:
     ImageViewer& m_viewer;          ///< Backpointer to viewer
     bool m_shaders_created;         ///< Have the shaders been created?
     GLuint m_vertex_shader;         ///< Vertex shader id
-    GLuint m_fragment_shader;       ///< Fragment shader id
     GLuint m_shader_program;        ///< GL shader program id
     bool m_tex_created;             ///< Have the textures been created?
     float m_zoom;                   ///< Zoom ratio
@@ -113,6 +114,9 @@ protected:
     bool m_dragging;                ///< Are we dragging?
     int m_mousex, m_mousey;         ///< Last mouse position
     Qt::MouseButton m_drag_button;  ///< Button on when dragging
+    QPoint m_select_start;          ///< Mouse start position for the area probe
+    QPoint m_select_end;            ///< Mouse end position for the area probe
+    bool m_selecting;               ///< Are we selecting?
     bool m_use_shaders;             ///< Are shaders supported?
     bool m_use_halffloat;           ///< Are half-float textures supported?
     bool m_use_float;               ///< Are float textures supported?
@@ -126,9 +130,13 @@ protected:
     IvImage* m_current_image;      ///< Image to show on screen.
     GLuint m_pixelview_tex;        ///< Pixelview's own texture.
     bool m_pixelview_left_corner;  ///< Draw pixelview in upper left or right
+    bool m_probeview_left_corner;  ///< Draw probeview in bottom left or right
     /// Buffer passed to IvImage::copy_image when not using PBO.
     ///
     std::vector<unsigned char> m_tex_buffer;
+
+    std::string m_color_shader_text;
+    std::string m_area_probe_text;
 
     /// Represents a texture object being used as a buffer.
     ///
@@ -144,17 +152,19 @@ protected:
     bool m_mouse_activation;  ///< Can we expect the window to be activated by mouse?
 
 
-    virtual void initializeGL();
-    virtual void resizeGL(int w, int h);
-    virtual void paintGL();
+    void initializeGL() override;
+    void resizeGL(int w, int h) override;
+    void paintGL() override;
 
-    virtual void mousePressEvent(QMouseEvent* event);
-    virtual void mouseReleaseEvent(QMouseEvent* event);
-    virtual void mouseMoveEvent(QMouseEvent* event);
-    virtual void wheelEvent(QWheelEvent* event);
-    virtual void focusOutEvent(QFocusEvent* event);
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
+    void focusOutEvent(QFocusEvent* event) override;
 
     void paint_pixelview();
+    void paint_probeview();
+    void paint_windowguides();
     void glSquare(float xmin, float ymin, float xmax, float ymax, float z = 0);
 
     virtual void create_shaders(void);
@@ -164,6 +174,16 @@ protected:
 
     void shadowed_text(float x, float y, float z, const std::string& s,
                        const QFont& font);
+
+    virtual void update_state(void);
+
+    virtual void use_program(void);
+
+    virtual void update_uniforms(int tex_width, int tex_height, bool pixelview);
+
+    void print_error(const char* msg);
+
+    virtual const char* color_func_shader_text();
 
 private:
     typedef QOpenGLWidget parent_t;

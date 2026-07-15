@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: BSD-3-Clause and Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #ifndef OPENIMAGEIO_IMAGEVIEWER_H
@@ -21,10 +21,17 @@
 #include <vector>
 
 #include <QAction>
+#include <QActionGroup>
 #include <QCheckBox>
 #include <QDialog>
-#include <QGLWidget>
 #include <QMainWindow>
+#include <QMimeData>
+
+#if OIIO_QT_MAJOR < 6
+#    include <QGLWidget>
+#else
+#    include <QOpenGLWidget>
+#endif
 
 #ifndef QT_NO_PRINTER
 // #include <QPrinter>
@@ -32,6 +39,8 @@
 
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imageio.h>
+
+#include "ivgl_ocio.h"
 
 using namespace OIIO;
 
@@ -108,7 +117,7 @@ public:
     /// color space correction when indicated.
     void pixel_transform(bool srgb_to_linear, int color_mode, int channel);
 
-    bool get_pixels(ROI roi, TypeDesc format, void* result)
+    bool get_pixels(ROI roi, TypeDesc format, span<std::byte> result)
     {
         if (m_corrected_image.localpixels())
             return m_corrected_image.get_pixels(roi, format, result);
@@ -138,7 +147,8 @@ class ImageViewer final : public QMainWindow {
     Q_OBJECT
 
 public:
-    ImageViewer();
+    ImageViewer(bool use_ocio, const std::string& image_color_space,
+                const std::string& display, const std::string& view);
     ~ImageViewer();
 
     enum COLOR_MODE {
@@ -214,6 +224,16 @@ public:
         return showPixelviewWindowAct && showPixelviewWindowAct->isChecked();
     }
 
+    bool probeviewOn(void) const
+    {
+        return toggleAreaSampleAct && toggleAreaSampleAct->isChecked();
+    }
+
+    bool windowguidesOn(void) const
+    {
+        return toggleWindowGuidesAct && toggleWindowGuidesAct->isChecked();
+    }
+
     bool pixelviewFollowsMouse(void) const
     {
         return pixelviewFollowsMouseBox
@@ -234,6 +254,12 @@ public:
 
     void rawcolor(bool val) { m_rawcolor = val; }
     bool rawcolor() const { return m_rawcolor; }
+    bool areaSampleMode() const;
+
+    bool useOCIO() { return m_useOCIO; }
+    const std::string& ocioColorSpace() { return m_ocioColourSpace; }
+    const std::string& ocioDisplay() { return m_ocioDisplay; }
+    const std::string& ocioView() { return m_ocioView; }
 
 private slots:
     void open();                ///< Dialog to open new image from file
@@ -243,21 +269,25 @@ private slots:
     void saveAs();              ///< Save As... functionality
     void saveWindowAs();        ///< Save As... functionality
     void saveSelectionAs();     ///< Save As... functionality
+    void moveToNewWindow();     ///< Split current image off as a new window
     void print();               ///< Print current image
     void deleteCurrentImage();  ///< Deleting displayed image
-    void zoomIn();              ///< Zoom in to next power of 2
-    void zoomOut();             ///< Zoom out to next power of 2
-    void normalSize();          ///< Adjust zoom to 1:1
-    void fitImageToWindow();    ///< Adjust zoom to fit window exactly
+    void zoomIn(bool smooth = true);   ///< Zoom in to next power of 2
+    void zoomOut(bool smooth = true);  ///< Zoom out to next power of 2
+    void zoomToCursor(float newzoom,
+                      bool smooth = true);  ///< Zoom to a specific level
+    void normalSize();                      ///< Adjust zoom to 1:1
+    void fitImageToWindow();  ///< Adjust zoom to fit window exactly
     /// Resize window to fit image exactly.  If zoomok is false, do not
     /// change the zoom, even to fit on screen. If minsize is true, do not
     /// resize smaller than default_width x default_height.
     void fitWindowToImage(bool zoomok = true, bool minsize = false);
-    void fullScreenToggle();           ///< Toggle full screen mode
-    void about();                      ///< Show "about iv" dialog
-    void prevImage();                  ///< View previous image in sequence
-    void nextImage();                  ///< View next image in sequence
-    void toggleImage();                ///< View most recently viewed image
+    void fullScreenToggle();    ///< Toggle full screen mode
+    void about();               ///< Show "about iv" dialog
+    void prevImage();           ///< View previous image in sequence
+    void nextImage();           ///< View next image in sequence
+    void toggleImage();         ///< View most recently viewed image
+    void toggleWindowGuides();  ///< Toggle data and display window overlay
     void exposureMinusOneTenthStop();  ///< Decrease exposure 1/10 stop
     void exposureMinusOneHalfStop();   ///< Decrease exposure 1/2 stop
     void exposurePlusOneTenthStop();   ///< Increase exposure 1/10 stop
@@ -292,6 +322,12 @@ private slots:
     void showInfoWindow();       ///< View extended info on image
     void showPixelviewWindow();  ///< View closeup pixel view
     void editPreferences();      ///< Edit viewer preferences
+    void toggleAreaSample();     ///< Use area probe
+
+    void useOCIOAction(bool checked);
+    void ocioColorSpaceAction();
+    void ocioDisplayViewAction();
+
 private:
     void createActions();
     void createMenus();
@@ -307,9 +343,11 @@ private:
     void displayCurrentImage(bool update = true);
     void updateTitle();
     void updateStatusBar();
-    void keyPressEvent(QKeyEvent* event);
-    void resizeEvent(QResizeEvent* event);
-    void closeEvent(QCloseEvent* event);
+    void keyPressEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
     QTimer* slideTimer;     ///< Timer to use for slide show mode
     long slideDuration_ms;  ///< Slide show mode duration (in ms)
@@ -323,10 +361,12 @@ private:
     // QPrinter printer;
 #endif
 
+
     QAction *openAct, *reloadAct, *closeImgAct;
     static const unsigned int MaxRecentFiles = 10;
     QAction* openRecentAct[MaxRecentFiles];
     QAction *saveAsAct, *saveWindowAsAct, *saveSelectionAsAct;
+    QAction* moveToNewWindowAct;
     QAction* printAct;
     QAction* deleteCurrentImageAct;
     QAction* exitAct;
@@ -352,6 +392,8 @@ private:
     QAction* showInfoWindowAct;
     QAction* editPreferencesAct;
     QAction* showPixelviewWindowAct;
+    QAction* toggleAreaSampleAct;
+    QAction* toggleWindowGuidesAct;
     QMenu *fileMenu, *editMenu, /**imageMenu,*/ *viewMenu, *toolsMenu,
         *helpMenu;
     QMenu* openRecentMenu;
@@ -386,7 +428,8 @@ private:
     float m_default_gamma;                    // Default gamma of the display
     QPalette m_palette;                       // Custom palette
     bool m_darkPalette;                       // Use dark palette?
-    bool m_rawcolor = false;                  // Use raw color mode
+    bool m_rawcolor       = false;            // Use raw color mode
+    bool m_areaSampleMode = false;            // Use area sample mode
 
     // The default width and height of the window:
     static const int m_default_width  = 640;
@@ -400,6 +443,23 @@ private:
     friend class IvInfoWindow;
     friend class IvPreferenceWindow;
     friend bool image_progress_callback(void* opaque, float done);
+
+    friend class IvGL_OCIO;
+
+    void createOCIOMenus(QMenu* parent);
+
+    QMenu* ocioColorSpacesMenu;
+    QMenu* ocioDisplaysMenu;
+    QMenu* ocioOptimizationMenu;
+
+    QActionGroup* ocioColorSpacesGroup;
+    QActionGroup* ocioDisplayViewsGroup;
+    QActionGroup* ocioOptimizationGroup;
+
+    bool m_useOCIO;
+    std::string m_ocioColourSpace;
+    std::string m_ocioDisplay;
+    std::string m_ocioView;
 };
 
 
@@ -411,7 +471,7 @@ public:
     void update(IvImage* img);
 
 protected:
-    void keyPressEvent(QKeyEvent* event);
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     QPushButton* closeButton;
@@ -430,7 +490,7 @@ public:
     IvPreferenceWindow(ImageViewer& viewer);
 
 protected:
-    void keyPressEvent(QKeyEvent* event);
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     QVBoxLayout* layout;

@@ -1,12 +1,14 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <cmath>
 #include <list>
 #include <sstream>
 #include <string>
+
+#include <OpenImageIO/Imath.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/filter.h>
@@ -18,7 +20,6 @@
 #include <OpenImageIO/thread.h>
 #include <OpenImageIO/typedesc.h>
 #include <OpenImageIO/ustring.h>
-#include <OpenImageIO/varyingref.h>
 
 #include "imagecache_pvt.h"
 #include "texture_pvt.h"
@@ -202,67 +203,55 @@ OIIO_NAMESPACE_BEGIN
 using namespace pvt;
 using namespace simd;
 
-namespace {  // anonymous
 
-static EightBitConverter<float> uchar2float;
-
-}  // end anonymous namespace
-
-namespace pvt {  // namespace pvt
-
+bool
+TextureSystem::environment(ustring filename, TextureOpt& options, V3fParam R,
+                           V3fParam dRdx, V3fParam dRdy, int nchannels,
+                           float* result, float* dresultds, float* dresultdt)
+{
+    return m_impl->environment(filename, options, R, dRdx, dRdy, nchannels,
+                               result, dresultds, dresultdt);
+}
 
 
 bool
-TextureSystemImpl::environment(ustring filename, TextureOptions& options,
-                               Runflag* runflags, int beginactive,
-                               int endactive, VaryingRef<Imath::V3f> R,
-                               VaryingRef<Imath::V3f> dRdx,
-                               VaryingRef<Imath::V3f> dRdy, int nchannels,
-                               float* result, float* dresultds,
-                               float* dresultdt)
+TextureSystem::environment(TextureHandle* texture_handle,
+                           Perthread* thread_info, TextureOpt& options,
+                           V3fParam R, V3fParam dRdx, V3fParam dRdy,
+                           int nchannels, float* result, float* dresultds,
+                           float* dresultdt)
 {
-    Perthread* thread_info        = get_perthread_info();
-    TextureHandle* texture_handle = get_texture_handle(filename, thread_info);
-    return environment(texture_handle, thread_info, options, runflags,
-                       beginactive, endactive, R, dRdx, dRdy, nchannels, result,
-                       dresultds, dresultdt);
+    return m_impl->environment(texture_handle, thread_info, options, R, dRdx,
+                               dRdy, nchannels, result, dresultds, dresultdt);
+}
+
+
+bool
+TextureSystem::environment(ustring filename, TextureOptBatch& options,
+                           Tex::RunMask mask, const float* R, const float* dRdx,
+                           const float* dRdy, int nchannels, float* result,
+                           float* dresultds, float* dresultdt)
+{
+    return m_impl->environment(filename, options, mask, R, dRdx, dRdy,
+                               nchannels, result, dresultds, dresultdt);
+}
+
+
+bool
+TextureSystem::environment(TextureHandle* texture_handle,
+                           Perthread* thread_info, TextureOptBatch& options,
+                           Tex::RunMask mask, const float* R, const float* dRdx,
+                           const float* dRdy, int nchannels, float* result,
+                           float* dresultds, float* dresultdt)
+{
+    return m_impl->environment(texture_handle, thread_info, options, mask, R,
+                               dRdx, dRdy, nchannels, result, dresultds,
+                               dresultdt);
 }
 
 
 
-bool
-TextureSystemImpl::environment(TextureHandle* texture_handle,
-                               Perthread* thread_info, TextureOptions& options,
-                               Runflag* runflags, int beginactive,
-                               int endactive, VaryingRef<Imath::V3f> R,
-                               VaryingRef<Imath::V3f> dRdx,
-                               VaryingRef<Imath::V3f> dRdy, int nchannels,
-                               float* result, float* dresultds,
-                               float* dresultdt)
-{
-    if (!texture_handle)
-        return false;
-    bool ok = true;
-    result += beginactive * nchannels;
-    if (dresultds) {
-        dresultds += beginactive * nchannels;
-        dresultdt += beginactive * nchannels;
-    }
-    for (int i = beginactive; i < endactive; ++i) {
-        if (runflags[i]) {
-            TextureOpt opt(options, i);
-            ok &= environment(texture_handle, thread_info, opt, R[i], dRdx[i],
-                              dRdy[i], nchannels, result, dresultds, dresultdt);
-        }
-        result += nchannels;
-        if (dresultds) {
-            dresultds += nchannels;
-            dresultdt += nchannels;
-        }
-    }
-    return ok;
-}
-
+namespace pvt {
 
 
 /// Convert a direction vector to latlong st coordinates
@@ -271,11 +260,11 @@ inline void
 vector_to_latlong(const Imath::V3f& R, bool y_is_up, float& s, float& t)
 {
     if (y_is_up) {
-        s = atan2f(-R[0], R[2]) / (2.0f * (float)M_PI) + 0.5f;
-        t = 0.5f - atan2f(R[1], hypotf(R[2], -R[0])) / (float)M_PI;
+        s = atan2f(-R.x, R.z) / (2.0f * (float)M_PI) + 0.5f;
+        t = 0.5f - atan2f(R.y, hypotf(R.z, -R.x)) / (float)M_PI;
     } else {
-        s = atan2f(R[1], R[0]) / (2.0f * (float)M_PI) + 0.5f;
-        t = 0.5f - atan2f(R[2], hypotf(R[0], R[1])) / (float)M_PI;
+        s = atan2f(R.y, R.x) / (2.0f * (float)M_PI) + 0.5f;
+        t = 0.5f - atan2f(R.z, hypotf(R.x, R.y)) / (float)M_PI;
     }
     // learned from experience, beware NaNs
     if (isnan(s))
@@ -284,13 +273,14 @@ vector_to_latlong(const Imath::V3f& R, bool y_is_up, float& s, float& t)
         t = 0.0f;
 }
 
+}  // namespace pvt
+
 
 
 bool
 TextureSystemImpl::environment(ustring filename, TextureOpt& options,
-                               const Imath::V3f& R, const Imath::V3f& dRdx,
-                               const Imath::V3f& dRdy, int nchannels,
-                               float* result, float* dresultds,
+                               V3fParam R, V3fParam dRdx, V3fParam dRdy,
+                               int nchannels, float* result, float* dresultds,
                                float* dresultdt)
 {
     PerThreadInfo* thread_info = m_imagecache->get_perthread_info();
@@ -305,9 +295,8 @@ TextureSystemImpl::environment(ustring filename, TextureOpt& options,
 bool
 TextureSystemImpl::environment(TextureHandle* texture_handle_,
                                Perthread* thread_info_, TextureOpt& options,
-                               const Imath::V3f& _R, const Imath::V3f& _dRdx,
-                               const Imath::V3f& _dRdy, int nchannels,
-                               float* result, float* dresultds,
+                               V3fParam _R, V3fParam _dRdx, V3fParam _dRdy,
+                               int nchannels, float* result, float* dresultds,
                                float* dresultdt)
 {
     // Handle >4 channel lookups by recursion.
@@ -372,8 +361,8 @@ TextureSystemImpl::environment(TextureHandle* texture_handle_,
     options.twrap = TextureOpt::WrapClamp;
 
     options.envlayout  = LayoutLatLong;
-    int actualchannels = Imath::clamp(spec.nchannels - options.firstchannel, 0,
-                                      nchannels);
+    int actualchannels = OIIO::clamp(spec.nchannels - options.firstchannel, 0,
+                                     nchannels);
 
     // Initialize results to 0.  We'll add from here on as we sample.
     for (int c = 0; c < nchannels; ++c)
@@ -392,11 +381,11 @@ TextureSystemImpl::environment(TextureHandle* texture_handle_,
 
     // Calculate unit-length vectors in the direction of R, R+dRdx, R+dRdy.
     // These define the ellipse we're filtering over.
-    Imath::V3f R = _R;
+    Imath::V3f R = _R.cast<Imath::V3f>();
     R.normalize();  // center
-    Imath::V3f Rx = _R + _dRdx;
+    Imath::V3f Rx = _R.cast<Imath::V3f>() + _dRdx.cast<Imath::V3f>();
     Rx.normalize();  // x axis of the ellipse
-    Imath::V3f Ry = _R + _dRdy;
+    Imath::V3f Ry = _R.cast<Imath::V3f>() + _dRdy.cast<Imath::V3f>();
     Ry.normalize();  // y axis of the ellipse
     // angles formed by the ellipse axes.
     float xfilt_noblur = std::max(safe_acos(R.dot(Rx)), 1e-8f);
@@ -454,7 +443,7 @@ TextureSystemImpl::environment(TextureHandle* texture_handle_,
     float invsamples;
     if (aniso) {
         aspect    = anisotropic_aspect(majorlength, minorlength, options,
-                                    trueaspect);
+                                       trueaspect);
         filtwidth = minorlength;
         if (trueaspect > stats.max_aniso)
             stats.max_aniso = trueaspect;
@@ -498,7 +487,7 @@ TextureSystemImpl::environment(TextureHandle* texture_handle_,
             if (filtwidth_ras <= 1) {
                 miplevel[0] = m - 1;
                 miplevel[1] = m;
-                levelblend  = Imath::clamp(2.0f * filtwidth_ras - 1.0f, 0.0f,
+                levelblend  = OIIO::clamp(2.0f * filtwidth_ras - 1.0f, 0.0f,
                                           1.0f);
                 break;
             }
@@ -529,11 +518,9 @@ TextureSystemImpl::environment(TextureHandle* texture_handle_,
 
         float levelweight[2] = { 1.0f - levelblend, levelblend };
 
-        int npointson = 0;
         for (int level = 0; level < 2; ++level) {
             if (!levelweight[level])
                 continue;
-            ++npointson;
             int lev = miplevel[level];
             if (options.interpmode == TextureOpt::InterpSmartBicubic) {
                 if (lev == 0
@@ -605,13 +592,16 @@ TextureSystemImpl::environment(TextureHandle* texture_handle,
 
     bool ok          = true;
     Tex::RunMask bit = 1;
+    float* r         = OIIO_ALLOCA(float, 3 * nchannels * Tex::BatchWidth);
+    float* drds      = r + nchannels * Tex::BatchWidth;
+    float* drdt      = r + 2 * nchannels * Tex::BatchWidth;
     for (int i = 0; i < Tex::BatchWidth; ++i, bit <<= 1) {
-        float r[4], drds[4], drdt[4];  // temp result
         if (mask & bit) {
             opt.sblur  = options.sblur[i];
             opt.tblur  = options.tblur[i];
             opt.swidth = options.swidth[i];
             opt.twidth = options.twidth[i];
+            opt.rnd    = options.rnd[i];
             Imath::V3f R_(R[i], R[i + Tex::BatchWidth],
                           R[i + 2 * Tex::BatchWidth]);
             Imath::V3f dRdx_(dRdx[i], dRdx[i + Tex::BatchWidth],
@@ -653,7 +643,5 @@ TextureSystemImpl::environment(ustring filename, TextureOptBatch& options,
                        dRdy, nchannels, result, dresultds, dresultdt);
 }
 
-
-}  // end namespace pvt
 
 OIIO_NAMESPACE_END

@@ -1,9 +1,11 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <iostream>
+
+#include <OpenImageIO/half.h>
 
 #include <OpenImageIO/deepdata.h>
 #include <OpenImageIO/imagebuf.h>
@@ -425,7 +427,8 @@ ImageBufAlgo::transpose(ImageBuf& dst, const ImageBuf& src, ROI roi,
     ROI dst_roi(roi.ybegin, roi.yend, roi.xbegin, roi.xend, roi.zbegin,
                 roi.zend, roi.chbegin, roi.chend);
     bool dst_initialized = dst.initialized();
-    if (!IBAprep(dst_roi, &dst))
+    ParamValue options[] = { { "dst_format", src.spec().format.c_str() } };
+    if (!IBAprep(dst_roi, dst, {}, options))
         return false;
     if (!dst_initialized) {
         ROI r = src.roi_full();

@@ -1,5 +1,5 @@
 // Ceres Solver - A fast non-linear least squares minimizer
-// Copyright 2017 Google Inc. All rights reserved.
+// Copyright 2023 Google Inc. All rights reserved.
 // http://ceres-solver.org/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -29,18 +29,23 @@
 // Author: sameeragarwal@google.com (Sameer Agarwal)
 
 #include "ceres/subset_preconditioner.h"
+
+#include <memory>
+#include <random>
+
 #include "Eigen/Dense"
 #include "Eigen/SparseCore"
 #include "ceres/block_sparse_matrix.h"
 #include "ceres/compressed_row_sparse_matrix.h"
 #include "ceres/inner_product_computer.h"
+#include "ceres/internal/config.h"
 #include "ceres/internal/eigen.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "glog/logging.h"
 #include "gtest/gtest.h"
 
-namespace ceres {
-namespace internal {
+namespace ceres::internal {
+
+namespace {
 
 // TODO(sameeragarwal): Refactor the following two functions out of
 // here and sparse_cholesky_test.cc into a more suitable place.
@@ -63,7 +68,8 @@ bool ComputeExpectedSolution(const CompressedRowSparseMatrix& lhs,
                              Vector* solution) {
   Matrix dense_triangular_lhs;
   lhs.ToDenseMatrix(&dense_triangular_lhs);
-  if (lhs.storage_type() == CompressedRowSparseMatrix::UPPER_TRIANGULAR) {
+  if (lhs.storage_type() ==
+      CompressedRowSparseMatrix::StorageType::UPPER_TRIANGULAR) {
     Matrix full_lhs = dense_triangular_lhs.selfadjointView<Eigen::Upper>();
     return SolveLinearSystemUsingEigen<Eigen::Upper>(full_lhs, rhs, solution);
   }
@@ -71,7 +77,7 @@ bool ComputeExpectedSolution(const CompressedRowSparseMatrix& lhs,
       dense_triangular_lhs, rhs, solution);
 }
 
-typedef ::testing::tuple<SparseLinearAlgebraLibraryType, bool> Param;
+using Param = ::testing::tuple<SparseLinearAlgebraLibraryType, bool>;
 
 std::string ParamInfoToString(testing::TestParamInfo<Param> info) {
   Param param = info.param;
@@ -81,9 +87,11 @@ std::string ParamInfoToString(testing::TestParamInfo<Param> info) {
   return ss.str();
 }
 
+}  // namespace
+
 class SubsetPreconditionerTest : public ::testing::TestWithParam<Param> {
  protected:
-  virtual void SetUp() {
+  void SetUp() final {
     BlockSparseMatrix::RandomMatrixOptions options;
     options.num_col_blocks = 4;
     options.min_col_block_size = 1;
@@ -93,38 +101,39 @@ class SubsetPreconditionerTest : public ::testing::TestWithParam<Param> {
     options.max_row_block_size = 4;
     options.block_density = 0.9;
 
-    m_.reset(BlockSparseMatrix::CreateRandomMatrix(options));
+    m_ = BlockSparseMatrix::CreateRandomMatrix(options, prng_);
     start_row_block_ = m_->block_structure()->rows.size();
 
     // Ensure that the bottom part of the matrix has the same column
     // block structure.
     options.col_blocks = m_->block_structure()->cols;
-    b_.reset(BlockSparseMatrix::CreateRandomMatrix(options));
+    b_ = BlockSparseMatrix::CreateRandomMatrix(options, prng_);
     m_->AppendRows(*b_);
 
     // Create a Identity block diagonal matrix with the same column
     // block structure.
     diagonal_ = Vector::Ones(m_->num_cols());
-    block_diagonal_.reset(BlockSparseMatrix::CreateDiagonalMatrix(
-        diagonal_.data(), b_->block_structure()->cols));
+    block_diagonal_ = BlockSparseMatrix::CreateDiagonalMatrix(
+        diagonal_.data(), b_->block_structure()->cols);
 
     // Unconditionally add the block diagonal to the matrix b_,
     // because either it is either part of b_ to make it full rank, or
     // we pass the same diagonal matrix later as the parameter D. In
     // either case the preconditioner matrix is b_' b + D'D.
     b_->AppendRows(*block_diagonal_);
-    inner_product_computer_.reset(InnerProductComputer::Create(
-        *b_, CompressedRowSparseMatrix::UPPER_TRIANGULAR));
+    inner_product_computer_ = InnerProductComputer::Create(
+        *b_, CompressedRowSparseMatrix::StorageType::UPPER_TRIANGULAR);
     inner_product_computer_->Compute();
   }
 
-  scoped_ptr<BlockSparseMatrix> m_;
-  scoped_ptr<BlockSparseMatrix> b_;
-  scoped_ptr<BlockSparseMatrix> block_diagonal_;
-  scoped_ptr<InnerProductComputer> inner_product_computer_;
-  scoped_ptr<Preconditioner> preconditioner_;
+  std::unique_ptr<BlockSparseMatrix> m_;
+  std::unique_ptr<BlockSparseMatrix> b_;
+  std::unique_ptr<BlockSparseMatrix> block_diagonal_;
+  std::unique_ptr<InnerProductComputer> inner_product_computer_;
+  std::unique_ptr<Preconditioner> preconditioner_;
   Vector diagonal_;
   int start_row_block_;
+  std::mt19937 prng_;
 };
 
 TEST_P(SubsetPreconditionerTest, foo) {
@@ -132,7 +141,7 @@ TEST_P(SubsetPreconditionerTest, foo) {
   Preconditioner::Options options;
   options.subset_preconditioner_start_row_block = start_row_block_;
   options.sparse_linear_algebra_library_type = ::testing::get<0>(param);
-  preconditioner_.reset(new SubsetPreconditioner(options, *m_));
+  preconditioner_ = std::make_unique<SubsetPreconditioner>(options, *m_);
 
   const bool with_diagonal = ::testing::get<1>(param);
   if (!with_diagonal) {
@@ -140,7 +149,7 @@ TEST_P(SubsetPreconditionerTest, foo) {
   }
 
   EXPECT_TRUE(
-      preconditioner_->Update(*m_, with_diagonal ? diagonal_.data() : NULL));
+      preconditioner_->Update(*m_, with_diagonal ? diagonal_.data() : nullptr));
 
   // Repeatedly apply the preconditioner to random vectors and check
   // that the preconditioned value is the same as one obtained by
@@ -152,7 +161,7 @@ TEST_P(SubsetPreconditionerTest, foo) {
     EXPECT_TRUE(ComputeExpectedSolution(*lhs, rhs, &expected));
 
     Vector actual(lhs->num_rows());
-    preconditioner_->RightMultiply(rhs.data(), actual.data());
+    preconditioner_->RightMultiplyAndAccumulate(rhs.data(), actual.data());
 
     Matrix eigen_lhs;
     lhs->ToDenseMatrix(&eigen_lhs);
@@ -167,28 +176,28 @@ TEST_P(SubsetPreconditionerTest, foo) {
 }
 
 #ifndef CERES_NO_SUITESPARSE
-INSTANTIATE_TEST_CASE_P(SubsetPreconditionerWithSuiteSparse,
-                        SubsetPreconditionerTest,
-                        ::testing::Combine(::testing::Values(SUITE_SPARSE),
-                                           ::testing::Values(true, false)),
-                        ParamInfoToString);
+INSTANTIATE_TEST_SUITE_P(SubsetPreconditionerWithSuiteSparse,
+                         SubsetPreconditionerTest,
+                         ::testing::Combine(::testing::Values(SUITE_SPARSE),
+                                            ::testing::Values(true, false)),
+                         ParamInfoToString);
 #endif
 
-#ifndef CERES_NO_CXSPARSE
-INSTANTIATE_TEST_CASE_P(SubsetPreconditionerWithCXSparse,
-                        SubsetPreconditionerTest,
-                        ::testing::Combine(::testing::Values(CX_SPARSE),
-                                           ::testing::Values(true, false)),
-                        ParamInfoToString);
+#ifndef CERES_NO_ACCELERATE_SPARSE
+INSTANTIATE_TEST_SUITE_P(
+    SubsetPreconditionerWithAccelerateSparse,
+    SubsetPreconditionerTest,
+    ::testing::Combine(::testing::Values(ACCELERATE_SPARSE),
+                       ::testing::Values(true, false)),
+    ParamInfoToString);
 #endif
 
 #ifdef CERES_USE_EIGEN_SPARSE
-INSTANTIATE_TEST_CASE_P(SubsetPreconditionerWithEigenSparse,
-                        SubsetPreconditionerTest,
-                        ::testing::Combine(::testing::Values(EIGEN_SPARSE),
-                                           ::testing::Values(true, false)),
-                        ParamInfoToString);
+INSTANTIATE_TEST_SUITE_P(SubsetPreconditionerWithEigenSparse,
+                         SubsetPreconditionerTest,
+                         ::testing::Combine(::testing::Values(EIGEN_SPARSE),
+                                            ::testing::Values(true, false)),
+                         ParamInfoToString);
 #endif
 
-}  // namespace internal
-}  // namespace ceres
+}  // namespace ceres::internal

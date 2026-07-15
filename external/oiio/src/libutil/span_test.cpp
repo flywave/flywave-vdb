@@ -1,12 +1,11 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <array>
 #include <iostream>
 #include <vector>
 
-#include <OpenImageIO/array_view.h>
 #include <OpenImageIO/image_view.h>
 #include <OpenImageIO/span.h>
 #include <OpenImageIO/strided_ptr.h>
@@ -33,9 +32,12 @@ test_span()
     OIIO_CHECK_EQUAL(&a.back(), &a[a.size() - 1]);
 
     OIIO_CHECK_EQUAL(a.begin(), &a[0]);
-    OIIO_CHECK_EQUAL(a.end(), &a[a.size()]);
+    OIIO_CHECK_EQUAL(a.begin(), a.data());
+    OIIO_CHECK_EQUAL(a.end(), a.data() + a.size());
+    OIIO_CHECK_EQUAL(a.end(), &a[a.size() - 1] + 1);
     OIIO_CHECK_EQUAL(a.cbegin(), &a[0]);
-    OIIO_CHECK_EQUAL(a.cend(), &a[a.size()]);
+    OIIO_CHECK_EQUAL(a.end(), a.data() + a.size());
+    OIIO_CHECK_EQUAL(a.cend(), &a[a.size() - 1] + 1);
 
     span<float>::const_iterator i = a.begin();
     OIIO_CHECK_EQUAL(*i, 0.0f);
@@ -311,6 +313,204 @@ test_image_view_mutable()
 
 
 
+void
+test_make_span()
+{
+    print("testing make_span\n");
+    std::vector<float> vec { 1, 2, 3, 4 };
+    float c_arr[] = { 1, 2, 3, 4 };
+    {
+        auto s1 = make_span(vec);
+        auto s2 = make_span(c_arr);
+        OIIO_CHECK_EQUAL(s1.size(), 4);
+        OIIO_CHECK_EQUAL(s1.data(), vec.data());
+        OIIO_CHECK_EQUAL(s2.size(), 4);
+        OIIO_CHECK_EQUAL(s2.data(), c_arr);
+    }
+    {
+        auto s1 = make_cspan(vec);
+        auto s2 = make_cspan(c_arr);
+        OIIO_CHECK_EQUAL(s1.size(), 4);
+        OIIO_CHECK_EQUAL(s1.data(), vec.data());
+        OIIO_CHECK_EQUAL(s2.size(), 4);
+        OIIO_CHECK_EQUAL(s2.data(), c_arr);
+    }
+    {
+        auto s1 = make_cspan(vec[1]);
+        OIIO_CHECK_EQUAL(s1.size(), 1);
+        OIIO_CHECK_EQUAL(s1.data(), vec.data() + 1);
+        OIIO_CHECK_EQUAL(s1[0], vec[1]);
+    }
+}
+
+
+
+void
+test_as_bytes()
+{
+    print("testing as_bytes, as_writable_bytes\n");
+
+    float c_arr[] = { 1, 2.5, 3, 4 };
+    span<float> aspan(c_arr);
+    OIIO_CHECK_ASSERT(aspan.size() == 4 && aspan[1] == 2.5f);
+
+    auto ab  = as_bytes(aspan);
+    auto awb = as_writable_bytes(aspan);
+    OIIO_CHECK_EQUAL(ab.size(), aspan.size() * sizeof(float));
+    OIIO_CHECK_EQUAL(ab.size_bytes(), aspan.size_bytes());
+    OIIO_CHECK_EQUAL(ab.data(), reinterpret_cast<std::byte*>(aspan.data()));
+    OIIO_CHECK_EQUAL(awb.size(), aspan.size() * sizeof(float));
+    OIIO_CHECK_EQUAL(awb.size_bytes(), aspan.size_bytes());
+    OIIO_CHECK_EQUAL(awb.data(), reinterpret_cast<std::byte*>(aspan.data()));
+}
+
+
+
+void
+test_span_cast()
+{
+    print("testing span_cast\n");
+
+    float c_arr[] = { 1, 2.5, 3, 4 };
+    span<float> aspan(c_arr);
+    OIIO_CHECK_ASSERT(aspan.size() == 4 && aspan[1] == 2.5f);
+
+    auto cast = span_cast<uint16_t>(aspan);
+    OIIO_CHECK_EQUAL(cast.size_bytes(), aspan.size_bytes());
+    OIIO_CHECK_EQUAL(cast.size(), 8);
+    OIIO_CHECK_EQUAL(cast.data(), reinterpret_cast<uint16_t*>(aspan.data()));
+}
+
+
+
+void
+test_spancpy()
+{
+    print("testing spancpy\n");
+    std::vector<float> vec { 1, 2, 3, 4 };
+    float c_arr[] = { 1, 2, 3, 4 };
+
+    {  // copy an array into an array
+        float dst[5] = { 0, 0, 0, 0, 0 };
+        auto r       = spancpy(make_span(dst), 1, make_cspan(c_arr), 2, 2);
+        OIIO_CHECK_EQUAL(dst[0], 0);
+        OIIO_CHECK_EQUAL(dst[1], 3);
+        OIIO_CHECK_EQUAL(dst[2], 4);
+        OIIO_CHECK_EQUAL(dst[3], 0);
+        OIIO_CHECK_EQUAL(dst[4], 0);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // try to copy too many items from the input into an array
+        float dst[5] = { 0, 0, 0, 0, 0 };
+        auto r       = spancpy(make_span(dst), 0, make_cspan(c_arr), 2,
+                               5);  // too big!
+        OIIO_CHECK_EQUAL(dst[0], 3);
+        OIIO_CHECK_EQUAL(dst[1], 4);
+        OIIO_CHECK_EQUAL(dst[2], 0);
+        OIIO_CHECK_EQUAL(dst[3], 0);
+        OIIO_CHECK_EQUAL(dst[4], 0);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // copy a vector into a vector
+        std::vector<float> dst { 0, 0, 0, 0, 0 };
+        auto r = spancpy(make_span(dst), 1, make_cspan(vec), 2, 2);
+        OIIO_CHECK_EQUAL(dst[0], 0);
+        OIIO_CHECK_EQUAL(dst[1], 3);
+        OIIO_CHECK_EQUAL(dst[2], 4);
+        OIIO_CHECK_EQUAL(dst[3], 0);
+        OIIO_CHECK_EQUAL(dst[4], 0);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // try to copy too many items from the input into a vector
+        std::vector<float> dst { 0, 0, 0, 0, 0 };
+        auto r = spancpy(make_span(dst), 0, make_cspan(vec), 2, 5);  // too big!
+        OIIO_CHECK_EQUAL(dst[0], 3);
+        OIIO_CHECK_EQUAL(dst[1], 4);
+        OIIO_CHECK_EQUAL(dst[2], 0);
+        OIIO_CHECK_EQUAL(dst[3], 0);
+        OIIO_CHECK_EQUAL(dst[4], 0);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+}
+
+
+
+void
+test_spanset()
+{
+    print("testing spanset\n");
+    {  // write into a vector
+        std::vector<float> vec { 1, 2, 3, 4, 5 };
+        auto r = spanset(make_span(vec), 2, 42.0f, 2);
+        OIIO_CHECK_EQUAL(vec[0], 1);
+        OIIO_CHECK_EQUAL(vec[1], 2);
+        OIIO_CHECK_EQUAL(vec[2], 42);
+        OIIO_CHECK_EQUAL(vec[3], 42);
+        OIIO_CHECK_EQUAL(vec[4], 5);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // write into an array
+        float vec[] = { 1, 2, 3, 4, 5 };
+        auto r      = spanset(make_span(vec), 2, 42.0f, 2);
+        OIIO_CHECK_EQUAL(vec[0], 1);
+        OIIO_CHECK_EQUAL(vec[1], 2);
+        OIIO_CHECK_EQUAL(vec[2], 42);
+        OIIO_CHECK_EQUAL(vec[3], 42);
+        OIIO_CHECK_EQUAL(vec[4], 5);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // write too many items into a vector
+        std::vector<float> vec { 1, 2, 3, 4, 5 };
+        auto r = spanset(make_span(vec), 2, 42.0f, 10);
+        OIIO_CHECK_EQUAL(vec[0], 1);
+        OIIO_CHECK_EQUAL(vec[1], 2);
+        OIIO_CHECK_EQUAL(vec[2], 42);
+        OIIO_CHECK_EQUAL(vec[3], 42);
+        OIIO_CHECK_EQUAL(vec[4], 42);
+        OIIO_CHECK_EQUAL(r, 3);
+    }
+}
+
+
+
+void
+test_spanzero()
+{
+    print("testing spanzero\n");
+    {  // write into a vector
+        std::vector<float> vec { 1, 2, 3, 4, 5 };
+        auto r = spanzero(make_span(vec), 2, 2);
+        OIIO_CHECK_EQUAL(vec[0], 1);
+        OIIO_CHECK_EQUAL(vec[1], 2);
+        OIIO_CHECK_EQUAL(vec[2], 0);
+        OIIO_CHECK_EQUAL(vec[3], 0);
+        OIIO_CHECK_EQUAL(vec[4], 5);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // write into an array
+        float vec[] = { 1, 2, 3, 4, 5 };
+        auto r      = spanzero(make_span(vec), 2, 2);
+        OIIO_CHECK_EQUAL(vec[0], 1);
+        OIIO_CHECK_EQUAL(vec[1], 2);
+        OIIO_CHECK_EQUAL(vec[2], 0);
+        OIIO_CHECK_EQUAL(vec[3], 0);
+        OIIO_CHECK_EQUAL(vec[4], 5);
+        OIIO_CHECK_EQUAL(r, 2);
+    }
+    {  // write too many items into a vector
+        std::vector<float> vec { 1, 2, 3, 4, 5 };
+        auto r = spanzero(make_span(vec), 2, 10);
+        OIIO_CHECK_EQUAL(vec[0], 1);
+        OIIO_CHECK_EQUAL(vec[1], 2);
+        OIIO_CHECK_EQUAL(vec[2], 0);
+        OIIO_CHECK_EQUAL(vec[3], 0);
+        OIIO_CHECK_EQUAL(vec[4], 0);
+        OIIO_CHECK_EQUAL(r, 3);
+    }
+}
+
+
+
 int
 main(int /*argc*/, char* /*argv*/[])
 {
@@ -325,10 +525,12 @@ main(int /*argc*/, char* /*argv*/[])
     test_span_strided_mutable();
     test_image_view();
     test_image_view_mutable();
-
-    // array_view and span should be synonyms
-    OIIO_CHECK_ASSERT((
-        std::is_same<OIIO::cspan<float>, OIIO::array_view<const float>>::value));
+    test_make_span();
+    test_as_bytes();
+    test_span_cast();
+    test_spancpy();
+    test_spanset();
+    test_spanzero();
 
     return unit_test_failures;
 }

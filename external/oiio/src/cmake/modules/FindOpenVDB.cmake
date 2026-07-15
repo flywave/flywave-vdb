@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find OPENVDB library
 # Find the native OPENVDB includes and library
 # This module defines
@@ -76,16 +78,27 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenVDB
     )
 
 if (OpenVDB_FOUND)
+    set (OpenVDB_VERSION ${OPENVDB_VERSION})
     set(OPENVDB_LIBRARIES ${OPENVDB_LIBRARY})
     set(OPENVDB_INCLUDES ${OPENVDB_INCLUDE_DIR})
 
-    if (NOT TARGET OpenVDB::OpenVDB)
-        add_library(OpenVDB::OpenVDB UNKNOWN IMPORTED)
-        set_target_properties(OpenVDB::OpenVDB PROPERTIES
+    if (NOT TARGET OpenVDB::openvdb)
+        add_library(OpenVDB::openvdb UNKNOWN IMPORTED)
+        set_target_properties(OpenVDB::openvdb PROPERTIES
             INTERFACE_INCLUDE_DIRECTORIES "${OPENVDB_INCLUDES}")
-        set_property(TARGET OpenVDB::OpenVDB APPEND PROPERTY
+        set_property(TARGET OpenVDB::openvdb APPEND PROPERTY
             IMPORTED_LOCATION "${OPENVDB_LIBRARIES}")
     endif ()
+
+    # Note: OpenVDB older than 12 needs Boost headers.
+    if (OpenVDB_VERSION VERSION_LESS 12)
+        find_package (Boost)
+        if (Boost_FOUND)
+            list(APPEND OPENVDB_INCLUDES ${Boost_INCLUDE_DIRS})
+        else()
+            unset(OpenVDB_FOUND)
+        endif()
+    endif()
 endif ()
 
 MARK_AS_ADVANCED(

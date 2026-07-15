@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <vector>
 
@@ -67,11 +67,11 @@ static void
 test_old()
 {
     auto args   = split_commands("basic alpha --flag --unflag --intarg 42 "
-                               "--floatarg 3.5 --stringarg foo "
-                               "--append xxx --append yyy "
-                               "--hidden "
-                               "--callback who "
-                               "bravo charlie");
+                                   "--floatarg 3.5 --stringarg foo "
+                                   "--append xxx --append yyy "
+                                   "--hidden "
+                                   "--callback who "
+                                   "bravo charlie");
     bool flag   = false;
     bool unflag = true;
     bool hidden = false;
@@ -243,12 +243,12 @@ test_new()
     OIIO_CHECK_EQUAL(ap["filename"].type(), TypeDesc("string[2]"));
     std::cout << "\nAll args:\n";
     for (auto& a : ap.params())
-        Strutil::printf("  %s = %s   [%s]\n", a.name(), a.get_string(),
-                        a.type());
+        Strutil::print("  {} = {}   [{}]\n", a.name(), a.get_string(),
+                       a.type());
     std::cout << "Extracting filenames:\n";
     auto fn = ap["filename"].as_vec<std::string>();
     for (auto& f : fn)
-        Strutil::printf("  \"%s\"\n", f);
+        Strutil::print("  \"{}\"\n", f);
 }
 
 

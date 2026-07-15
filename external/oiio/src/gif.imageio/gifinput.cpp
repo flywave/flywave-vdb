@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <fcntl.h>
 #include <memory>
@@ -19,7 +19,7 @@
 
 // for older giflib versions
 #ifndef GIFLIB_MAJOR
-#    define GIFLIB_MAJOR 4
+#    error "GIFLIB 5.0 minimum required"
 #endif
 
 #ifndef DISPOSAL_UNSPECIFIED
@@ -30,25 +30,33 @@
 #    define DISPOSE_BACKGROUND 2
 #endif
 
+
+
 OIIO_PLUGIN_NAMESPACE_BEGIN
 
 class GIFInput final : public ImageInput {
 public:
     GIFInput() { init(); }
-    virtual ~GIFInput() { close(); }
-    virtual const char* format_name(void) const override { return "gif"; }
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool close(void) override;
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
+    ~GIFInput() override { close(); }
+    const char* format_name(void) const override { return "gif"; }
+    int supports(string_view feature) const override
+    {
+        return (feature == "ioproxy" || feature == "multiimage");
+    }
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool close(void) override;
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
 
-    virtual int current_subimage(void) const override
+    int current_subimage(void) const override
     {
         lock_guard lock(*this);
         return m_subimage;
     }
-    virtual int current_miplevel(void) const override
+    int current_miplevel(void) const override
     {
         // No mipmap support
         return 0;
@@ -92,11 +100,25 @@ private:
     /// Print error message.
     ///
     void report_last_error(void);
+
+    // Wrapper for GIF library to call that inputs from our IOProxy
+    static int readFunc(GifFileType* gif, GifByteType* data, int bytes)
+    {
+        size_t size(bytes);
+        auto inp    = reinterpret_cast<GIFInput*>(gif->UserData);
+        auto io     = inp->ioproxy();
+        auto result = io->read(data, size);
+        if (result < size)
+            inp->errorfmt(
+                "GIF read error at position {}, asked for {} bytes, got {} (total size {})",
+                io->tell() - result, size, result, io->size());
+        return static_cast<int>(result);
+    }
 };
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin
+// Obligatory material to make this a recognizable imageio plugin
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT int gif_imageio_version = OIIO_PLUGIN_VERSION;
@@ -110,14 +132,8 @@ OIIO_EXPORT const char* gif_input_extensions[] = { "gif", NULL };
 OIIO_EXPORT const char*
 gif_imageio_library_version()
 {
-#define STRINGIZE2(a) #a
-#define STRINGIZE(a) STRINGIZE2(a)
-#if defined(GIFLIB_MAJOR) && defined(GIFLIB_MINOR) && defined(GIFLIB_RELEASE)
-    return "gif_lib " STRINGIZE(GIFLIB_MAJOR) "." STRINGIZE(
-        GIFLIB_MINOR) "." STRINGIZE(GIFLIB_RELEASE);
-#else
-    return "gif_lib unknown version";
-#endif
+    return "gif_lib " OIIO_STRINGIZE(GIFLIB_MAJOR) "." OIIO_STRINGIZE(
+        GIFLIB_MINOR) "." OIIO_STRINGIZE(GIFLIB_RELEASE);
 }
 
 OIIO_PLUGIN_EXPORTS_END
@@ -128,6 +144,7 @@ void
 GIFInput::init(void)
 {
     m_gif_file = nullptr;
+    ioproxy_clear();
 }
 
 
@@ -139,9 +156,25 @@ GIFInput::open(const std::string& name, ImageSpec& newspec)
     m_subimage = -1;
     m_canvas.clear();
 
-    bool ok = seek_subimage(0, 0);
-    newspec = spec();
-    return ok;
+    if (seek_subimage(0, 0)) {
+        newspec = spec();
+        return true;
+    } else {
+        close();
+        return false;
+    }
+}
+
+
+
+bool
+GIFInput::open(const std::string& name, ImageSpec& newspec,
+               const ImageSpec& config)
+{
+    // Check 'config' for any special requests
+    ioproxy_retrieve_from_config(config);
+    ioseek(0);
+    return open(name, newspec);
 }
 
 
@@ -226,7 +259,7 @@ GIFInput::read_subimage_metadata(ImageSpec& newspec)
     newspec.nchannels = 4;
     newspec.default_channel_names();
     newspec.alpha_channel = 4;
-    newspec.attribute("oiio:ColorSpace", "sRGB");
+    newspec.set_colorspace("sRGB");
 
     m_previous_disposal_method = m_disposal_method;
     m_disposal_method          = DISPOSAL_UNSPECIFIED;
@@ -290,12 +323,15 @@ bool
 GIFInput::read_subimage_data()
 {
     GifColorType* colormap = NULL;
+    int colormap_count;
     if (m_gif_file->Image.ColorMap) {  // local colormap
-        colormap = m_gif_file->Image.ColorMap->Colors;
+        colormap       = m_gif_file->Image.ColorMap->Colors;
+        colormap_count = m_gif_file->Image.ColorMap->ColorCount;
     } else if (m_gif_file->SColorMap) {  // global colormap
-        colormap = m_gif_file->SColorMap->Colors;
+        colormap       = m_gif_file->SColorMap->Colors;
+        colormap_count = m_gif_file->SColorMap->ColorCount;
     } else {
-        errorf("Neither local nor global colormap present.");
+        errorfmt("Neither local nor global colormap present.");
         return false;
     }
 
@@ -322,6 +358,12 @@ GIFInput::read_subimage_data()
                 + (interlacing ? decode_line_number(wy, window_height) : wy);
         if (0 <= y && y < m_spec.height) {
             for (int wx = 0; wx < window_width; wx++) {
+                if (fscanline[wx] >= colormap_count) {
+                    errorfmt(
+                        "Possible corruption: Encoded value {:d} @ ({},{}) exceeds palette size {}\n",
+                        fscanline[wx], wx, y, colormap_count);
+                    return false;
+                }
                 int x   = window_left + wx;
                 int idx = m_spec.nchannels * (y * m_spec.width + x);
                 if (0 <= x && x < m_spec.width
@@ -360,33 +402,14 @@ GIFInput::seek_subimage(int subimage, int miplevel)
     }
 
     if (!m_gif_file) {
-#if GIFLIB_MAJOR >= 5 && defined(_WIN32)
-        // On Windows, UTF-8 filenames won't work properly with Giflib. Jump
-        // through some hoops: get an integer file descriptor for Giflib.
-        int fd = Filesystem::open(m_filename, _O_RDONLY | _O_BINARY);
-        if (fd == -1) {
-            errorf("Error trying to open the file.");
+        if (!ioproxy_use_or_open(m_filename))
             return false;
-        }
         int giflib_error;
-        if (!(m_gif_file = DGifOpenFileHandle(fd, &giflib_error))) {
-            errorf("%s", GifErrorString(giflib_error));
+        m_gif_file = DGifOpen(this, readFunc, &giflib_error);
+        if (!m_gif_file) {
+            errorfmt("{}", GifErrorString(giflib_error));
             return false;
         }
-#elif GIFLIB_MAJOR >= 5
-        int giflib_error;
-        if (!(m_gif_file = DGifOpenFileName(m_filename.c_str(),
-                                            &giflib_error))) {
-            errorf("%s", GifErrorString(giflib_error));
-            return false;
-        }
-#else
-        if (!(m_gif_file = DGifOpenFileName(m_filename.c_str()))) {
-            errorf("Error trying to open the file.");
-            return false;
-        }
-#endif
-
         m_subimage = -1;
         m_canvas.resize(m_gif_file->SWidth * m_gif_file->SHeight * 4);
     }
@@ -424,27 +447,12 @@ GIFInput::seek_subimage(int subimage, int miplevel)
 
 
 
-static spin_mutex gif_error_mutex;
-
-
 void
 GIFInput::report_last_error(void)
 {
-    // N.B. Only GIFLIB_MAJOR >= 5 looks properly thread-safe, in that the
-    // error is guaranteed to be specific to this open file.  We use a  spin
-    // mutex to prevent a thread clash for older versions, but it still
-    // appears to be a global call, so we can't be absolutely sure that the
-    // error was for *this* file.  So if you're using giflib prior to
-    // version 5, beware.
-#if GIFLIB_MAJOR >= 5
-    errorf("%s", GifErrorString(m_gif_file->Error));
-#elif GIFLIB_MAJOR == 4 && GIFLIB_MINOR >= 2
-    spin_lock lock(gif_error_mutex);
-    errorf("%s", GifErrorString());
-#else
-    spin_lock lock(gif_error_mutex);
-    errorf("GIF error %d", GifLastError());
-#endif
+    // GIFLIB_MAJOR >= 5 looks properly thread-safe, in that the error is
+    // guaranteed to be specific to this open file.
+    errorfmt("{}", GifErrorString(m_gif_file->Error));
 }
 
 
@@ -452,20 +460,21 @@ GIFInput::report_last_error(void)
 inline bool
 GIFInput::close(void)
 {
+    bool ok = true;
     if (m_gif_file) {
 #if GIFLIB_MAJOR > 5 || (GIFLIB_MAJOR == 5 && GIFLIB_MINOR >= 1)
         if (DGifCloseFile(m_gif_file, NULL) == GIF_ERROR) {
 #else
         if (DGifCloseFile(m_gif_file) == GIF_ERROR) {
 #endif
-            errorf("Error trying to close the file.");
-            return false;
+            errorfmt("Error trying to close the file.");
+            ok = false;
         }
-        m_gif_file = NULL;
+        m_gif_file = nullptr;
     }
     m_canvas.clear();
-
-    return true;
+    ioproxy_clear();
+    return ok;
 }
 
 OIIO_PLUGIN_NAMESPACE_END

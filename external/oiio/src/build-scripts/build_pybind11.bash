@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Copyright Contributors to the OpenImageIO project.
+# SPDX-License-Identifier: Apache-2.0
+# https://github.com/AcademySoftwareFoundation/OpenImageIO
+
 # Utility script to download and build pybind11
 
 # Exit the whole script if any command fails.
@@ -7,7 +11,7 @@ set -ex
 
 # Repo and branch/tag/commit of pybind11 to download if we don't have it yet
 PYBIND11_REPO=${PYBIND11_REPO:=https://github.com/pybind/pybind11.git}
-PYBIND11_VERSION=${PYBIND11_VERSION:=v2.5.0}
+PYBIND11_VERSION=${PYBIND11_VERSION:=v2.12.0}
 
 # Where to put pybind11 repo source (default to the ext area)
 PYBIND11_SRC_DIR=${PYBIND11_SRC_DIR:=${PWD}/ext/pybind11}
@@ -17,6 +21,10 @@ PYBIND11_BUILD_DIR=${PYBIND11_BUILD_DIR:=${PYBIND11_SRC_DIR}/build}
 LOCAL_DEPS_DIR=${LOCAL_DEPS_DIR:=${PWD}/ext}
 PYBIND11_INSTALL_DIR=${PYBIND11_INSTALL_DIR:=${LOCAL_DEPS_DIR}/dist}
 #PYBIND11_BUILD_OPTS=${PYBIND11_BUILD_OPTS:=}
+
+# Fix for pybind11 breaking against cmake 4.0 because of too-old cmake min.
+# Remove when pybind11 is fixed to declare its own minimum high enough.
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 if [[ "${PYTHON_VERSION}" != "" ]] ; then
     PYBIND11_BUILD_OPTS+=" -DPYBIND11_PYTHON_VERSION=${PYTHON_VERSION}"
@@ -34,16 +42,17 @@ if [[ ! -e ${PYBIND11_SRC_DIR} ]] ; then
     git clone ${PYBIND11_REPO} ${PYBIND11_SRC_DIR}
 fi
 cd ${PYBIND11_SRC_DIR}
+
 echo "git checkout ${PYBIND11_VERSION} --force"
 git checkout ${PYBIND11_VERSION} --force
 
-mkdir -p ${PYBIND11_BUILD_DIR}
-cd ${PYBIND11_BUILD_DIR}
-time cmake -DCMAKE_BUILD_TYPE=Release \
-           -DCMAKE_INSTALL_PREFIX=${PYBIND11_INSTALL_DIR} \
-           -DPYBIND11_TEST=OFF \
-           ${PYBIND11_BUILD_OPTS} ..
-time cmake --build . --config Release --target install
+if [[ -z $DEP_DOWNLOAD_ONLY ]]; then
+    time cmake -S . -B ${PYBIND11_BUILD_DIR} -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX=${PYBIND11_INSTALL_DIR} \
+               -DPYBIND11_TEST=OFF \
+               ${PYBIND11_BUILD_OPTS}
+    time cmake --build ${PYBIND11_BUILD_DIR} --config Release --target install
+fi
 
 # ls -R ${PYBIND11_INSTALL_DIR}
 popd

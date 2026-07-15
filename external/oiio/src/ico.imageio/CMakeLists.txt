@@ -1,11 +1,12 @@
-# Copyright 2008-present Contributors to the OpenImageIO project.
-# SPDX-License-Identifier: BSD-3-Clause
-# https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+# Copyright Contributors to the OpenImageIO project.
+# SPDX-License-Identifier: Apache-2.0
+# https://github.com/AcademySoftwareFoundation/OpenImageIO
 
-if (PNG_FOUND)
+if (PNG_TARGET)
     add_oiio_plugin (icoinput.cpp icooutput.cpp
-                     INCLUDE_DIRS ${PNG_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS}
-                     LINK_LIBRARIES ${PNG_LIBRARIES} ${ZLIB_LIBRARIES})
+                     INCLUDE_DIRS ${PNG_INCLUDE_DIRS}
+                     DEFINITIONS ${PNG_DEFINITIONS}
+                     LINK_LIBRARIES ${PNG_LIBRARIES} ${PNG_TARGET} ZLIB::ZLIB)
 else ()
     message (WARNING "libpng not found, so ICO support will not work")
     set (format_plugin_definitions ${format_plugin_definitions} DISABLE_ICO=1 PARENT_SCOPE)

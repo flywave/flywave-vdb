@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <cstdio>
@@ -22,29 +22,27 @@ OIIO_PLUGIN_NAMESPACE_BEGIN
 class NullOutput final : public ImageOutput {
 public:
     NullOutput() {}
-    virtual ~NullOutput() {}
-    virtual const char* format_name(void) const override { return "null"; }
-    virtual int supports(string_view /*feature*/) const override
+    ~NullOutput() override {}
+    const char* format_name(void) const override { return "null"; }
+    int supports(string_view feature) const override
     {
-        return true;
+        return feature != "rectangles";
     }
-    virtual bool open(const std::string& /*name*/, const ImageSpec& spec,
-                      OpenMode /*mode*/) override
+    bool open(const std::string& /*name*/, const ImageSpec& spec,
+              OpenMode /*mode*/) override
     {
         m_spec = spec;
         return true;
     }
-    virtual bool close() override { return true; }
-    virtual bool write_scanline(int /*y*/, int /*z*/, TypeDesc /*format*/,
-                                const void* /*data*/,
-                                stride_t /*xstride*/) override
+    bool close() override { return true; }
+    bool write_scanline(int /*y*/, int /*z*/, TypeDesc /*format*/,
+                        const void* /*data*/, stride_t /*xstride*/) override
     {
         return true;
     }
-    virtual bool write_tile(int /*x*/, int /*y*/, int /*z*/,
-                            TypeDesc /*format*/, const void* /*data*/,
-                            stride_t /*xstride*/, stride_t /*ystride*/,
-                            stride_t /*zstride*/) override
+    bool write_tile(int /*x*/, int /*y*/, int /*z*/, TypeDesc /*format*/,
+                    const void* /*data*/, stride_t /*xstride*/,
+                    stride_t /*ystride*/, stride_t /*zstride*/) override
     {
         return true;
     }
@@ -58,24 +56,21 @@ public:
 class NullInput final : public ImageInput {
 public:
     NullInput() { init(); }
-    virtual ~NullInput() {}
-    virtual const char* format_name(void) const override { return "null"; }
-    virtual bool valid_file(const std::string& filename) const override;
-    virtual int supports(string_view /*feature*/) const override
-    {
-        return true;
-    }
-    virtual bool open(const std::string& name, ImageSpec& newspec) override;
-    virtual bool open(const std::string& name, ImageSpec& newspec,
-                      const ImageSpec& config) override;
-    virtual bool close() override { return true; }
-    virtual int current_subimage(void) const override { return m_subimage; }
-    virtual int current_miplevel(void) const override { return m_miplevel; }
-    virtual bool seek_subimage(int subimage, int miplevel) override;
-    virtual bool read_native_scanline(int subimage, int miplevel, int y, int z,
-                                      void* data) override;
-    virtual bool read_native_tile(int subimage, int miplevel, int x, int y,
-                                  int z, void* data) override;
+    ~NullInput() override {}
+    const char* format_name(void) const override { return "null"; }
+    bool valid_file(const std::string& filename) const override;
+    int supports(string_view /*feature*/) const override { return true; }
+    bool open(const std::string& name, ImageSpec& newspec) override;
+    bool open(const std::string& name, ImageSpec& newspec,
+              const ImageSpec& config) override;
+    bool close() override { return true; }
+    int current_subimage(void) const override { return m_subimage; }
+    int current_miplevel(void) const override { return m_miplevel; }
+    bool seek_subimage(int subimage, int miplevel) override;
+    bool read_native_scanline(int subimage, int miplevel, int y, int z,
+                              void* data) override;
+    bool read_native_tile(int subimage, int miplevel, int x, int y, int z,
+                          void* data) override;
 
 private:
     std::string m_filename;        ///< Stash the filename
@@ -97,7 +92,7 @@ private:
 
 
 
-// Obligatory material to make this a recognizeable imageio plugin:
+// Obligatory material to make this a recognizable imageio plugin:
 OIIO_PLUGIN_EXPORTS_BEGIN
 
 OIIO_EXPORT ImageOutput*
@@ -189,16 +184,16 @@ parse_param(string_view paramname, string_view val, ImageSpec& spec)
             // Surrounded by quotes? it's a string (strip off the quotes)
             val.remove_prefix(1);
             val.remove_suffix(1);
-            type = TypeDesc::TypeString;
+            type = TypeString;
         } else if (Strutil::string_is<int>(val)) {
             // Looks like an int, is an int
-            type = TypeDesc::TypeInt;
+            type = TypeInt;
         } else if (Strutil::string_is<float>(val)) {
             // Looks like a float, is a float
-            type = TypeDesc::TypeFloat;
+            type = TypeFloat;
         } else {
             // Everything else is assumed a string
-            type = TypeDesc::TypeString;
+            type = TypeString;
         }
     }
 
@@ -324,12 +319,12 @@ NullInput::open(const std::string& name, ImageSpec& newspec,
         }
     }
 
+    m_value.resize(m_topspec.pixel_bytes());  // default fills with 0's
     if (fvalue.size()) {
         // Convert float to the native type
         fvalue.resize(m_topspec.nchannels, 0.0f);
-        m_value.resize(m_topspec.pixel_bytes());
-        convert_types(TypeFloat, fvalue.data(), m_topspec.format,
-                      m_value.data(), m_topspec.nchannels);
+        convert_pixel_values(TypeFloat, fvalue.data(), m_topspec.format,
+                             m_value.data(), m_topspec.nchannels);
     }
 
     bool ok = seek_subimage(0, 0);
@@ -351,7 +346,7 @@ NullInput::seek_subimage(int subimage, int miplevel)
     m_subimage = subimage;
 
     if (miplevel > 0 && !m_mip)
-        return false;  // Asked for MIP levels but we aren't makign them
+        return false;  // Asked for MIP levels but we aren't making them
 
     m_spec = m_topspec;
     for (m_miplevel = 0; m_miplevel < miplevel; ++m_miplevel) {
@@ -373,13 +368,10 @@ bool
 NullInput::read_native_scanline(int /*subimage*/, int /*miplevel*/, int /*y*/,
                                 int /*z*/, void* data)
 {
-    if (m_value.size()) {
-        size_t s = m_spec.pixel_bytes();
-        for (int x = 0; x < m_spec.width; ++x)
-            memcpy((char*)data + s * x, m_value.data(), s);
-    } else {
-        memset(data, 0, m_spec.scanline_bytes());
-    }
+    size_t s = m_spec.pixel_bytes();
+    OIIO_DASSERT(m_value.size() == s);
+    for (int x = 0; x < m_spec.width; ++x)
+        memcpy((char*)data + s * x, m_value.data(), s);
     return true;
 }
 
@@ -389,13 +381,10 @@ bool
 NullInput::read_native_tile(int /*subimage*/, int /*miplevel*/, int /*x*/,
                             int /*y*/, int /*z*/, void* data)
 {
-    if (m_value.size()) {
-        size_t s = m_spec.pixel_bytes();
-        for (size_t x = 0, e = m_spec.tile_pixels(); x < e; ++x)
-            memcpy((char*)data + s * x, m_value.data(), s);
-    } else {
-        memset(data, 0, m_spec.tile_bytes());
-    }
+    size_t s = m_spec.pixel_bytes();
+    OIIO_DASSERT(m_value.size() == s);
+    for (size_t x = 0, e = m_spec.tile_pixels(); x < e; ++x)
+        memcpy((char*)data + s * x, m_value.data(), s);
     return true;
 }
 

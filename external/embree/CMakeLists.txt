@@ -108,6 +108,7 @@ SET(EMBREE_LIB_TYPE STATIC)
 ADD_DEFINITIONS(-DEMBREE_STATIC_LIB)
 
 OPTION(EMBREE_ISPC_SUPPORT "Build Embree with support for ISPC applications." OFF)
+SET(EMBREE_ISPC_SUPPORT OFF CACHE BOOL "Build Embree with support for ISPC applications." FORCE)
 IF (EMSCRIPTEN)
   SET(EMBREE_ISPC_SUPPORT OFF CACHE BOOL "Build Embree with support for ISPC applications." FORCE)
 ENDIF()

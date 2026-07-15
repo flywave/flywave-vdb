@@ -1,9 +1,11 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <iostream>
+
+#include <OpenImageIO/half.h>
 
 #include <OpenImageIO/deepdata.h>
 #include <OpenImageIO/imagebuf.h>
@@ -305,7 +307,8 @@ ImageBufAlgo::crop(const ImageBuf& src, ROI roi, int nthreads)
 bool
 ImageBufAlgo::cut(ImageBuf& dst, const ImageBuf& src, ROI roi, int nthreads)
 {
-    pvt::LoggedTimer logtime("IBA::cut");
+    // pvt::LoggedTimer logtime("IBA::cut");
+    // Don't log, because all the work is inside crop, which already logs
     bool ok = crop(dst, src, roi, nthreads);
     if (!ok)
         return false;

@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <cstdio>
@@ -10,6 +10,7 @@
 #include <limits>
 #include <sstream>
 
+#include <OpenImageIO/Imath.h>
 #include <OpenImageIO/argparse.h>
 #include <OpenImageIO/color.h>
 #include <OpenImageIO/dassert.h>
@@ -17,12 +18,17 @@
 #include <OpenImageIO/filter.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
+#include <OpenImageIO/imagecache.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/sysutil.h>
 #include <OpenImageIO/timer.h>
 
 using namespace OIIO;
+
+#ifndef OPENIMAGEIO_METADATA_HISTORY_DEFAULT
+#    define OPENIMAGEIO_METADATA_HISTORY_DEFAULT 0
+#endif
 
 
 // # FIXME: Refactor all statics into a struct
@@ -85,7 +91,7 @@ colorconvert_help_string()
 
     s += " (choices: ";
     ColorConfig colorconfig;
-    if (colorconfig.error() || colorconfig.getNumColorSpaces() == 0) {
+    if (colorconfig.has_error() || colorconfig.getNumColorSpaces() == 0) {
         s += "NONE";
     } else {
         for (int i = 0; i < colorconfig.getNumColorSpaces(); ++i) {
@@ -159,7 +165,8 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
     std::string wrap = "black";
     std::string swrap;
     std::string twrap;
-    bool doresize = false;
+    bool doresize   = false;
+    bool keepaspect = false;
     Imath::M44f Mcam(0.0f), Mscr(0.0f), MNDC(0.0f);  // Initialize to 0
     bool separate              = false;
     bool nomipmap              = false;
@@ -175,11 +182,28 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
     bool unpremult             = false;
     bool sansattrib            = false;
     float sharpen              = 0.0f;
+    float bumpscale            = 1.0f;
+    bool bumpinverts           = false;
+    bool bumpinvertt           = false;
+    float uvslopes_scale       = 0.0f;
+    bool cdf                   = false;
+    float cdfsigma             = 1.0f / 6;
+    int cdfbits                = 8;
+#if OPENIMAGEIO_METADATA_HISTORY_DEFAULT
+    bool metadata_history = Strutil::from_string<int>(
+        getenv("OPENIMAGEIO_METADATA_HISTORY", "1"));
+#else
+    bool metadata_history = Strutil::from_string<int>(
+        getenv("OPENIMAGEIO_METADATA_HISTORY"));
+#endif
     std::string incolorspace;
     std::string outcolorspace;
     std::string colorconfigname;
     std::string channelnames;
-    std::string bumpformat = "auto";
+    std::string bumpformat  = "auto";
+    std::string slopefilter = "sobel";
+    std::string bumprange   = "auto";
+    std::string handed;
     std::vector<std::string> string_attrib_names, string_attrib_values;
     std::vector<std::string> any_attrib_names, any_attrib_values;
     filenames.clear();
@@ -187,8 +211,9 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
     // clang-format off
     ArgParse ap;
     ap.intro("maketx -- convert images to tiled, MIP-mapped textures\n"
-             OIIO_INTRO_STRING);
-    ap.usage("maketx [options] file...");
+             OIIO_INTRO_STRING)
+      .usage("maketx [options] file...")
+      .add_version(OIIO_VERSION_STRING);
 
     ap.arg("filename")
       .hidden()
@@ -225,8 +250,8 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
       .help("Specific t wrap mode separately");
     ap.arg("--resize", &doresize)
       .help("Resize textures to power of 2 (default: no)");
-    ap.arg("--noresize %!", &doresize)
-      .help("Do not resize textures to power of 2 (deprecated)");
+    ap.arg("--keepaspect", &keepaspect)
+      .help("Keep the texture aspect ratio when resizing to power of 2");
     ap.arg("--filter %s:FILTERNAME", &filtername)
       .help(filter_help_string());
     ap.arg("--hicomp", &do_highlight_compensation)
@@ -267,6 +292,10 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
       .help("Sets string metadata attribute (name, value)");
     ap.arg("--sansattrib", &sansattrib)
       .help("Write command line into Software & ImageHistory but remove --sattrib and --attrib options");
+    ap.arg("--history", &metadata_history)
+      .help("Write full command line into Exif:ImageHistory, Software metadata attributes");
+    ap.arg("--no-history %!", &metadata_history)
+      .help("Do not write full command line into Exif:ImageHistory, Software metadata attributes");
     ap.arg("--constant-color-detect", &constant_color_detect)
       .help("Create 1-tile textures from constant color inputs");
     ap.arg("--monochrome-detect", &monochrome_detect)
@@ -279,10 +308,15 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
       .help("Ignore unassociated alpha tags in input (don't autoconvert)");
     ap.arg("--runstats", &runstats)
       .help("Print runtime statistics");
-    ap.arg("--stats", &runstats)
-      .hidden(); // DEPRECATED 1.6
     ap.arg("--mipimage %L:FILENAME", &mipimages)
       .help("Specify an individual MIP level");
+    ap.arg("--cdf", &cdf)
+      .help("Store the forward and inverse Gaussian CDF as a lookup-table. The variance is set by cdfsigma (1/6 by default), and the number of buckets \
+              in the lookup table is determined by cdfbits (8 bit - 256 buckets by default)");
+    ap.arg("--cdfsigma %f:N", &cdfsigma)
+      .help("Specify the Gaussian sigma parameter when writing the forward and inverse Gaussian CDF data. The default vale is 1/6 (0.1667)");
+    ap.arg("--cdfbits %d:N", &cdfbits)
+      .help("Specify the number of bits used to store the forward and inverse Gaussian CDF. The default value is 8 bits");
 
     ap.separator("Basic modes (default is plain texture):");
     ap.arg("--shadow", &shadowmode)
@@ -293,9 +327,23 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
       .help("Create lat/long environment map from a light probe");
     ap.arg("--bumpslopes", &bumpslopesmode)
       .help("Create a 6 channels bump-map with height, derivatives and square derivatives from an height or a normal map");
+    ap.arg("--uvslopes_scale %f:VALUE", &uvslopes_scale)
+      .help("If specified, compute derivatives for --bumpslopes in UV space rather than in texel space and divide them by a scale factor. 0=disable by default, only valid for height maps.");
     ap.arg("--bumpformat %s:NAME", &bumpformat)
       .help("Specify the interpretation of a 3-channel input image for --bumpslopes: \"height\", \"normal\" or \"auto\" (default).");
 //                  "--envcube", &envcubemode, "Create cubic env map (file order: px, nx, py, ny, pz, nz) (UNIMP)",
+    ap.arg("--bumpscale %f:N", &bumpscale)
+      .help("Set the scale factor for the bump-slope map. The default is 1.0");
+    ap.arg("--bumpinverts", &bumpinverts)
+      .help("Invert the bump-slope map in the s (u) direction.");
+    ap.arg("--bumpinvertt", &bumpinvertt)
+      .help("Invert the bump-slope map in the t (v) direction.");
+    ap.arg("--slopefilter %s:FILTER", &slopefilter)
+      .help("Specify the filter used to calculate the slope of a height map:  \"sobel\" (default), \"centraldiff\" (matches txmake behavior).");
+    ap.arg("--bumprange %s:RANGE", &bumprange)
+      .help("Specify the expected range of values for the input normal map: \"centered\" from [-1,1], \"positive\" from [0,1] (traditional blue-ish normal map), \"auto\" will select this based off of the presence of negative values.");
+    ap.arg("--handed %s:STRING", &handed)
+      .help("Specify the handedness of a vector or normal map: \"left\", \"right\", or \"\" (default).");
 
     ap.separator(colortitle_help_string());
     ap.arg("--colorconfig %s:FILENAME", &colorconfigname)
@@ -393,6 +441,7 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
     configspec.attribute("maketx:verbose", verbose);
     configspec.attribute("maketx:runstats", runstats);
     configspec.attribute("maketx:resize", doresize);
+    configspec.attribute("maketx:keepaspect", keepaspect);
     configspec.attribute("maketx:nomipmap", nomipmap);
     configspec.attribute("maketx:updatemode", updatemode);
     configspec.attribute("maketx:constant_color_detect", constant_color_detect);
@@ -420,12 +469,24 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
     configspec.attribute("maketx:prman_options", prman);
     if (mipimages.size())
         configspec.attribute("maketx:mipimages", Strutil::join(mipimages, ";"));
-    if (bumpslopesmode)
+    if (bumpslopesmode) {
+        configspec.attribute("maketx:bumpscale", bumpscale);
+        configspec.attribute("maketx:bumpinverts", bumpinverts);
+        configspec.attribute("maketx:bumpinvertt", bumpinvertt);
+        configspec.attribute("maketx:slopefilter", slopefilter);
+        configspec.attribute("maketx:bumprange", bumprange);
         configspec.attribute("maketx:bumpformat", bumpformat);
+    }
+    if (handed.size())
+        configspec.attribute("handed", handed);
+    configspec.attribute("maketx:cdf", cdf);
+    configspec.attribute("maketx:cdfsigma", cdfsigma);
+    configspec.attribute("maketx:cdfbits", cdfbits);
 
-    std::string cmdline
-        = Strutil::sprintf("OpenImageIO %s : %s", OIIO_VERSION_STRING,
-                           command_line_string(argc, argv, sansattrib));
+    std::string cmdline = command_line_string(argc, argv, sansattrib);
+    cmdline = Strutil::fmt::format("OpenImageIO {} : {}", OIIO_VERSION_STRING,
+                                   metadata_history ? cmdline
+                                                    : SHA1(cmdline).digest());
     configspec.attribute("Software", cmdline);
     configspec.attribute("maketx:full_command_line", cmdline);
 
@@ -462,9 +523,12 @@ getargs(int argc, char* argv[], ImageSpec& configspec)
 
     if (ignore_unassoc) {
         configspec.attribute("maketx:ignore_unassoc", (int)ignore_unassoc);
-        ImageCache* ic = ImageCache::create();  // get the shared one
+        auto ic = ImageCache::create();  // get the shared one
         ic->attribute("unassociatedalpha", (int)ignore_unassoc);
     }
+
+    if (bumpslopesmode)
+        configspec.attribute("maketx:uvslopes_scale", uvslopes_scale);
 }
 
 
@@ -489,7 +553,7 @@ main(int argc, char* argv[])
     OIIO::attribute("threads", nthreads);
 
     // N.B. This will apply to the default IC that any ImageBuf's get.
-    ImageCache* ic = ImageCache::create();   // get the shared one
+    auto ic = ImageCache::create();          // get the shared one
     ic->attribute("forcefloat", 1);          // Force float upon read
     ic->attribute("max_memory_MB", 1024.0);  // 1 GB cache
 
@@ -506,9 +570,10 @@ main(int argc, char* argv[])
     bool ok = ImageBufAlgo::make_texture(mode, filenames[0], outputfilename,
                                          configspec, &std::cout);
     if (!ok)
-        std::cout << OIIO::geterror() << "\n";
+        std::cout << "make_texture ERROR: " << OIIO::geterror() << "\n";
     if (runstats)
         std::cout << "\n" << ic->getstats();
 
+    shutdown();
     return ok ? 0 : EXIT_FAILURE;
 }

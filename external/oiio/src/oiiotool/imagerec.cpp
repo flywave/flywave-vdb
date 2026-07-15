@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <cmath>
@@ -12,15 +12,16 @@
 #include <utility>
 #include <vector>
 
+#include "oiiotool.h"
+
 #include <OpenImageIO/argparse.h>
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/filter.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
+#include <OpenImageIO/imagecache.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/thread.h>
-
-#include "oiiotool.h"
 
 using namespace OIIO;
 using namespace OiioTool;
@@ -59,12 +60,24 @@ ImageRec::ImageRec(ImageRec& img, int subimage_to_copy, int miplevel_to_copy,
     , m_imagecache(img.m_imagecache)
 {
     img.read();
-    int first_subimage = std::max(0, subimage_to_copy);
+    if (subimage_to_copy >= img.subimages()) {
+        errorfmt("Selecting subimage {}, but there are only {} subimages",
+                 subimage_to_copy, img.subimages());
+        subimage_to_copy = img.subimages() - 1;
+    }
+    int first_subimage = clamp(subimage_to_copy, 0, img.subimages() - 1);
     int subimages      = (subimage_to_copy < 0) ? img.subimages() : 1;
     m_subimages.resize(subimages);
     for (int s = 0; s < subimages; ++s) {
-        int srcsub         = s + first_subimage;
-        int first_miplevel = std::max(0, miplevel_to_copy);
+        int srcsub = s + first_subimage;
+        if (miplevel_to_copy >= img.miplevels(srcsub)) {
+            errorfmt(
+                "Selecting MIP level {} of subimage {}, which has only {} MIP levels",
+                miplevel_to_copy, srcsub, img.miplevels(srcsub));
+            miplevel_to_copy = img.miplevels(srcsub) - 1;
+        }
+        int first_miplevel = clamp(miplevel_to_copy, 0,
+                                   img.miplevels(srcsub) - 1);
         int miplevels      = (miplevel_to_copy < 0) ? img.miplevels(srcsub) : 1;
         m_subimages[s].m_miplevels.resize(miplevels);
         m_subimages[s].m_specs.resize(miplevels);
@@ -81,7 +94,7 @@ ImageRec::ImageRec(ImageRec& img, int subimage_to_copy, int miplevel_to_copy,
             } else {
                 // The other image is not modified, and we don't need to be
                 // writable, either.
-                ib      = new ImageBuf(img.name(), srcib.imagecache());
+                ib      = new ImageBuf(img.name(), 0, 0, srcib.imagecache());
                 bool ok = ib->read(srcsub, srcmip, false /*force*/,
                                    img.m_input_dataformat /*convert*/);
                 OIIO_ASSERT(ok);
@@ -102,9 +115,9 @@ ImageRec::ImageRec(ImageRec& A, ImageRec& B, int subimage_to_copy,
 {
     A.read();
     B.read();
-    int subimages = (subimage_to_copy < 0)
-                        ? std::min(A.subimages(), B.subimages())
-                        : 1;
+    int subimages      = (subimage_to_copy < 0)
+                             ? std::min(A.subimages(), B.subimages())
+                             : 1;
     int first_subimage = clamp(subimage_to_copy, 0, subimages - 1);
     m_subimages.resize(subimages);
     for (int s = 0; s < subimages; ++s) {
@@ -169,7 +182,7 @@ ImageRec::ImageRec(ImageBufRef img, bool copy_pixels)
 
 
 ImageRec::ImageRec(const std::string& name, const ImageSpec& spec,
-                   ImageCache* imagecache)
+                   std::shared_ptr<ImageCache> imagecache)
     : m_name(name)
     , m_elaborated(true)
     , m_pixels_modified(true)
@@ -205,7 +218,7 @@ ImageRec::read_nativespec()
     ustring uname(name());
     if (!m_imagecache->get_image_info(uname, 0, 0, u_subimages, TypeInt,
                                       &subimages)) {
-        errorf("file not found: \"%s\"", name());
+        errorfmt("file not found: \"{}\"", name());
         return false;  // Image not found
     }
     m_subimages.resize(subimages);
@@ -222,7 +235,7 @@ ImageRec::read_nativespec()
                 new ImageBuf(name(), s, m, m_imagecache, m_configspec.get()));
             bool ok = ib->init_spec(name(), s, m);
             if (!ok)
-                errorf("%s", ib->geterror());
+                errorfmt("{}", ib->geterror());
             allok &= ok;
             m_subimages[s].m_miplevels[m] = ib;
             m_subimages[s].m_specs[m]     = ib->spec();
@@ -244,11 +257,12 @@ ImageRec::read(ReadPolicy readpolicy, string_view channel_set)
     ustring uname(name());
     if (!m_imagecache->get_image_info(uname, 0, 0, u_subimages, TypeInt,
                                       &subimages)) {
-        errorf("file not found: \"%s\"", name());
+        errorfmt("file not found: \"{}\"", name());
         return false;  // Image not found
     }
     m_subimages.resize(subimages);
     bool allok = true;
+    ErrorHandler eh;
     for (int s = 0; s < subimages; ++s) {
         int miplevels = 0;
         m_imagecache->get_image_info(uname, s, 0, u_miplevels, TypeInt,
@@ -268,9 +282,11 @@ ImageRec::read(ReadPolicy readpolicy, string_view channel_set)
             // relying on the cache to read their frames on demand rather
             // than reading the whole movie up front, even though each frame
             // individually would be well below the threshold.
-            imagesize_t imgbytes
-                = m_imagecache->imagespec(uname, s, m)->image_bytes();
-            bool forceread = (s == 0 && m == 0
+            ImageSpec spec;
+            m_imagecache->get_imagespec(uname, spec, s);
+            m_imagecache->get_cache_dimensions(uname, spec, s, m);
+            imagesize_t imgbytes = spec.image_bytes();
+            bool forceread       = (s == 0 && m == 0
                               && imgbytes * subimages < 50 * 1024 * 1024);
             ImageBufRef ib(
                 new ImageBuf(name(), s, m, m_imagecache, configspec()));
@@ -279,11 +295,13 @@ ImageRec::read(ReadPolicy readpolicy, string_view channel_set)
             std::vector<std::string> newchannelnames;
             std::vector<int> channel_set_channels;
             std::vector<float> channel_set_values;
+            int new_alpha_channel = -1;
+            int new_z_channel     = -1;
             int chbegin = 0, chend = -1;
             if (channel_set.size()) {
                 decode_channel_set(ib->nativespec(), channel_set,
                                    newchannelnames, channel_set_channels,
-                                   channel_set_values);
+                                   channel_set_values, eh);
                 for (size_t c = 0, e = channel_set_channels.size(); c < e;
                      ++c) {
                     if (channel_set_channels[c] < 0)
@@ -292,6 +310,10 @@ ImageRec::read(ReadPolicy readpolicy, string_view channel_set)
                              && channel_set_channels[c]
                                     != channel_set_channels[c - 1] + 1)
                         post_channel_set_action = true;  // non-consecutive chans
+                    if (channel_set_channels[c] == ib->spec().alpha_channel)
+                        new_alpha_channel = c;
+                    if (channel_set_channels[c] == ib->spec().z_channel)
+                        new_z_channel = c;
                 }
                 if (ib->deep())
                     post_channel_set_action = true;
@@ -313,8 +335,16 @@ ImageRec::read(ReadPolicy readpolicy, string_view channel_set)
                 if (m_input_dataformat != ib->nativespec().format)
                     m_subimages[s].m_was_direct_read = false;
                 forceread = true;
-            } else if (readpolicy & ReadNative)
-                convert = ib->nativespec().format;
+            } else if (readpolicy & ReadNative) {
+                if (channel_set.size()) {
+                    convert = TypeUnknown;
+                    for (int c = chbegin; c < chend; ++c)
+                        convert = TypeDesc::basetype_merge(
+                            convert, ib->nativespec().channelformat(c));
+                } else {
+                    convert = ib->nativespec().format;
+                }
+            }
             if (!forceread && convert != TypeDesc::UINT8
                 && convert != TypeDesc::UINT16 && convert != TypeDesc::HALF
                 && convert != TypeDesc::FLOAT) {
@@ -325,16 +355,21 @@ ImageRec::read(ReadPolicy readpolicy, string_view channel_set)
 
             bool ok = ib->read(s, m, chbegin, chend, forceread, convert);
             if (ok && post_channel_set_action) {
-                ImageBufRef allchan_buf;
+                ImageBufRef allchan_buf(new ImageBuf);
                 std::swap(allchan_buf, ib);
                 ok = ImageBufAlgo::channels(*ib, *allchan_buf,
                                             (int)channel_set_channels.size(),
-                                            &channel_set_channels[0],
-                                            &channel_set_values[0],
-                                            &newchannelnames[0], false);
+                                            channel_set_channels,
+                                            channel_set_values, newchannelnames,
+                                            false);
             }
             if (!ok)
-                errorf("%s", ib->geterror());
+                errorfmt("{}", ib->geterror());
+            if (channel_set.size()) {
+                // Adjust the spec to reflect the new channel set
+                ib->specmod().alpha_channel = new_alpha_channel;
+                ib->specmod().z_channel     = new_z_channel;
+            }
 
             allok &= ok;
             // Remove any existing SHA-1 hash from the spec.
@@ -400,5 +435,5 @@ ImageRec::append_error(string_view message) const
         && "Accumulated error messages > 16MB. Try checking return codes!");
     if (m_err.size() && m_err[m_err.size() - 1] != '\n')
         m_err += '\n';
-    m_err += message;
+    m_err += std::string(message);
 }

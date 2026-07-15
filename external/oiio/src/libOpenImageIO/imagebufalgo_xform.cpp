@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 /// \file
 /// ImageBufAlgo functions for filtered transformations
@@ -8,6 +8,8 @@
 
 #include <cmath>
 #include <memory>
+
+#include <OpenImageIO/Imath.h>
 
 #include "imageio_pvt.h"
 #include <OpenImageIO/dassert.h>
@@ -17,16 +19,123 @@
 #include <OpenImageIO/imagebufalgo_util.h>
 #include <OpenImageIO/thread.h>
 
-#if OIIO_USING_IMATH >= 3
-#    include <Imath/ImathBox.h>
-#else
-#    include <OpenEXR/ImathBox.h>
-#endif
+#include <Imath/ImathBox.h>
 
 OIIO_NAMESPACE_BEGIN
 
 
 namespace {
+
+static const ustring edgeclamp_us("edgeclamp");
+static const ustring exact_us("exact");
+static const ustring fillmode_us("fillmode");
+static const ustring filtername_us("filtername");
+static const ustring filterptr_us("filterptr");
+static const ustring filterwidth_us("filterwidth");
+static const ustring recompute_roi_us("recompute_roi");
+static const ustring wrap_us("wrap");
+
+
+#if 0
+// I'm not sure if I want to keep this and/or make it public. Just let it
+// sit here for a while.
+
+/// Helper class that is used for passing filtering options to IBA functions.
+/// A `FilterOpt` may specify filtering options one of several ways:
+///
+/// * Default constructor / empty FilterOpt: The IBA function will pick a
+///   reasonable default filter.
+/// * Filter name and width: Use the named filter with the given width.
+/// * Filter name only: Use the named filter with that filter's default width.
+/// * shared_ptr<Filter2D>: Use the filter object directly with shared
+///   ownership.
+/// * Raw `const Filter2D*` pointer: Use the filter object directly, and
+///   it is owned by the caller (i.e., nothing in FilterOpt nor the IBA
+///   function will free it).
+///
+class FilterOpt {
+public:
+    using shared_filter = std::shared_ptr<const Filter2D>;
+
+    std::string name;    ///< Name of the filter to use.
+    float width = 0.0f;  ///< Width of the filter (0 = default width).
+
+    /// Default constructor
+    FilterOpt() = default;
+
+    /// Copy constructor
+    FilterOpt(const FilterOpt& f) = default;
+
+    /// Construct from a filter name and optional width. If the width is not
+    /// supplied, the default width for that filter will be used.
+    FilterOpt(string_view name, float width = 0.0f)
+        : name(name), width(width) {}
+
+    /// Construct from a shared_ptr to a Filter2D object.
+    FilterOpt(shared_filter& filter)
+        : m_filter(filter) {}
+
+    /// Construct from a pointer to a caller-owned Filter2D.
+    FilterOpt(const Filter2D* filter)
+        : m_filter(shared_filter(filter, [](const Filter2D*){ })) {}
+    // Note: this works by constructing a shared_ptr with a custom deleter
+    // that does nothing.
+
+    /// Retrieve a shared_ptr holding the Filter2D.
+    const shared_filter& filter() const { return m_filter; }
+    /// Retrieve a raw pointer to the Filter2D, or nullptr if none has been
+    /// assigned.
+    const Filter2D* filterptr() const { return m_filter.get(); }
+
+    FilterOpt& operator= (const FilterOpt& f) = default;
+
+    // Helper: Fill in the additional fields: If name and width were
+    // specified, set up the actual Filter2D; if the Filter2D was supplied,
+    // make sure the name and width are set. If none were set, use the
+    // defaults passed (or, if none is passed, pick a reasonable default).
+    // Return true for success, false for error (such as unknown filter name).
+    OIIO_API bool resolve(string_view default_filtername = "",
+                          float default_width = 0.0f);
+
+private:
+    shared_filter m_filter;  ///< Shared ptr to Filter2D
+};
+
+
+
+bool
+FilterOpt::resolve(string_view default_filtername, float default_width)
+{
+    if (m_filter) {
+        // If the filter was specified, make sure the name+width match.
+        name  = m_filter->name();
+        width = m_filter->width();
+    } else {
+        // No filter was specfied. Get one.
+        if (name.empty()) {
+            // If no name was specified, use the default filtername as passed,
+            // or blackman-harris is a good all-purpose guess.
+            if (default_filtername.empty())
+                name = "blackman-harris";
+            else
+                name = default_filtername;
+            width = default_width;
+        }
+        // Look for a matching filter name. Use its preferred width if none
+        // was specified by the user.
+        for (int i = 0, e = Filter2D::num_filters(); i < e; ++i) {
+            const FilterDesc& fd(Filter2D::get_filterdesc(i));
+            if (fd.name == name) {
+                float w  = width > 0.0f ? width : fd.width;
+                m_filter = Filter2D::create_shared(name, w, w);
+                break;
+            }
+        }
+    }
+    return filterptr() ? true : false;
+}
+#endif
+
 
 // Define a templated Accumulator type that's float, except in the case
 // of double input, in which case it's double.
@@ -118,7 +227,7 @@ robust_multVecMatrix(const Imath::M33f& M, const Dual2& x, const Dual2& y,
 
 
 // Transform an ROI by an affine matrix.
-ROI
+static ROI
 transform(const Imath::M33f& M, ROI roi)
 {
     Imath::V2f ul(roi.xbegin + 0.5f, roi.ybegin + 0.5f);
@@ -177,6 +286,15 @@ filtered_sample(const ImageBuf& src, float s, float t, float dsdx, float dtdx,
         tmin = clamp(tmin, src.ybegin(), src.yend());
         tmax = clamp(tmax, src.ybegin(), src.yend());
         // wrap = ImageBuf::WrapClamp;
+        if (s < src.xbegin() - 1 || s >= src.xend() || t < src.ybegin() - 1
+            || t >= src.yend()) {
+            // Also, when edgeclamp is true, to further reduce ringing that
+            // shows up outside the image boundary, always be black when
+            // sampling more than one pixel from the source edge.
+            for (int c = 0, nc = src.nchannels(); c < nc; ++c)
+                result[c] = 0.0f;
+            return;
+        }
     }
     ImageBuf::ConstIterator<SRCTYPE> samp(src, smin, smax, tmin, tmax, 0, 1,
                                           wrap);
@@ -200,6 +318,30 @@ filtered_sample(const ImageBuf& src, float s, float t, float dsdx, float dtdx,
 }
 
 }  // namespace
+
+
+
+static std::shared_ptr<const Filter2D>
+get_warp_filter(string_view filtername_, float filterwidth, ImageBuf& dst)
+{
+    // Set up a shared pointer with custom deleter to make sure any
+    // filter we allocate here is properly destroyed.
+    Filter2D::ref filter((Filter2D*)nullptr, Filter2D::destroy);
+    std::string filtername = filtername_.size() ? filtername_ : "lanczos3";
+    for (int i = 0, e = Filter2D::num_filters(); i < e; ++i) {
+        FilterDesc fd;
+        Filter2D::get_filterdesc(i, &fd);
+        if (fd.name == filtername) {
+            float w = filterwidth > 0.0f ? filterwidth : fd.width;
+            filter.reset(Filter2D::create(filtername, w, w));
+            break;
+        }
+    }
+    if (!filter) {
+        dst.errorfmt("Filter \"{}\" not recognized", filtername);
+    }
+    return filter;
+}
 
 
 
@@ -243,9 +385,9 @@ warp_impl(ImageBuf& dst, const ImageBuf& src, const Imath::M33f& M,
         dst_roi      = roi.defined() ? roi : dst.roi();
         dst_roi_full = dst.roi_full();
     } else {
-        dst_roi = roi.defined()
-                      ? roi
-                      : (recompute_roi ? transform(M, src.roi()) : src.roi());
+        dst_roi      = roi.defined()
+                           ? roi
+                           : (recompute_roi ? transform(M, src.roi()) : src.roi());
         dst_roi_full = src_roi_full;
     }
     dst_roi.chend      = std::min(dst_roi.chend, src.nchannels());
@@ -258,7 +400,7 @@ warp_impl(ImageBuf& dst, const ImageBuf& src, const Imath::M33f& M,
     // filter we allocate here is properly destroyed.
     std::shared_ptr<Filter2D> filterptr((Filter2D*)NULL, Filter2D::destroy);
     if (filter == NULL) {
-        // If no filter was provided, punt and just linearly interpolate.
+        // If no filter was provided, punt and use lanczos3
         filterptr.reset(Filter2D::create("lanczos3", 6.0f, 6.0f));
         filter = filterptr.get();
     }
@@ -272,51 +414,138 @@ warp_impl(ImageBuf& dst, const ImageBuf& src, const Imath::M33f& M,
 
 
 
-bool
-ImageBufAlgo::warp(ImageBuf& dst, const ImageBuf& src, const Imath::M33f& M,
-                   const Filter2D* filter, bool recompute_roi,
-                   ImageBuf::WrapMode wrap, ROI roi, int nthreads)
+// Is the PV `option` in the `recognized` list? If so, return true.
+// Is it in the `obsolete` list? If so, return false.
+// Is it in neither? Return false.
+static bool
+IBA_find_optional(const ParamValue& option, cspan<ustring> recognized,
+                  cspan<ustring> obsolete = {})
 {
-    return warp_impl(dst, src, M, filter, recompute_roi, wrap,
-                     false /*edgeclamp*/, roi, nthreads);
+    for (auto&& r : recognized)
+        if (option.name() == r)
+            return true;
+    for (auto&& o : obsolete)
+        if (option.name() == o)
+            return false;
+    return false;
+}
+
+
+
+// Given list of `options`, check if any are unrecognized or obsolete.
+// Return true if all are fine, false if not.
+static bool
+IBA_check_optional(ImageBufAlgo::KWArgs options, cspan<ustring> recognized,
+                   cspan<ustring> obsolete = {})
+{
+    bool ok = true;
+    for (auto&& pv : options) {
+        ok &= IBA_find_optional(pv, recognized, obsolete);
+    }
+    return ok;
+}
+
+
+
+// Extract filterptr from the options of it exists
+inline Filter2D::ref
+get_filterptr_option(ImageBufAlgo::KWArgs options)
+{
+    Filter2D::ref filterptr;
+    auto f = options.find(filterptr_us, TypePointer);
+    if (f != options.end())
+        filterptr = Filter2D::ref(f->get<const Filter2D*>(),
+                                  Filter2D::no_destroy);
+    return filterptr;
 }
 
 
 
 bool
-ImageBufAlgo::warp(ImageBuf& dst, const ImageBuf& src, const Imath::M33f& M,
-                   string_view filtername_, float filterwidth,
-                   bool recompute_roi, ImageBuf::WrapMode wrap, ROI roi,
-                   int nthreads)
+ImageBufAlgo::warp(ImageBuf& dst, const ImageBuf& src, M33fParam M,
+                   KWArgs options, ROI roi, int nthreads)
 {
-    // Set up a shared pointer with custom deleter to make sure any
-    // filter we allocate here is properly destroyed.
-    std::shared_ptr<Filter2D> filter((Filter2D*)NULL, Filter2D::destroy);
-    std::string filtername = filtername_.size() ? filtername_ : "lanczos3";
-    for (int i = 0, e = Filter2D::num_filters(); i < e; ++i) {
-        FilterDesc fd;
-        Filter2D::get_filterdesc(i, &fd);
-        if (fd.name == filtername) {
-            float w = filterwidth > 0.0f ? filterwidth : fd.width;
-            float h = filterwidth > 0.0f ? filterwidth : fd.width;
-            filter.reset(Filter2D::create(filtername, w, h));
-            break;
-        }
+    static const ustring recognized[] = { filtername_us,    filterwidth_us,
+                                          wrap_us,          edgeclamp_us,
+                                          recompute_roi_us, filterptr_us };
+    IBA_check_optional(options, recognized);
+
+    Filter2D::ref filterptr = get_filterptr_option(options);
+    if (!filterptr) {
+        filterptr = get_warp_filter(options.get_string(filtername_us),
+                                    options.get_float(filterwidth_us), dst);
+        if (!filterptr)
+            return false;  // error issued in get_warp_filter
     }
-    if (!filter) {
-        dst.errorfmt("Filter \"{}\" not recognized", filtername);
+    if (!filterptr) {
+        dst.errorfmt("Invalid filter");
         return false;
     }
 
-    return warp(dst, src, M, filter.get(), recompute_roi, wrap, roi, nthreads);
+    ImageBuf::WrapMode wrap = ImageBuf::WrapMode::WrapDefault;
+    auto wrapparam          = options.find(wrap_us);
+    if (wrapparam != options.end()) {
+        if (wrapparam->type() == TypeString)
+            wrap = ImageBuf::WrapMode_from_string(wrapparam->get_ustring());
+        else
+            wrap = (ImageBuf::WrapMode)wrapparam->get_int();
+    }
+    bool recompute_roi = options.get_int(recompute_roi_us, 0);
+    bool edgeclamp     = options.get_int(edgeclamp_us, 0);
+
+    return warp_impl(dst, src, M, filterptr.get(), recompute_roi, wrap,
+                     edgeclamp, roi, nthreads);
 }
 
 
 
 ImageBuf
-ImageBufAlgo::warp(const ImageBuf& src, const Imath::M33f& M,
+ImageBufAlgo::warp(const ImageBuf& src, M33fParam M, KWArgs options, ROI roi,
+                   int nthreads)
+{
+    ImageBuf result;
+    bool ok = warp(result, src, M, options, roi, nthreads);
+    if (!ok && !result.has_error())
+        result.errorfmt("ImageBufAlgo::warp() error");
+    return result;
+}
+
+
+
+bool
+ImageBufAlgo::warp(ImageBuf& dst, const ImageBuf& src, M33fParam M,
                    const Filter2D* filter, bool recompute_roi,
                    ImageBuf::WrapMode wrap, ROI roi, int nthreads)
+{
+    return warp(dst, src, M,
+                { make_pv(filterptr_us, filter),
+                  { recompute_roi_us, int(recompute_roi) },
+                  { wrap_us, int(wrap) } },
+                roi, nthreads);
+}
+
+
+
+bool
+ImageBufAlgo::warp(ImageBuf& dst, const ImageBuf& src, M33fParam M,
+                   string_view filtername, float filterwidth,
+                   bool recompute_roi, ImageBuf::WrapMode wrap, ROI roi,
+                   int nthreads)
+{
+    return warp(dst, src, M,
+                { { filtername_us, filtername },
+                  { filterwidth_us, filterwidth },
+                  { recompute_roi_us, int(recompute_roi) },
+                  { wrap_us, int(wrap) } },
+                roi, nthreads);
+}
+
+
+
+ImageBuf
+ImageBufAlgo::warp(const ImageBuf& src, M33fParam M, const Filter2D* filter,
+                   bool recompute_roi, ImageBuf::WrapMode wrap, ROI roi,
+                   int nthreads)
 {
     ImageBuf result;
     bool ok = warp(result, src, M, filter, recompute_roi, wrap, roi, nthreads);
@@ -328,10 +557,9 @@ ImageBufAlgo::warp(const ImageBuf& src, const Imath::M33f& M,
 
 
 ImageBuf
-ImageBufAlgo::warp(const ImageBuf& src, const Imath::M33f& M,
-                   string_view filtername, float filterwidth,
-                   bool recompute_roi, ImageBuf::WrapMode wrap, ROI roi,
-                   int nthreads)
+ImageBufAlgo::warp(const ImageBuf& src, M33fParam M, string_view filtername,
+                   float filterwidth, bool recompute_roi,
+                   ImageBuf::WrapMode wrap, ROI roi, int nthreads)
 {
     ImageBuf result;
     bool ok = warp(result, src, M, filtername, filterwidth, recompute_roi, wrap,
@@ -361,7 +589,7 @@ ImageBufAlgo::rotate(ImageBuf& dst, const ImageBuf& src, float angle,
 
 template<typename DSTTYPE, typename SRCTYPE>
 static bool
-resize_(ImageBuf& dst, const ImageBuf& src, Filter2D* filter, ROI roi,
+resize_(ImageBuf& dst, const ImageBuf& src, const Filter2D* filter, ROI roi,
         int nthreads)
 {
     ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
@@ -448,9 +676,10 @@ resize_(ImageBuf& dst, const ImageBuf& src, Filter2D* filter, ROI roi,
         // Special case: src and dst are local memory, float buffers, and we're
         // operating on all channels, <= 4.
         bool special
-            = ((is_same<DSTTYPE, float>::value || is_same<DSTTYPE, half>::value)
-               && (is_same<SRCTYPE, float>::value
-                   || is_same<SRCTYPE, half>::value)
+            = ((std::is_same<DSTTYPE, float>::value
+                || std::is_same<DSTTYPE, half>::value)
+               && (std::is_same<SRCTYPE, float>::value
+                   || std::is_same<SRCTYPE, half>::value)
                // && dst.localpixels() // has to be, because it's writable
                && src.localpixels()
                // && R.contains_roi(roi)  // has to be, because IBAPrep
@@ -599,7 +828,7 @@ get_resize_filter(string_view filtername, float fwidth, ImageBuf& dst,
 {
     // Set up a shared pointer with custom deleter to make sure any
     // filter we allocate here is properly destroyed.
-    std::shared_ptr<Filter2D> filter((Filter2D*)nullptr, Filter2D::destroy);
+    std::shared_ptr<Filter2D> filter;
     if (filtername.empty()) {
         // No filter name supplied -- pick a good default
         if (wratio > 1.0f || hratio > 1.0f)
@@ -628,98 +857,99 @@ get_resize_filter(string_view filtername, float fwidth, ImageBuf& dst,
 
 
 bool
-ImageBufAlgo::resize(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
+ImageBufAlgo::resize(ImageBuf& dst, const ImageBuf& src, KWArgs options,
                      ROI roi, int nthreads)
 {
     pvt::LoggedTimer logtime("IBA::resize");
-    if (!IBAprep(roi, &dst, &src,
-                 IBAprep_NO_SUPPORT_VOLUME | IBAprep_NO_COPY_ROI_FULL))
-        return false;
 
-    // Set up a shared pointer with custom deleter to make sure any
-    // filter we allocate here is properly destroyed.
-    std::shared_ptr<Filter2D> filterptr((Filter2D*)NULL, Filter2D::destroy);
-    if (!filter) {
-        // If no filter was provided, punt and just linearly interpolate.
-        const ImageSpec& srcspec(src.spec());
-        const ImageSpec& dstspec(dst.spec());
-        float wratio = float(dstspec.full_width) / float(srcspec.full_width);
-        float hratio = float(dstspec.full_height) / float(srcspec.full_height);
-        float w      = 2.0f * std::max(1.0f, wratio);
-        float h      = 2.0f * std::max(1.0f, hratio);
-        filter       = Filter2D::create("triangle", w, h);
-        filterptr.reset(filter);
-    }
+    static const ustring recognized[] = {
+        filtername_us,
+        filterwidth_us,
+        filterptr_us,
+#if 0 /* Not currently recognized */
+        wrap_us,
+        edgeclamp_us,
+        recompute_roi_us,
+#endif
+    };
+    IBA_check_optional(options, recognized);
 
-    bool ok;
-    OIIO_DISPATCH_COMMON_TYPES2(ok, "resize", resize_, dst.spec().format,
-                                src.spec().format, dst, src, filter, roi,
-                                nthreads);
-    return ok;
-}
-
-
-
-bool
-ImageBufAlgo::resize(ImageBuf& dst, const ImageBuf& src, string_view filtername,
-                     float fwidth, ROI roi, int nthreads)
-{
-    pvt::LoggedTimer logtime("IBA::resize");
     if (!IBAprep(roi, &dst, &src,
                  IBAprep_NO_SUPPORT_VOLUME | IBAprep_NO_COPY_ROI_FULL))
         return false;
     const ImageSpec& srcspec(src.spec());
     const ImageSpec& dstspec(dst.spec());
 
-    // Resize ratios
-    float wratio = float(dstspec.full_width) / float(srcspec.full_width);
-    float hratio = float(dstspec.full_height) / float(srcspec.full_height);
+    Filter2D::ref filterptr = get_filterptr_option(options);
+    if (!filterptr) {
+        // Resize ratios
+        float wratio = float(dstspec.full_width) / float(srcspec.full_width);
+        float hratio = float(dstspec.full_height) / float(srcspec.full_height);
+        filterptr    = get_resize_filter(options.get_string(filtername_us),
+                                         options.get_float(filterwidth_us), dst,
+                                         wratio, hratio);
+        if (!filterptr)
+            return false;  // error issued in get_resize_filter
+    }
 
-    // Set up a shared pointer with custom deleter to make sure any
-    // filter we allocate here is properly destroyed.
-    auto filter = get_resize_filter(filtername, fwidth, dst, wratio, hratio);
-    if (!filter)
-        return false;  // error issued in get_resize_filter
+#if 0 /* These aren't currently reconized */
+    ImageBuf::WrapMode wrap = ImageBuf::WrapMode::WrapDefault;
+    auto wrapparam          = options.find(wrap_us);
+    if (wrapparam != options.end()) {
+        if (wrapparam->type() == TypeString)
+            wrap = ImageBuf::WrapMode_from_string(wrapparam->get_ustring());
+        else
+            wrap = (ImageBuf::WrapMode)wrapparam->get_int();
+    }
+    bool recompute_roi = options.get_int(recompute_roi_us, 0);
+    bool edgeclamp     = options.get_int(edgeclamp_us, 0);
+#endif
 
-    logtime.stop();  // it will be picked up again by the next call...
-    return resize(dst, src, filter.get(), roi, nthreads);
+    bool ok;
+    OIIO_DISPATCH_COMMON_TYPES2(ok, "resize", resize_, dst.spec().format,
+                                src.spec().format, dst, src, filterptr.get(),
+                                roi, nthreads);
+    return ok;
 }
 
 
 
 ImageBuf
-ImageBufAlgo::resize(const ImageBuf& src, Filter2D* filter, ROI roi,
-                     int nthreads)
+ImageBufAlgo::resize(const ImageBuf& src, KWArgs options, ROI roi, int nthreads)
 {
     ImageBuf result;
-    bool ok = resize(result, src, filter, roi, nthreads);
+    bool ok = resize(result, src, options, roi, nthreads);
     if (!ok && !result.has_error())
         result.errorfmt("ImageBufAlgo::resize() error");
     return result;
 }
-
-
-ImageBuf
-ImageBufAlgo::resize(const ImageBuf& src, string_view filtername,
-                     float filterwidth, ROI roi, int nthreads)
-{
-    ImageBuf result;
-    bool ok = resize(result, src, filtername, filterwidth, roi, nthreads);
-    if (!ok && !result.has_error())
-        result.errorfmt("ImageBufAlgo::resize() error");
-    return result;
-}
-
 
 
 bool
-ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
-                  string_view fillmode, bool exact, ROI roi, int nthreads)
+ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, KWArgs options, ROI roi,
+                  int nthreads)
 {
+    pvt::LoggedTimer logtime("IBA::fit");
+
+    static const ustring recognized[] = {
+        filtername_us,
+        filterwidth_us,
+        filterptr_us,
+        fillmode_us,
+        exact_us,
+#if 0 /* Not currently recognized */
+        wrap_us,
+        edgeclamp_us,
+#endif
+    };
+    IBA_check_optional(options, recognized);
     // No time logging, it will be accounted in the underlying warp/resize
     if (!IBAprep(roi, &dst, &src,
                  IBAprep_NO_SUPPORT_VOLUME | IBAprep_NO_COPY_ROI_FULL))
         return false;
+
+    string_view fillmode = options.get_string(fillmode_us, "letterbox");
+    int exact            = options.get_int(exact_us);
 
     const ImageSpec& srcspec(src.spec());
 
@@ -767,17 +997,16 @@ ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
     //           << " into " << newroi << "\n";
     // std::cout << "  Fit scale factor " << scale << "\n";
 
-    // Set up a shared pointer with custom deleter to make sure any
-    // filter we allocate here is properly destroyed.
-    std::shared_ptr<Filter2D> filterptr((Filter2D*)NULL, Filter2D::destroy);
-    if (!filter) {
+    Filter2D::ref filterptr = get_filterptr_option(options);
+    if (!filterptr) {
         // If no filter was provided, punt and just linearly interpolate.
         float wratio = float(resize_full_width) / float(srcspec.full_width);
         float hratio = float(resize_full_height) / float(srcspec.full_height);
-        float w      = 2.0f * std::max(1.0f, wratio);
-        float h      = 2.0f * std::max(1.0f, hratio);
-        filter       = Filter2D::create("triangle", w, h);
-        filterptr.reset(filter);
+        filterptr    = get_resize_filter(options.get_string(filtername_us),
+                                         options.get_float(filterwidth_us), dst,
+                                         wratio, hratio);
+        if (!filterptr)
+            return false;  // error issued in get_resize_filter
     }
 
     bool ok = true;
@@ -793,7 +1022,8 @@ ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
         newspec.set_roi_full(newroi);
         dst.reset(newspec);
         ImageBuf::WrapMode wrap = ImageBuf::WrapMode_from_string("black");
-        ok &= warp_impl(dst, src, M, filter, false, wrap, true, {}, nthreads);
+        ok &= warp_impl(dst, src, M, filterptr.get(), /*recompute_roi*/ false,
+                        wrap, /*edgeclamp*/ true, /*roi*/ {}, nthreads);
     } else {
         // Full pixel resize -- gives the sharpest result, but for odd-sized
         // destination resolution, may not be exactly centered and will only
@@ -808,7 +1038,11 @@ ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
             newspec.set_roi(resizeroi);
             newspec.set_roi_full(resizeroi);
             dst.reset(newspec);
-            ok &= ImageBufAlgo::resize(dst, src, filter, resizeroi, nthreads);
+            logtime.stop();  // it will be picked up again by the next call...
+            const Filter2D* filterraw = filterptr.get();
+            ok &= ImageBufAlgo::resize(dst, src,
+                                       { make_pv(filterptr_us, filterraw) },
+                                       resizeroi, nthreads);
         } else {
             ok &= dst.copy(src);  // no resize is necessary
         }
@@ -824,88 +1058,14 @@ ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
 
 
 
-bool
-ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, string_view filtername,
-                  float fwidth, string_view fillmode, bool exact, ROI roi,
-                  int nthreads)
-{
-    pvt::LoggedTimer logtime("IBA::fit");
-    if (!IBAprep(roi, &dst, &src,
-                 IBAprep_NO_SUPPORT_VOLUME | IBAprep_NO_COPY_ROI_FULL))
-        return false;
-    const ImageSpec& srcspec(src.spec());
-    const ImageSpec& dstspec(dst.spec());
-    // Resize ratios
-    float wratio = float(dstspec.full_width) / float(srcspec.full_width);
-    float hratio = float(dstspec.full_height) / float(srcspec.full_height);
-
-    // Set up a shared pointer with custom deleter to make sure any
-    // filter we allocate here is properly destroyed.
-    auto filter = get_resize_filter(filtername, fwidth, dst, wratio, hratio);
-    if (!filter)
-        return false;  // error issued in get_resize_filter
-
-    logtime.stop();  // it will be picked up again by the next call...
-    return fit(dst, src, filter.get(), fillmode, exact, roi, nthreads);
-}
-
-
-
 ImageBuf
-ImageBufAlgo::fit(const ImageBuf& src, Filter2D* filter, string_view fillmode,
-                  bool exact, ROI roi, int nthreads)
+ImageBufAlgo::fit(const ImageBuf& src, KWArgs options, ROI roi, int nthreads)
 {
     ImageBuf result;
-    bool ok = fit(result, src, filter, fillmode, exact, roi, nthreads);
+    bool ok = fit(result, src, options, roi, nthreads);
     if (!ok && !result.has_error())
         result.errorfmt("ImageBufAlgo::fit() error");
     return result;
-}
-
-
-ImageBuf
-ImageBufAlgo::fit(const ImageBuf& src, string_view filtername,
-                  float filterwidth, string_view fillmode, bool exact, ROI roi,
-                  int nthreads)
-{
-    ImageBuf result;
-    bool ok = fit(result, src, filtername, filterwidth, fillmode, exact, roi,
-                  nthreads);
-    if (!ok && !result.has_error())
-        result.errorfmt("ImageBufAlgo::fit() error");
-    return result;
-}
-
-
-
-// DEPRECATED(2.3) versions without the "mode" parameter
-ImageBuf
-ImageBufAlgo::fit(const ImageBuf& src, string_view filtername,
-                  float filterwidth, bool exact, ROI roi, int nthreads)
-{
-    return fit(src, filtername, filterwidth, "letterbox", exact, roi, nthreads);
-}
-
-ImageBuf
-ImageBufAlgo::fit(const ImageBuf& src, Filter2D* filter, bool exact, ROI roi,
-                  int nthreads)
-{
-    return fit(src, filter, "letterbox", exact, roi, nthreads);
-}
-
-bool
-ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, string_view filtername,
-                  float filterwidth, bool exact, ROI roi, int nthreads)
-{
-    return fit(dst, src, filtername, filterwidth, "letterbox", exact, roi,
-               nthreads);
-}
-
-bool
-ImageBufAlgo::fit(ImageBuf& dst, const ImageBuf& src, Filter2D* filter,
-                  bool exact, ROI roi, int nthreads)
-{
-    return fit(dst, src, filter, "letterbox", exact, roi, nthreads);
 }
 
 
@@ -934,7 +1094,7 @@ resample_(ImageBuf& dst, const ImageBuf& src, bool interpolate, ROI roi,
         float dstfh          = dstspec.full_height;
         float dstpixelwidth  = 1.0f / dstfw;
         float dstpixelheight = 1.0f / dstfh;
-        float* pel           = OIIO_ALLOCA(float, nchannels);
+        span<float> pel      = OIIO_ALLOCA_SPAN(float, nchannels);
 
         ImageBuf::Iterator<DSTTYPE> out(dst, roi);
         ImageBuf::ConstIterator<SRCTYPE> srcpel(src);
@@ -1051,9 +1211,12 @@ ImageBufAlgo::rotate(ImageBuf& dst, const ImageBuf& src, float angle,
     M.translate(Imath::V2f(-center_x, -center_y));
     M.rotate(angle);
     M *= Imath::M33f().translate(Imath::V2f(center_x, center_y));
-    return ImageBufAlgo::warp(dst, src, M, filtername, filterwidth,
-                              recompute_roi, ImageBuf::WrapBlack, roi,
-                              nthreads);
+    return ImageBufAlgo::warp(dst, src, M,
+                              { { "filtername", filtername },
+                                { "filterwidth", filterwidth },
+                                { "recompute_roi", int(recompute_roi) },
+                                { "wrap", "black" } },
+                              roi, nthreads);
 }
 
 
@@ -1139,6 +1302,234 @@ ImageBufAlgo::rotate(const ImageBuf& src, float angle, string_view filtername,
                      roi, nthreads);
     if (!ok && !result.has_error())
         result.errorfmt("ImageBufAlgo::rotate() error");
+    return result;
+}
+
+
+
+template<typename DSTTYPE, typename SRCTYPE, typename STTYPE>
+static bool
+st_warp_(ImageBuf& dst, const ImageBuf& src, const ImageBuf& stbuf, int chan_s,
+         int chan_t, bool flip_s, bool flip_t, const Filter2D* filter, ROI roi,
+         int nthreads)
+{
+    OIIO_DASSERT(filter);
+    OIIO_DASSERT(dst.spec().nchannels >= roi.chend);
+
+    ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
+        const ImageSpec& srcspec(src.spec());
+        const ImageSpec& dstspec(dst.spec());
+        const int src_width  = srcspec.full_width;
+        const int src_height = srcspec.full_height;
+
+        const float xscale = float(dstspec.full_width) / src_width;
+        const float yscale = float(dstspec.full_height) / src_height;
+
+        const int xbegin = src.xbegin();
+        const int xend   = src.xend();
+        const int ybegin = src.ybegin();
+        const int yend   = src.yend();
+
+        // The horizontal and vertical filter radii, in source pixels.
+        // We will sample and filter the source over
+        //   [x-filterrad_x, x+filterrad_x] X [y-filterrad_y,y+filterrad_y].
+        const int filterrad_x = (int)ceilf(filter->width() / 2.0f / xscale);
+        const int filterrad_y = (int)ceilf(filter->height() / 2.0f / yscale);
+
+        // Accumulation buffer for filter samples, typed to maintain the
+        // necessary precision.
+        typedef typename Accum_t<DSTTYPE>::type Acc_t;
+        const int nchannels = roi.chend - roi.chbegin;
+        Acc_t* sample_accum = OIIO_ALLOCA(Acc_t, nchannels);
+
+        ImageBuf::ConstIterator<SRCTYPE, Acc_t> src_iter(src);
+        ImageBuf::ConstIterator<STTYPE> st_iter(stbuf, roi);
+        ImageBuf::Iterator<DSTTYPE, Acc_t> out_iter(dst, roi);
+
+        // The ST buffer defines the output dimensions, and thus the bounds of
+        // the outer loop.
+        // XXX: Sampling of the source buffer can be entirely random, so there
+        // are probably some opportunities for optimization in here...
+        for (; !st_iter.done(); ++st_iter, ++out_iter) {
+            // Look up source coordinates from ST channels.
+            float src_s = st_iter[chan_s];
+            float src_t = st_iter[chan_t];
+
+            if (flip_s) {
+                src_s = 1.0f - src_s;
+            }
+            if (flip_t) {
+                src_t = 1.0f - src_t;
+            }
+
+            const float src_x = src_s * src_width;
+            const float src_y = src_t * src_height;
+
+            // Set up source iterator range
+            const int x_min = clamp((int)floorf(src_x - filterrad_x), xbegin,
+                                    xend);
+            const int x_max = clamp((int)ceilf(src_x + filterrad_x), xbegin,
+                                    xend);
+            const int y_min = clamp((int)floorf(src_y - filterrad_y), ybegin,
+                                    yend);
+            const int y_max = clamp((int)ceilf(src_y + filterrad_y), ybegin,
+                                    yend);
+
+            src_iter.rerange(x_min, x_max + 1, y_min, y_max + 1, 0, 1);
+
+            memset(sample_accum, 0, nchannels * sizeof(Acc_t));
+            float total_weight = 0.0f;
+            for (; !src_iter.done(); ++src_iter) {
+                const float weight = (*filter)(src_iter.x() - src_x + 0.5f,
+                                               src_iter.y() - src_y + 0.5f);
+                total_weight += weight;
+                for (int idx = 0, chan = roi.chbegin; chan < roi.chend;
+                     ++chan, ++idx) {
+                    sample_accum[idx] += src_iter[chan] * weight;
+                }
+            }
+
+            if (total_weight > 0.0f) {
+                for (int idx = 0, chan = roi.chbegin; chan < roi.chend;
+                     ++chan, ++idx) {
+                    out_iter[chan] = sample_accum[idx] / total_weight;
+                }
+            } else {
+                for (int chan = roi.chbegin; chan < roi.chend; ++chan) {
+                    out_iter[chan] = 0;
+                }
+            }
+        }
+    });  // end of parallel_image
+    return true;
+}
+
+
+
+static bool
+check_st_warp_args(ImageBuf& dst, const ImageBuf& src, const ImageBuf& stbuf,
+                   int chan_s, int chan_t, ROI& roi)
+{
+    // Validate ST buffer
+    if (!stbuf.initialized()) {
+        dst.errorfmt("ImageBufAlgo::st_warp : Uninitialized ST buffer");
+        return false;
+    }
+
+    const ImageSpec& stSpec = stbuf.spec();
+    // XXX: Wanted to use `uint32_t` for channel indices, but I don't want to
+    // break from the rest of the API and introduce a bunch of compile warnings.
+    if (chan_s >= stSpec.nchannels) {
+        dst.errorfmt("ImageBufAlgo::st_warp : Out-of-range S channel index: {}",
+                     chan_s);
+        return false;
+    }
+    if (chan_t >= stSpec.nchannels) {
+        dst.errorfmt("ImageBufAlgo::st_warp : Out-of-range T channel index: {}",
+                     chan_t);
+        return false;
+    }
+
+    // Prep the output buffer, and then intersect the resulting ROI with the ST
+    // buffer's ROI, since the ST warp is only defined for pixels in the latter.
+    bool res
+        = ImageBufAlgo::IBAprep(roi, &dst, &src,
+                                ImageBufAlgo::IBAprep_NO_SUPPORT_VOLUME
+                                    | ImageBufAlgo::IBAprep_NO_COPY_ROI_FULL);
+    if (res) {
+        const int chbegin = roi.chbegin;
+        const int chend   = roi.chend;
+        roi               = roi_intersection(roi, stSpec.roi());
+        if (roi.npixels() <= 0) {
+            dst.errorfmt("ImageBufAlgo::st_warp : Output ROI does not "
+                         "intersect ST buffer.");
+            return false;
+        }
+        // Make sure to preserve the channel range determined by `IBAprep`.
+        roi.chbegin = chbegin;
+        roi.chend   = chend;
+    }
+    return res;
+}
+
+
+
+bool
+ImageBufAlgo::st_warp(ImageBuf& dst, const ImageBuf& src, const ImageBuf& stbuf,
+                      const Filter2D* filter, int chan_s, int chan_t,
+                      bool flip_s, bool flip_t, ROI roi, int nthreads)
+{
+    pvt::LoggedTimer logtime("IBA::st_warp");
+
+    if (!check_st_warp_args(dst, src, stbuf, chan_s, chan_t, roi)) {
+        return false;
+    }
+
+    // Set up a shared pointer with custom deleter to make sure any
+    // filter we allocate here is properly destroyed.
+    std::shared_ptr<Filter2D> filterptr((Filter2D*)nullptr, Filter2D::destroy);
+    if (!filter) {
+        // If a null filter was provided, fall back to a reasonable default.
+        filterptr.reset(Filter2D::create("lanczos3", 6.0f, 6.0f));
+        filter = filterptr.get();
+    }
+
+    bool ok;
+    OIIO_DISPATCH_COMMON_TYPES3(ok, "st_warp", st_warp_, dst.spec().format,
+                                src.spec().format, stbuf.spec().format, dst,
+                                src, stbuf, chan_s, chan_t, flip_s, flip_t,
+                                filter, roi, nthreads);
+    return ok;
+}
+
+
+
+bool
+ImageBufAlgo::st_warp(ImageBuf& dst, const ImageBuf& src, const ImageBuf& stbuf,
+                      string_view filtername, float filterwidth, int chan_s,
+                      int chan_t, bool flip_s, bool flip_t, ROI roi,
+                      int nthreads)
+{
+    // Set up a shared pointer with custom deleter to make sure any
+    // filter we allocate here is properly destroyed.
+    auto filter = get_warp_filter(filtername, filterwidth, dst);
+    if (!filter) {
+        return false;  // Error issued in `get_warp_filter`.
+    }
+    return st_warp(dst, src, stbuf, filter.get(), chan_s, chan_t, flip_s,
+                   flip_t, roi, nthreads);
+}
+
+
+
+ImageBuf
+ImageBufAlgo::st_warp(const ImageBuf& src, const ImageBuf& stbuf,
+                      const Filter2D* filter, int chan_s, int chan_t,
+                      bool flip_s, bool flip_t, ROI roi, int nthreads)
+{
+    ImageBuf result;
+    bool ok = st_warp(result, src, stbuf, filter, chan_s, chan_t, flip_s,
+                      flip_t, roi, nthreads);
+    if (!ok && !result.has_error()) {
+        result.errorfmt("ImageBufAlgo::st_warp : Unknown error");
+    }
+    return result;
+}
+
+
+
+ImageBuf
+ImageBufAlgo::st_warp(const ImageBuf& src, const ImageBuf& stbuf,
+                      string_view filtername, float filterwidth, int chan_s,
+                      int chan_t, bool flip_s, bool flip_t, ROI roi,
+                      int nthreads)
+{
+    ImageBuf result;
+    bool ok = st_warp(result, src, stbuf, filtername, filterwidth, chan_s,
+                      chan_t, flip_s, flip_t, roi, nthreads);
+    if (!ok && !result.has_error()) {
+        result.errorfmt("ImageBufAlgo::st_warp : Unknown error");
+    }
     return result;
 }
 

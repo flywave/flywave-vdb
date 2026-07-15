@@ -1,5 +1,5 @@
 # Ceres Solver - A fast non-linear least squares minimizer
-# Copyright 2018 Google Inc. All rights reserved.
+# Copyright 2023 Google Inc. All rights reserved.
 # http://ceres-solver.org/
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,11 +29,11 @@
 # Support for building Ceres Solver with a specific configuration.
 
 CERES_SRCS = ["internal/ceres/" + filename for filename in [
+    "accelerate_sparse.cc",
     "array_utils.cc",
-    "blas.cc",
     "block_evaluate_preparer.cc",
-    "block_jacobian_writer.cc",
     "block_jacobi_preconditioner.cc",
+    "block_jacobian_writer.cc",
     "block_random_access_dense_matrix.cc",
     "block_random_access_diagonal_matrix.cc",
     "block_random_access_matrix.cc",
@@ -48,14 +48,16 @@ CERES_SRCS = ["internal/ceres/" + filename for filename in [
     "compressed_row_jacobian_writer.cc",
     "compressed_row_sparse_matrix.cc",
     "conditioned_cost_function.cc",
-    "conjugate_gradients_solver.cc",
     "context.cc",
     "context_impl.cc",
     "coordinate_descent_minimizer.cc",
     "corrector.cc",
+    "cost_function.cc",
     "covariance.cc",
     "covariance_impl.cc",
+    "dense_cholesky.cc",
     "dense_normal_cholesky_solver.cc",
+    "dense_qr.cc",
     "dense_qr_solver.cc",
     "dense_sparse_matrix.cc",
     "detect_structure.cc",
@@ -64,37 +66,42 @@ CERES_SRCS = ["internal/ceres/" + filename for filename in [
     "dynamic_compressed_row_sparse_matrix.cc",
     "dynamic_sparse_normal_cholesky_solver.cc",
     "eigensparse.cc",
+    "evaluation_callback.cc",
     "evaluator.cc",
     "file.cc",
+    "first_order_function.cc",
+    "float_suitesparse.cc",
     "function_sample.cc",
     "gradient_checker.cc",
     "gradient_checking_cost_function.cc",
     "gradient_problem.cc",
     "gradient_problem_solver.cc",
-    "is_close.cc",
     "implicit_schur_complement.cc",
     "inner_product_computer.cc",
+    "is_close.cc",
+    "iteration_callback.cc",
+    "iterative_refiner.cc",
     "iterative_schur_complement_solver.cc",
-    "lapack.cc",
     "levenberg_marquardt_strategy.cc",
     "line_search.cc",
     "line_search_direction.cc",
     "line_search_minimizer.cc",
+    "line_search_preprocessor.cc",
     "linear_least_squares_problems.cc",
     "linear_operator.cc",
-    "line_search_preprocessor.cc",
     "linear_solver.cc",
-    "local_parameterization.cc",
     "loss_function.cc",
     "low_rank_inverse_hessian.cc",
+    "manifold.cc",
     "minimizer.cc",
     "normal_prior.cc",
-    "parallel_for_cxx.cc",
-    "parallel_for_tbb.cc",
+    "parallel_for.cc",
+    "parallel_invoke.cc",
     "parallel_utils.cc",
     "parameter_block_ordering.cc",
     "partitioned_matrix_view.cc",
     "polynomial.cc",
+    "power_series_expansion_preconditioner.cc",
     "preconditioner.cc",
     "preprocessor.cc",
     "problem.cc",
@@ -114,7 +121,6 @@ CERES_SRCS = ["internal/ceres/" + filename for filename in [
     "sparse_cholesky.cc",
     "sparse_matrix.cc",
     "sparse_normal_cholesky_solver.cc",
-    "split.cc",
     "stringprintf.cc",
     "subset_preconditioner.cc",
     "suitesparse.cc",
@@ -135,8 +141,7 @@ CERES_SRCS = ["internal/ceres/" + filename for filename in [
 # like SuiteSparse or not, threading or not, glog or not, and so on.
 # See https://github.com/ceres-solver/ceres-solver/issues/335.
 def ceres_library(name,
-                  restrict_schur_specializations=False,
-                  gflags_namespace="gflags"):
+                  restrict_schur_specializations=False):
     # The path to internal/ depends on whether Ceres is the main workspace or
     # an external repository.
     if native.repository_name() != '@':
@@ -172,14 +177,17 @@ def ceres_library(name,
                 "include/ceres/internal/*.h",
             ]) +
 
-            # This is an empty config, since the Bazel-based build does not
-            # generate a config.h from config.h.in. This is fine, since Bazel
-            # properly handles propagating -D defines to dependent targets.
+            # This is an empty config and export, since the
+            # Bazel-based build does not generate a
+            # config.h/export.h. This is fine, since Bazel properly
+            # handles propagating -D defines to dependent targets.
             native.glob([
                 "config/ceres/internal/config.h",
+                "config/ceres/internal/export.h",
             ]),
         copts = [
             "-I" + internal,
+            "-Wunused-parameter",
             "-Wno-sign-compare",
         ] + schur_eliminator_copts,
 
@@ -188,13 +196,17 @@ def ceres_library(name,
         # TODO(keir): These defines are placeholders for now to facilitate getting
         # started with a Bazel build. However, these should become configurable as
         # part of a Skylark Ceres target macro.
+        # https://github.com/ceres-solver/ceres-solver/issues/396
         defines = [
-            "CERES_NO_SUITESPARSE",
-            "CERES_NO_CXSPARSE",
-            "CERES_NO_THREADS",
+            "CERES_EXPORT=",
+            "CERES_NO_ACCELERATE_SPARSE",
+            "CERES_NO_CHOLMOD_PARTITION",
+            "CERES_NO_CUDA",
+            "CERES_NO_EIGEN_METIS",
+            "CERES_NO_EXPORT=",
             "CERES_NO_LAPACK",
-            "CERES_STD_UNORDERED_MAP",
-            "CERES_GFLAGS_NAMESPACE=" + gflags_namespace,
+            "CERES_NO_SUITESPARSE",
+            "CERES_USE_EIGEN_SPARSE",
         ],
         includes = [
             "config",
@@ -202,7 +214,7 @@ def ceres_library(name,
         ],
         visibility = ["//visibility:public"],
         deps = [
-            "@com_github_eigen_eigen//:eigen",
+            "@com_gitlab_libeigen_eigen//:eigen",
             "@com_github_google_glog//:glog",
         ],
     )

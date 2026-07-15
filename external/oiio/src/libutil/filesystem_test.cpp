@@ -1,11 +1,10 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <fstream>
 #include <sstream>
 
-#include <OpenImageIO/Imath.h>
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/platform.h>
@@ -36,6 +35,13 @@ test_filename_decomposition()
                      ".ext");
     OIIO_CHECK_EQUAL(Filesystem::extension("/directory/filename"), "");
     OIIO_CHECK_EQUAL(Filesystem::extension("/directory/filename."), ".");
+    OIIO_CHECK_EQUAL(Filesystem::extension("a.foo"), ".foo");
+    OIIO_CHECK_EQUAL(Filesystem::extension("a.foo", false), "foo");
+    OIIO_CHECK_EQUAL(Filesystem::extension("foo"), "");
+    OIIO_CHECK_EQUAL(Filesystem::extension("foo", false), "");
+    OIIO_CHECK_EQUAL(Filesystem::extension(".foo"), "");
+    OIIO_CHECK_EQUAL(Filesystem::extension(".foo", false), "");
+
     OIIO_CHECK_EQUAL(Filesystem::parent_path(test), "/directoryA/directory");
 
     std::cout << "Testing path_is_absolute\n";
@@ -47,11 +53,21 @@ test_filename_decomposition()
     OIIO_CHECK_EQUAL(Filesystem::replace_extension(test, "foo"),
                      "/directoryA/directory/filename.foo");
 
-    std::cout << "Testing generic_string\n";
+    std::cout << "Testing generic_filepath\n";
 #if _WIN32
     OIIO_CHECK_EQUAL(Filesystem::generic_filepath("\\x\\y"), "/x/y");
     OIIO_CHECK_EQUAL(Filesystem::generic_filepath("c:\\x\\y"), "c:/x/y");
 #endif
+
+    std::cout << "Testing filename_to_regex\n";
+    OIIO_CHECK_EQUAL(Filesystem::filename_to_regex("/foo/bar/baz.exr"),
+                     "/foo/bar/baz\\.exr");
+    OIIO_CHECK_EQUAL(Filesystem::filename_to_regex("/f(o)o/b[a]r/b{a}z.exr"),
+                     "/f\\(o\\)o/b\\[a\\]r/b\\{a\\}z\\.exr");
+    OIIO_CHECK_EQUAL(Filesystem::filename_to_regex("/foo/bar/baz.*"),
+                     "/foo/bar/baz\\..*");
+    OIIO_CHECK_EQUAL(Filesystem::filename_to_regex("/fo?/b*r/b?z.*"),
+                     "/fo.?/b.*r/b.?z\\..*");
 }
 
 
@@ -70,6 +86,25 @@ test_filename_searchpath_find()
 
     std::cout << "Testing searchpath_split\n";
     std::vector<std::string> dirs;
+
+    // Split of empty string should make an empty path vector
+    dirs.clear();
+    Filesystem::searchpath_split("", dirs, false);
+    OIIO_CHECK_EQUAL(dirs.size(), 0);
+
+    // Test that empty paths don't show up in the result vector
+    dirs.clear();
+    Filesystem::searchpath_split(":", dirs, false);
+    OIIO_CHECK_EQUAL(dirs.size(), 0);
+    Filesystem::searchpath_split("::", dirs, false);
+    OIIO_CHECK_EQUAL(dirs.size(), 0);
+    dirs.clear();
+    Filesystem::searchpath_split(":abc::def:", dirs, false);
+    OIIO_CHECK_EQUAL(dirs.size(), 2);
+    OIIO_CHECK_EQUAL(dirs[0], "abc");
+    OIIO_CHECK_EQUAL(dirs[1], "def");
+
+    dirs.clear();
     Filesystem::searchpath_split(pathlist, dirs);
     OIIO_CHECK_EQUAL(dirs.size(), 3);
     OIIO_CHECK_EQUAL(dirs[0], ".." DIRSEP "..");
@@ -93,6 +128,10 @@ test_filename_searchpath_find()
                                                  true),
                      ".." DIRSEP ".." DIRSEP "include" DIRSEP
                      "OpenImageIO" DIRSEP "oiioversion.h");
+
+    // Test find_program
+    OIIO_CHECK_ASSERT(
+        Filesystem::is_executable(Filesystem::find_program("bash")));
 }
 
 
@@ -103,6 +142,39 @@ my_read_text_file(string_view filename)
     std::string err;
     std::string contents;
     bool ok = Filesystem::read_text_file(filename, contents);
+    OIIO_CHECK_ASSERT(ok);
+    return contents;
+}
+
+
+inline std::string
+my_read_text_file(string_view filename, size_t size)
+{
+    std::string err;
+    std::string contents;
+    bool ok = Filesystem::read_text_file(filename, contents, size);
+    OIIO_CHECK_ASSERT(ok);
+    return contents;
+}
+
+
+inline std::string
+my_read_text_from_command(string_view filename)
+{
+    std::string err;
+    std::string contents;
+    bool ok = Filesystem::read_text_from_command(filename, contents);
+    OIIO_CHECK_ASSERT(ok);
+    return contents;
+}
+
+
+inline std::string
+my_read_text_from_command(string_view filename, size_t size)
+{
+    std::string err;
+    std::string contents;
+    bool ok = Filesystem::read_text_from_command(filename, contents, size);
     OIIO_CHECK_ASSERT(ok);
     return contents;
 }
@@ -127,7 +199,12 @@ test_file_status()
     std::cout << "Testing write_text_file\n";
     Filesystem::write_text_file("testfile4", testtext);
     OIIO_CHECK_EQUAL(my_read_text_file("testfile4"), testtext);
-
+    std::cout << "Testing read_text_file with size limit\n";
+    OIIO_CHECK_EQUAL(my_read_text_file("testfile", 10), "test\nfoo\nb");
+    std::cout << "Testing read_text_from_command\n";
+    OIIO_CHECK_EQUAL(my_read_text_from_command("cat testfile"), testtext);
+    std::cout << "Testing read_text_from_command with size limit\n";
+    OIIO_CHECK_EQUAL(my_read_text_from_command("cat testfile", 7), "test\nfo");
 
     std::cout << "Testing read_bytes:\n";
     char buf[3];
@@ -144,13 +221,20 @@ test_file_status()
     OIIO_CHECK_ASSERT(Filesystem::exists("testfile"));
     OIIO_CHECK_ASSERT(Filesystem::exists("testdir"));
     OIIO_CHECK_ASSERT(!Filesystem::exists("noexist"));
-    std::cout << "Testing is_directory, is_regular\n";
+    std::cout << "Testing is_directory, is_regular, is_executable\n";
     OIIO_CHECK_ASSERT(Filesystem::is_regular("testfile"));
     OIIO_CHECK_ASSERT(!Filesystem::is_directory("testfile"));
+#ifndef _WIN32
+    // Directories look "executable" on Unix, not on Windows
+    OIIO_CHECK_ASSERT(!Filesystem::is_executable("testfile"));
+#endif
     OIIO_CHECK_ASSERT(!Filesystem::is_regular("testdir"));
     OIIO_CHECK_ASSERT(Filesystem::is_directory("testdir"));
+    OIIO_CHECK_ASSERT(!Filesystem::is_executable("testdir"));
     OIIO_CHECK_ASSERT(!Filesystem::is_regular("noexist"));
     OIIO_CHECK_ASSERT(!Filesystem::is_directory("noexist"));
+    OIIO_CHECK_ASSERT(!Filesystem::is_executable("noexist"));
+    OIIO_CHECK_ASSERT(Filesystem::is_executable(Sysutil::this_program_path()));
 
     std::cout << "Testing copy, rename, remove\n";
     OIIO_CHECK_ASSERT(!Filesystem::exists("testfile2"));
@@ -193,7 +277,7 @@ test_seq(const char* str, const char* expected)
 
 
 static void
-test_file_seq(const char* pattern, const char* override,
+test_file_seq(const char* pattern, string_view overrideval,
               const std::string& expected)
 {
     std::vector<int> numbers;
@@ -202,23 +286,21 @@ test_file_seq(const char* pattern, const char* override,
     std::string frame_range;
 
     Filesystem::parse_pattern(pattern, 0, normalized_pattern, frame_range);
-    if (override && strlen(override) > 0)
-        frame_range = override;
+    if (overrideval.size())
+        frame_range = overrideval;
     Filesystem::enumerate_sequence(frame_range, numbers);
     Filesystem::enumerate_file_sequence(normalized_pattern, numbers, names);
     std::string joined = Strutil::join(names, " ");
-    std::cout << "  " << pattern;
-    if (override)
-        std::cout << " + " << override;
-    std::cout << " -> " << joined << "\n";
+    Strutil::print(" {}{}{} -> {}\n", pattern, overrideval.size() ? " + " : "",
+                   overrideval, joined);
     OIIO_CHECK_EQUAL(joined, expected);
 }
 
 
 
 static void
-test_file_seq_with_view(const char* pattern, const char* override,
-                        const char* view, const std::string& expected)
+test_file_seq_with_view(const char* pattern, string_view overrideval,
+                        string_view view, const std::string& expected)
 {
     std::vector<int> numbers;
     std::vector<string_view> views;
@@ -227,11 +309,11 @@ test_file_seq_with_view(const char* pattern, const char* override,
     std::string frame_range;
 
     Filesystem::parse_pattern(pattern, 0, normalized_pattern, frame_range);
-    if (override && strlen(override) > 0)
-        frame_range = override;
-    Filesystem::enumerate_sequence(frame_range.c_str(), numbers);
+    if (overrideval.size())
+        frame_range = overrideval;
+    Filesystem::enumerate_sequence(frame_range, numbers);
 
-    if (view) {
+    if (view.size()) {
         for (size_t i = 0, e = numbers.size(); i < e; ++i)
             views.emplace_back(view);
     }
@@ -239,10 +321,8 @@ test_file_seq_with_view(const char* pattern, const char* override,
     Filesystem::enumerate_file_sequence(normalized_pattern, numbers, views,
                                         names);
     std::string joined = Strutil::join(names, " ");
-    std::cout << "  " << pattern;
-    if (override)
-        std::cout << " + " << override;
-    std::cout << " -> " << joined << "\n";
+    Strutil::print(" {}{}{} -> {}\n", pattern, overrideval.size() ? " + " : "",
+                   overrideval, joined);
     OIIO_CHECK_EQUAL(joined, expected);
 }
 
@@ -432,10 +512,14 @@ test_scan_sequences()
     std::vector<std::string> filenames;
 
     for (size_t i = 1; i <= 5; i++) {
-        std::string fn = Strutil::sprintf("foo.%04d.exr", i);
+        std::string fn = Strutil::fmt::format("foo.{:04d}.exr", i);
         filenames.push_back(fn);
         create_test_file(fn);
     }
+    // Deliberate file that's not a match! Make sure dots in the filename
+    // aren't regex dots that match any character.
+    filenames.push_back("fooX0000Xexr");
+    create_test_file("fooX0000Xexr");
 
     test_scan_file_seq(
         "foo.#.exr",
@@ -447,7 +531,8 @@ test_scan_sequences()
     Filesystem::create_directory("left/l");
 
     for (size_t i = 1; i <= 5; i++) {
-        std::string fn = Strutil::sprintf("left/l/foo_left_l.%04d.exr", i);
+        std::string fn = Strutil::fmt::format("left/l/foo_left_l.{:04d}.exr",
+                                              i);
         filenames.push_back(fn);
         create_test_file(fn);
     }
@@ -509,6 +594,57 @@ test_mem_proxies()
 
 
 
+void
+test_last_write_time()
+{
+    Filesystem::write_text_file("oiio-testtime.txt", "test");
+    time_t t = Filesystem::last_write_time("oiio-testtime.txt");
+    std::cout << "Last write time of oiio-testtime.txt is " << t << "\n";
+    Filesystem::last_write_time("oiio-testtime.txt", t - 42);
+    OIIO_CHECK_EQUAL(Filesystem::last_write_time("oiio-testtime.txt"), t - 42);
+    Filesystem::remove("oiio-testtime.txt");
+}
+
+
+
+void
+test_getline()
+{
+    const char* contents    = "Line 1\n"
+                              "Line 2\n"
+                              "Really really really long long line line 3\n"
+                              "Line 4\n"
+                              "Line 5 no newline";
+    const char* tmpfilename = "getline.txt";
+    Filesystem::write_text_file(tmpfilename, contents);
+
+    FILE* in = Filesystem::fopen(tmpfilename, "r");
+    OIIO_CHECK_ASSERT(in != nullptr);
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "Line 1\n");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "Line 2\n");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30),
+                     "Really really really long long");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), " line line 3\n");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "Line 4\n");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "");  // EOF before \n
+    fclose(in);
+
+    // Again, with a complete line at the end to be sure we read it
+    Filesystem::write_text_file(tmpfilename, "Line 1\n"
+                                             "Line 2\n");
+    in = Filesystem::fopen(tmpfilename, "r");
+    OIIO_CHECK_ASSERT(in != nullptr);
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "Line 1\n");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "Line 2\n");
+    OIIO_CHECK_EQUAL(Filesystem::getline(in, 30), "");
+    OIIO_CHECK_ASSERT(feof(in));
+    fclose(in);
+
+    Filesystem::remove(tmpfilename);
+}
+
+
+
 int
 main(int /*argc*/, char* /*argv*/[])
 {
@@ -518,6 +654,8 @@ main(int /*argc*/, char* /*argv*/[])
     test_frame_sequences();
     test_scan_sequences();
     test_mem_proxies();
+    test_last_write_time();
+    test_getline();
 
     return unit_test_failures;
 }

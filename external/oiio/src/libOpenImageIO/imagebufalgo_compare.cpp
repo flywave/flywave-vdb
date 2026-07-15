@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 /// \file
 /// Implementation of ImageBufAlgo algorithms that analyze or compare
@@ -9,6 +9,8 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+
+#include <OpenImageIO/half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/hash.h>
@@ -88,7 +90,7 @@ val(ImageBufAlgo::PixelStats& p, int c, float value)
     }
     ++p.finitecount[c];
     p.sum[c] += value;
-    p.sum2[c] += value * value;
+    p.sum2[c] += double(value) * double(value);
     p.min[c] = std::min(value, p.min[c]);
     p.max[c] = std::max(value, p.max[c]);
 }
@@ -132,10 +134,10 @@ computePixelStats_(const ImageBuf& src, ImageBufAlgo::PixelStats& stats,
     stats.reset(nchannels);
     OIIO::spin_mutex mutex;  // protect the shared stats when merging
 
-    parallel_options opt(nthreads);
+    paropt opt(nthreads);
     if (src.deep()) {
         parallel_for_chunked(roi.ybegin, roi.yend, 64,
-                             [&](int /*id*/, int64_t ybegin, int64_t yend) {
+                             [&](int64_t ybegin, int64_t yend) {
             ROI subroi(roi.xbegin, roi.xend, ybegin, yend, roi.zbegin,
                        roi.zend, roi.chbegin, roi.chend);
             ImageBufAlgo::PixelStats tmp(nchannels);
@@ -157,7 +159,7 @@ computePixelStats_(const ImageBuf& src, ImageBufAlgo::PixelStats& stats,
 
     } else {  // Non-deep case
         parallel_for_chunked(roi.ybegin, roi.yend, 64,
-                             [&](int /*id*/, int64_t ybegin, int64_t yend) {
+                             [&](int64_t ybegin, int64_t yend) {
             ROI subroi(roi.xbegin, roi.xend, ybegin, yend, roi.zbegin,
                        roi.zend, roi.chbegin, roi.chend);
             ImageBufAlgo::PixelStats tmp(nchannels);
@@ -207,23 +209,13 @@ ImageBufAlgo::computePixelStats(const ImageBuf& src, ROI roi, int nthreads)
 
 
 
-// Deprecated:
-bool
-ImageBufAlgo::computePixelStats(PixelStats& stats, const ImageBuf& src, ROI roi,
-                                int nthreads)
-{
-    stats = computePixelStats(src, roi, nthreads);
-    return stats.min.size() == (size_t)src.nchannels();
-}
-
-
-
-template<class BUFT>
+template<class BUFT, class VALT>
 inline void
-compare_value(ImageBuf::ConstIterator<BUFT, float>& a, int chan, float aval,
-              float bval, ImageBufAlgo::CompareResults& result, float& maxval,
+compare_value(ImageBuf::ConstIterator<BUFT, float>& a, int chan, VALT aval,
+              VALT bval, ImageBufAlgo::CompareResults& result, float& maxval,
               double& batcherror, double& batch_sqrerror, bool& failed,
-              bool& warned, float failthresh, float warnthresh)
+              bool& warned, float failthresh, float warnthresh,
+              float failrelative, float warnrelative)
 {
     if (!isfinite(aval) || !isfinite(bval)) {
         if (isnan(aval) == isnan(bval) && isinf(aval) == isinf(bval))
@@ -238,8 +230,13 @@ compare_value(ImageBuf::ConstIterator<BUFT, float>& a, int chan, float aval,
             return;
         }
     }
-    maxval   = std::max(maxval, std::max(aval, bval));
-    double f = fabs(aval - bval);
+    auto aabs    = std::abs(aval);
+    auto babs    = std::abs(bval);
+    auto meanabs = lerp(aabs, babs, 0.5);
+    auto maxabs  = std::max(aabs, babs);
+    maxval       = std::max(maxval, maxabs);
+    double f     = std::abs(aval - bval);
+    double rel   = meanabs > 0.0 ? f / meanabs : 0.0;
     batcherror += f;
     batch_sqrerror += f * f;
     // We use the awkward '!(a<=threshold)' construct so that we have
@@ -252,11 +249,11 @@ compare_value(ImageBuf::ConstIterator<BUFT, float>& a, int chan, float aval,
         result.maxz     = a.z();
         result.maxc     = chan;
     }
-    if (!warned && !(f <= warnthresh)) {
+    if (!warned && !(f <= warnthresh) && !(rel <= warnrelative)) {
         ++result.nwarn;
         warned = true;
     }
-    if (!failed && !(f <= failthresh)) {
+    if (!failed && !(f <= failthresh) && !(rel <= failrelative)) {
         ++result.nfail;
         failed = true;
     }
@@ -267,8 +264,8 @@ compare_value(ImageBuf::ConstIterator<BUFT, float>& a, int chan, float aval,
 template<class Atype, class Btype>
 static bool
 compare_(const ImageBuf& A, const ImageBuf& B, float failthresh,
-         float warnthresh, ImageBufAlgo::CompareResults& result, ROI roi,
-         int /*nthreads*/)
+         float warnthresh, float failrelative, float warnrelative,
+         ImageBufAlgo::CompareResults& result, ROI roi, int /*nthreads*/)
 {
     imagesize_t npels = roi.npixels();
     imagesize_t nvals = npels * roi.nchannels();
@@ -286,14 +283,14 @@ compare_(const ImageBuf& A, const ImageBuf& B, float failthresh,
     // N.B. [PSNR](https://en.wikipedia.org/wiki/Peak_signal-to-noise_ratio)
     // formula requires the max possible value. We assume a normalized 1.0,
     // but for an HDR image with potentially values > 1.0, there is no true
-    // max value, so we punt and use the highest value found in either
-    // image. The compare_value() function we call on every pixel value will
-    // check and adjust our max as needed.
+    // max value, so we punt and use the highest absolute value found in
+    // either image. The compare_value() function we call on every pixel value
+    // will check and adjust our max as needed.
 
     ImageBuf::ConstIterator<Atype> a(A, roi, ImageBuf::WrapBlack);
     ImageBuf::ConstIterator<Btype> b(B, roi, ImageBuf::WrapBlack);
     bool deep = A.deep();
-    // Break up into batches to reduce cancelation errors as the error
+    // Break up into batches to reduce cancellation errors as the error
     // sums become too much larger than the error for individual pixels.
     const int batchsize = 4096;  // As good a guess as any
     for (; !a.done();) {
@@ -308,7 +305,8 @@ compare_(const ImageBuf& A, const ImageBuf& B, float failthresh,
                         compare_value(a, c, a.deep_value(c, s),
                                       b.deep_value(c, s), result, maxval,
                                       batcherror, batch_sqrerror, failed,
-                                      warned, failthresh, warnthresh);
+                                      warned, failthresh, warnthresh,
+                                      failrelative, warnrelative);
                     }
             }
         } else {  // non-deep
@@ -318,7 +316,8 @@ compare_(const ImageBuf& A, const ImageBuf& B, float failthresh,
                     compare_value(a, c, c < Achannels ? a[c] : 0.0f,
                                   c < Bchannels ? b[c] : 0.0f, result, maxval,
                                   batcherror, batch_sqrerror, failed, warned,
-                                  failthresh, warnthresh);
+                                  failthresh, warnthresh, failrelative,
+                                  warnrelative);
             }
         }
         totalerror += batcherror;
@@ -335,6 +334,17 @@ compare_(const ImageBuf& A, const ImageBuf& B, float failthresh,
 ImageBufAlgo::CompareResults
 ImageBufAlgo::compare(const ImageBuf& A, const ImageBuf& B, float failthresh,
                       float warnthresh, ROI roi, int nthreads)
+{
+    // equivalent to compare with the relative thresholds equal to 0
+    return compare(A, B, failthresh, warnthresh, 0.0f, 0.0f, roi, nthreads);
+}
+
+
+
+ImageBufAlgo::CompareResults
+ImageBufAlgo::compare(const ImageBuf& A, const ImageBuf& B, float failthresh,
+                      float warnthresh, float failrelative, float warnrelative,
+                      ROI roi, int nthreads)
 {
     pvt::LoggedTimer logtimer("IBA::compare");
     ImageBufAlgo::CompareResults result;
@@ -355,7 +365,8 @@ ImageBufAlgo::compare(const ImageBuf& A, const ImageBuf& B, float failthresh,
     bool ok;
     OIIO_DISPATCH_COMMON_TYPES2_CONST(ok, "compare", compare_, A.spec().format,
                                       B.spec().format, A, B, failthresh,
-                                      warnthresh, result, roi, nthreads);
+                                      warnthresh, failrelative, warnrelative,
+                                      result, roi, nthreads);
     // FIXME - The nthreads argument is for symmetry with the rest of
     // ImageBufAlgo and for future expansion. But for right now, we
     // don't actually split by threads.  Maybe later.
@@ -365,34 +376,50 @@ ImageBufAlgo::compare(const ImageBuf& A, const ImageBuf& B, float failthresh,
 
 
 
-bool
-ImageBufAlgo::compare(const ImageBuf& A, const ImageBuf& B, float failthresh,
-                      float warnthresh, ImageBufAlgo::CompareResults& result,
-                      ROI roi, int nthreads)
-{
-    result = compare(A, B, failthresh, warnthresh, roi, nthreads);
-    return result.error == false;
-}
-
-
-
 template<typename T>
 static bool
 isConstantColor_(const ImageBuf& src, float threshold, span<float> color,
                  ROI roi, int nthreads)
 {
-    atomic_int result(true);
-    if (threshold == 0.0f) {
+    // Single flag that will be set to false by any of the threads if they
+    // discover that the image is non-constant, so the others can abort early. It
+    // does NOT need to be atomic, because the timing is not critical and we
+    // don't want to slow things down by locking.
+    bool result = true;
+
+    imagesize_t npixels = roi.npixels();
+    if (npixels == 0) {
+        // Empty ROI? Just fail.
+        return false;
+    }
+
+    // Record the value of the first pixel. That's what we'll compare against.
+    std::vector<T> constval(roi.nchannels());
+    ImageBuf::ConstIterator<T, T> s(src, roi);
+    for (int c = roi.chbegin; c < roi.chend; ++c)
+        constval[c] = s[c];
+
+    if (npixels > 2) {
+        // Just check the second pixel. If it doesn't match the first (which
+        // is a pretty common case for non-constant images), then we're
+        // already done and don't need to even launch the threads that will
+        // traverse the rest of the image to check it.
+        ++s;
+        for (int c = roi.chbegin; c < roi.chend; ++c)
+            if (s[c] != constval[c])
+                return false;
+    }
+
+    if (npixels == 1) {
+        // One pixel? Yes, it's a constant color! Skip the image scan.
+    } else if (threshold == 0.0f) {
         // For 0.0 threshold, use shortcut of avoiding the conversion
         // to float, just compare original type values.
-        std::vector<T> constval(roi.nchannels());
-        ImageBuf::ConstIterator<T, T> s(src, roi);
-        for (int c = roi.chbegin; c < roi.chend; ++c)
-            constval[c] = s[c];
         ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
             if (!result)
                 return;  // another parallel bucket already failed, don't bother
-            for (ImageBuf::ConstIterator<T, T> s(src, roi); !s.done(); ++s) {
+            for (ImageBuf::ConstIterator<T, T> s(src, roi); result && !s.done();
+                 ++s) {
                 for (int c = roi.chbegin; c < roi.chend; ++c)
                     if (s[c] != constval[c]) {
                         result = false;
@@ -402,14 +429,11 @@ isConstantColor_(const ImageBuf& src, float threshold, span<float> color,
         });
     } else {
         // Nonzero threshold case
-        std::vector<T> constval(roi.nchannels());
-        ImageBuf::ConstIterator<T> s(src, roi);
-        for (int c = roi.chbegin; c < roi.chend; ++c)
-            constval[c] = s[c];
         ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
             if (!result)
                 return;  // another parallel bucket already failed, don't bother
-            for (ImageBuf::ConstIterator<T> s(src, roi); !s.done(); ++s) {
+            for (ImageBuf::ConstIterator<T> s(src, roi); result && !s.done();
+                 ++s) {
                 for (int c = roi.chbegin; c < roi.chend; ++c)
                     if (std::abs(s[c] - constval[c]) > threshold) {
                         result = false;
@@ -420,12 +444,13 @@ isConstantColor_(const ImageBuf& src, float threshold, span<float> color,
     }
 
     if (color.size()) {
+        int colsize = int(color.size());
         ImageBuf::ConstIterator<T, float> s(src, roi);
-        for (int c = 0; c < roi.chbegin && c < color.size(); ++c)
+        for (int c = 0; c < roi.chbegin && c < colsize; ++c)
             color[c] = 0.0f;
-        for (int c = roi.chbegin; c < roi.chend && c < color.size(); ++c)
+        for (int c = roi.chbegin; c < roi.chend && c < colsize; ++c)
             color[c] = s[c];
-        for (int c = roi.chend; c < src.nchannels() && c < color.size(); ++c)
+        for (int c = roi.chend; c < src.nchannels() && c < colsize; ++c)
             color[c] = 0.0f;
     }
     return result ? true : false;
@@ -612,7 +637,7 @@ ImageBufAlgo::color_count(const ImageBuf& src, imagesize_t* count, int ncolors,
         roi = get_roi(src.spec());
     roi.chend = std::min(roi.chend, src.nchannels());
 
-    if (color.size() < ncolors * src.nchannels()) {
+    if (std::ssize(color) < ncolors * src.nchannels()) {
         src.errorfmt(
             "ImageBufAlgo::color_count: not enough room in 'color' array");
         return false;
@@ -740,28 +765,28 @@ ImageBufAlgo::nonzero_region(const ImageBuf& src, ROI roi, int nthreads)
     for (; roi.ybegin < roi.yend; --roi.yend) {
         ROI test    = roi;
         test.ybegin = roi.yend - 1;
-        if (!isConstantColor(src, &color[0], test, nthreads) || color != zero)
+        if (!isConstantColor(src, 0.0f, color, test, nthreads) || color != zero)
             break;
     }
     // Trim top
     for (; roi.ybegin < roi.yend; ++roi.ybegin) {
         ROI test  = roi;
         test.yend = roi.ybegin + 1;
-        if (!isConstantColor(src, &color[0], test, nthreads) || color != zero)
+        if (!isConstantColor(src, 0.0f, color, test, nthreads) || color != zero)
             break;
     }
     // Trim right
     for (; roi.xbegin < roi.xend; --roi.xend) {
         ROI test    = roi;
         test.xbegin = roi.xend - 1;
-        if (!isConstantColor(src, &color[0], test, nthreads) || color != zero)
+        if (!isConstantColor(src, 0.0f, color, test, nthreads) || color != zero)
             break;
     }
     // Trim left
     for (; roi.xbegin < roi.xend; ++roi.xbegin) {
         ROI test  = roi;
         test.xend = roi.xbegin + 1;
-        if (!isConstantColor(src, &color[0], test, nthreads) || color != zero)
+        if (!isConstantColor(src, 0.0f, color, test, nthreads) || color != zero)
             break;
     }
     if (roi.depth() > 1) {
@@ -769,7 +794,7 @@ ImageBufAlgo::nonzero_region(const ImageBuf& src, ROI roi, int nthreads)
         for (; roi.zbegin < roi.zend; --roi.zend) {
             ROI test    = roi;
             test.zbegin = roi.zend - 1;
-            if (!isConstantColor(src, &color[0], test, nthreads)
+            if (!isConstantColor(src, 0.0f, color, test, nthreads)
                 || color != zero)
                 break;
         }
@@ -777,7 +802,7 @@ ImageBufAlgo::nonzero_region(const ImageBuf& src, ROI roi, int nthreads)
         for (; roi.zbegin < roi.zend; ++roi.zbegin) {
             ROI test  = roi;
             test.zend = roi.zbegin + 1;
-            if (!isConstantColor(src, &color[0], test, nthreads)
+            if (!isConstantColor(src, 0.0f, color, test, nthreads)
                 || color != zero)
                 break;
         }
@@ -801,7 +826,7 @@ simplePixelHashSHA1(const ImageBuf& src, string_view extrainfo, ROI roi)
     // Do it a few scanlines at a time
     int chunk = std::max(1, int(16 * 1024 * 1024 / scanline_bytes));
 
-    std::vector<unsigned char> tmp;
+    std::vector<std::byte> tmp;
     if (!localpixels)
         tmp.resize(chunk * scanline_bytes);
 
@@ -814,7 +839,7 @@ simplePixelHashSHA1(const ImageBuf& src, string_view extrainfo, ROI roi)
                            size_t(scanline_bytes * (y1 - y)));
             } else {
                 src.get_pixels(ROI(roi.xbegin, roi.xend, y, y1, z, z + 1),
-                               src.spec().format, &tmp[0]);
+                               src.spec().format, tmp);
                 sha.append(&tmp[0], size_t(scanline_bytes) * (y1 - y));
             }
         }
@@ -860,8 +885,8 @@ ImageBufAlgo::computePixelHashSHA1(const ImageBuf& src, string_view extrainfo,
     // blocks computed doesn't matter.)
     SHA1 sha;
     for (int b = 0; b < nblocks; ++b)
-        sha.append(results[b].c_str(), results[b].size());
-    sha.append(extrainfo.c_str(), extrainfo.size());
+        sha.append(results[b]);
+    sha.append(extrainfo);
     return sha.digest();
 }
 
@@ -916,7 +941,7 @@ ImageBufAlgo::histogram(const ImageBuf& src, int channel, int bins, float min,
                         float max, bool ignore_empty, ROI roi, int nthreads)
 {
     pvt::LoggedTimer logtimer("IBA::histogram");
-    std::vector<imagesize_t> h(bins);
+    std::vector<imagesize_t> h;
 
     // Sanity checks
     if (src.nchannels() == 0) {
@@ -941,6 +966,7 @@ ImageBufAlgo::histogram(const ImageBuf& src, int channel, int bins, float min,
     if (!roi.defined())
         roi = get_roi(src.spec());
 
+    h.resize(bins);
     bool ok = true;
     OIIO_DISPATCH_TYPES(ok, "histogram", histogram_impl, src.spec().format, src,
                         channel, h, bins, min, max, ignore_empty, roi,
@@ -950,151 +976,6 @@ ImageBufAlgo::histogram(const ImageBuf& src, int channel, int bins, float min,
         h.clear();
     return h;
 }
-
-
-
-/// histogram_impl -----------------------------------------------------------
-/// Fully type-specialized version of histogram.
-///
-/// Pixel values in min->max range are mapped to 0->(bins-1) range, so that
-/// each value is placed in the appropriate bin. The formula used is:
-/// y = (x-min) * bins/(max-min), where y is the value in the 0->(bins-1)
-/// range and x is the value in the min->max range. There is one special
-/// case x==max for which the formula is not used and x is assigned to the
-/// last bin at position (bins-1) in the vector histogram.
-/// --------------------------------------------------------------------------
-template<class Atype>
-static bool
-histogram_impl_old(const ImageBuf& A, int channel,
-                   std::vector<imagesize_t>& histogram, int bins, float min,
-                   float max, imagesize_t* submin, imagesize_t* supermax,
-                   ROI roi)
-{
-    // Double check A's type.
-    if (A.spec().format != BaseTypeFromC<Atype>::value) {
-        A.errorfmt("Unsupported pixel data format '{}'", A.spec().format);
-        return false;
-    }
-
-    // Initialize.
-    ImageBuf::ConstIterator<Atype, float> a(A, roi);
-    float ratio      = bins / (max - min);
-    int bins_minus_1 = bins - 1;
-    bool submin_ok   = submin != NULL;
-    bool supermax_ok = supermax != NULL;
-    if (submin_ok)
-        *submin = 0;
-    if (supermax_ok)
-        *supermax = 0;
-    histogram.assign(bins, 0);
-
-    // Compute histogram.
-    for (; !a.done(); a++) {
-        float c = a[channel];
-        if (c >= min && c < max) {
-            // Map range min->max to 0->(bins-1).
-            histogram[(int)((c - min) * ratio)]++;
-        } else if (c == max) {
-            histogram[bins_minus_1]++;
-        } else {
-            if (submin_ok && c < min)
-                (*submin)++;
-            else if (supermax_ok)
-                (*supermax)++;
-        }
-    }
-    return true;
-}
-
-
-
-bool
-ImageBufAlgo::histogram(const ImageBuf& A, int channel,
-                        std::vector<imagesize_t>& histogram, int bins,
-                        float min, float max, imagesize_t* submin,
-                        imagesize_t* supermax, ROI roi)
-{
-    pvt::LoggedTimer logtimer("IBA::histogram");
-    if (A.spec().format != TypeFloat) {
-        A.errorfmt("Unsupported pixel data format '{}'", A.spec().format);
-        return false;
-    }
-
-    if (A.nchannels() == 0) {
-        A.errorfmt("Input image must have at least 1 channel");
-        return false;
-    }
-
-    if (channel < 0 || channel >= A.nchannels()) {
-        A.errorfmt("Invalid channel {} for input image with channels 0 to {}",
-                   channel, A.nchannels() - 1);
-        return false;
-    }
-
-    if (bins < 1) {
-        A.errorfmt("The number of bins must be at least 1");
-        return false;
-    }
-
-    if (max <= min) {
-        A.errorfmt("Invalid range, min must be strictly smaller than max");
-        return false;
-    }
-
-    // Specified ROI -> use it. Unspecified ROI -> initialize from A.
-    if (!roi.defined())
-        roi = get_roi(A.spec());
-
-    histogram_impl_old<float>(A, channel, histogram, bins, min, max, submin,
-                              supermax, roi);
-
-    return !A.has_error();
-}
-
-
-
-bool
-ImageBufAlgo::histogram_draw(ImageBuf& R,
-                             const std::vector<imagesize_t>& histogram)
-{
-    pvt::LoggedTimer logtimer("IBA::histogram_draw");
-    // Fail if there are no bins to draw.
-    int bins = histogram.size();
-    if (bins == 0) {
-        R.errorfmt("There are no bins to draw, the histogram is empty");
-        return false;
-    }
-
-    // Check R and modify it if needed.
-    int height = R.spec().height;
-    if (R.spec().format != TypeFloat || R.nchannels() != 1
-        || R.spec().width != bins) {
-        ImageSpec newspec = ImageSpec(bins, height, 1, TypeDesc::FLOAT);
-        R.reset("dummy", newspec);
-    }
-
-    // Fill output image R with white color.
-    ImageBuf::Iterator<float, float> r(R);
-    for (; !r.done(); ++r)
-        r[0] = 1;
-
-    // Draw histogram left->right, bottom->up.
-    imagesize_t max = *std::max_element(histogram.begin(), histogram.end());
-    for (int b = 0; b < bins; b++) {
-        int bin_height = (int)((float)histogram[b] / (float)max * height
-                               + 0.5f);
-        if (bin_height != 0) {
-            // Draw one bin at column b.
-            for (int j = 1; j <= bin_height; j++) {
-                int row = height - j;
-                r.pos(b, row);
-                r[0] = 0;
-            }
-        }
-    }
-    return true;
-}
-
 
 
 OIIO_NAMESPACE_END

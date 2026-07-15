@@ -1,6 +1,6 @@
 // Copyright Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #pragma once
@@ -17,7 +17,7 @@ OIIO_NAMESPACE_BEGIN
 /// the basetype, but requires explicit conversion FROM the basetype.
 ///
 /// The problem this is meant to address is that you may have a function
-/// that has multiple bool, int, or float paramters, particularly if they
+/// that has multiple bool, int, or float parameters, particularly if they
 /// are adjacent in the call signature. This is extremely error prone. For
 /// example, suppose you have
 ///
@@ -68,7 +68,7 @@ OIIO_NAMESPACE_BEGIN
 /// implementation of units:
 ///
 /// Error prone: speed(float,float)  // which is first, meters or seconds?
-/// Unambigious: speed(Meters,Seconds)
+/// Unambiguous: speed(Meters,Seconds)
 ///
 ///     OIIO_STRONG_PARAM_TYPE(Meters, float);
 ///     OIIO_STRONG_PARAM_TYPE(Seconds, float);
@@ -82,6 +82,14 @@ OIIO_NAMESPACE_BEGIN
 /// Note that the fancy strong type is for declaration purposes. Any time
 /// you use it in the function, it implicitly converts to the underlying
 /// base type.
+///
+/// As an alternative to `OIIO_STRONG_TYPE(Meters, float)`, you may also use
+/// this notation (if you find it more pleasing):
+///
+///     using Meters = StrongParam<struct MetersTag, float>;
+///
+/// The MetersTag struct need not be defined anywhere, it just needs to
+/// be a unique name.
 ///
 
 template<typename Tag, typename Basetype> struct StrongParam {

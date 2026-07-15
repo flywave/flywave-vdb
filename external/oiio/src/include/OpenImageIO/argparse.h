@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: BSD-3-Clause and Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #pragma once
@@ -65,7 +65,7 @@ OIIO_NAMESPACE_BEGIN
 ///
 /// Parse the command line:
 ///
-///     ap.parse (argc, argv);
+///     ap.parse_args(argc, argv);
 ///
 /// Extract the values like they are attributes in a ParamValueList:
 ///
@@ -79,7 +79,7 @@ OIIO_NAMESPACE_BEGIN
 // Old syntax
 // ----------
 //
-// We still support this old syntax as well:
+// We still support this old syntax as well, but only internally:
 //
 // The parse function takes a list of options and variables or functions
 // for storing option values and return <0 on failure:
@@ -107,7 +107,7 @@ OIIO_NAMESPACE_BEGIN
 //                   "set the camera position",
 //             "-lookat %f %f %f", &lx, &ly, &lz,
 //                   "set the position of interest",
-//             "-oversampling %d", &oversampling,  "oversamping rate",
+//             "-oversampling %d", &oversampling,  "oversampling rate",
 //             "-passes %d", &passes, "number of passes",
 //             "-lens %f %f %f", &aperture, &focalDistance, &focalLength,
 //                    "set aperture, focal distance, focal length",
@@ -171,7 +171,7 @@ OIIO_NAMESPACE_BEGIN
 /////////////////////////////////////////////////////////////////////////////
 
 
-class OIIO_API ArgParse {
+class OIIO_UTIL_API ArgParse {
 public:
     class Arg;  // Forward declarion of Arg
 
@@ -189,7 +189,7 @@ public:
     ArgParse(int argc, const char** argv);
 
     // Disallow copy ctr and assignment
-    ArgParse(const ArgParse&) = delete;
+    ArgParse(const ArgParse&)                  = delete;
     const ArgParse& operator=(const ArgParse&) = delete;
 
     /// Move constructor
@@ -236,6 +236,10 @@ public:
     /// like any other argument.
     ArgParse& add_help(bool add_help);
 
+    /// Calling `add_version()` adds a `--version` argument, which will print
+    /// the version string supplied.
+    ArgParse& add_version(string_view version_string);
+
     /// By default, if the command line arguments do not conform to what is
     /// declared to ArgParse (for example, if unknown commands are
     /// encountered, required arguments are not found, etc.), the ArgParse
@@ -254,6 +258,18 @@ public:
 
     /// Reveal whether the current state is aborted.
     bool aborted() const;
+
+    /// Set whether current actions should run.
+    void running(bool run);
+
+    /// Reveal whether current actions should run.
+    bool running() const;
+
+    /// Reveal the current argument that is being parsed.
+    int current_arg() const;
+
+    /// Set the next argument to be processed. Use with extreme caution!
+    void set_next_arg(int nextarg);
 
     /// @}
 
@@ -401,7 +417,7 @@ public:
     ///       .help("Verbose mode")
     ///       .action(Arg::store_true());
     ///
-    class OIIO_API Arg {
+    class OIIO_UTIL_API Arg {
     public:
         // Arg constructor. This should only be called by
         // ArgParse::add_argument().
@@ -410,7 +426,7 @@ public:
         {
         }
         // Disallow copy ctr and assignment
-        Arg(const Arg&)    = delete;
+        Arg(const Arg&)                  = delete;
         const Arg& operator=(const Arg&) = delete;
 
         /// Set the help / description of this command line argument.
@@ -483,6 +499,9 @@ public:
 
         /// Mark the argument as hidden from the help message.
         Arg& hidden();
+
+        /// Always run, even when ArgParse.running() is false.
+        Arg& always_run();
 
         /// Set the action for this argument to store 1 in the destination
         /// attribute. Initialize the destination attribute to 0 now. Do not
@@ -741,20 +760,25 @@ public:
     // The format string is followed by a list of pointers to the argument
     // variables, just like scanf.  A NULL terminates the list.  Multiple
     // calls to options() will append additional options.
+    OIIO_DEPRECATED_EXTERNAL("(2.2)")
     int options(const char* intro, ...);
 
     // old name
-    // DEPRECATED(2.2)
+    OIIO_DEPRECATED_EXTERNAL("Use parse_args() instead. (2.2)")
     int parse(int argc, const char** argv) { return parse_args(argc, argv); }
 
     // Type for a callback that writes something to the output stream.
+    OIIO_DEPRECATED_EXTERNAL("(2.2)")
     typedef std::function<void(const ArgParse& ap, std::ostream&)> callback_t;
     // Set callbacks to run that will print any matter you want as part
     // of the verbose usage, before and after the options are detailed.
+    OIIO_DEPRECATED_EXTERNAL("(2.2)")
     void set_preoption_help(callback_t callback);
+    OIIO_DEPRECATED_EXTERNAL("(2.2)")
     void set_postoption_help(callback_t callback);
 
     // DEPRECATED(2.2) synonym for `print_help()`.
+    OIIO_DEPRECATED_EXTERNAL("Use print_help() instead. (2.2)")
     void usage() const { print_help(); }
 };
 

@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 /// \file
 /// Implementation of ImageBufAlgo algorithms that do math on
@@ -9,6 +9,8 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+
+#include <OpenImageIO/half.h>
 
 #include <OpenImageIO/dassert.h>
 #include <OpenImageIO/deepdata.h>
@@ -428,6 +430,71 @@ ImageBufAlgo::pow(const ImageBuf& A, cspan<float> b, ROI roi, int nthreads)
     bool ok = pow(result, A, b, roi, nthreads);
     if (!ok && !result.has_error())
         result.errorfmt("pow error");
+    return result;
+}
+
+template<class Rtype>
+static bool
+normalize_impl(ImageBuf& R, const ImageBuf& A, float inCenter, float outCenter,
+               float scale, ROI roi, int nthreads)
+{
+    ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
+        ImageBuf::ConstIterator<Rtype> a(A, roi);
+        for (ImageBuf::Iterator<Rtype> r(R, roi); !r.done(); ++r, ++a) {
+            float x = a[0] - inCenter;
+            float y = a[1] - inCenter;
+            float z = a[2] - inCenter;
+
+            float length = std::sqrt(x * x + y * y + z * z);
+
+            float s = (length > 0.0f) ? scale / length : 0.0f;
+
+            r[0] = x * s + outCenter;
+            r[1] = y * s + outCenter;
+            r[2] = z * s + outCenter;
+
+            if (R.spec().nchannels == 4) {
+                r[3] = a[3];
+            }
+        }
+    });
+    return true;
+}
+
+bool
+ImageBufAlgo::normalize(ImageBuf& dst, const ImageBuf& src, float inCenter,
+                        float outCenter, float scale, ROI roi, int nthreads)
+{
+    if (!ImageBufAlgo::IBAprep(roi, &dst, &src))
+        return false;
+
+    if (src.spec().nchannels != 3 && src.spec().nchannels != 4) {
+        src.errorfmt("normalize can only handle 3- or 4-channel images");
+        return false;
+    }
+    if (src.spec().nchannels < dst.spec().nchannels) {
+        dst.errorfmt(
+            "destination buffer can`t have more channels than the source");
+        return false;
+    }
+
+    bool ok;
+    OIIO_DISPATCH_COMMON_TYPES(ok, "normalize", normalize_impl,
+                               dst.spec().format, dst, src, inCenter, outCenter,
+                               scale, roi, nthreads);
+
+    return ok;
+}
+
+ImageBuf
+ImageBufAlgo::normalize(const ImageBuf& A, float inCenter, float outCenter,
+                        float scale, ROI roi, int nthreads)
+{
+    ImageBuf result;
+    bool ok = ImageBufAlgo::normalize(result, A, inCenter, outCenter, scale,
+                                      roi, nthreads);
+    if (!ok && !result.has_error())
+        result.errorfmt("normalize error");
     return result;
 }
 
@@ -1046,6 +1113,92 @@ ImageBufAlgo::contrast_remap(const ImageBuf& src, cspan<float> black,
 
 
 
+template<class Rtype, class Atype>
+static bool
+saturate_(ImageBuf& R, const ImageBuf& A, float scale, int firstchannel,
+          ROI roi, int nthreads)
+{
+    ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
+        // Gross simplification: assume linear sRGB primaries. Ick -- but
+        // what else to do if we don't really know the color space or its
+        // characteristics?
+        // FIXME: come back to this.
+        const simd::vfloat3 weights(0.2126f, 0.7152f, 0.0722f);
+        ImageBuf::ConstIterator<Atype> a(A, roi);
+        for (ImageBuf::Iterator<Rtype> r(R, roi); !r.done(); ++r, ++a) {
+            for (int c = roi.chbegin; c < firstchannel; ++c)
+                r[c] = a[c];
+            simd::vfloat3 rgb(a[firstchannel], a[firstchannel + 1],
+                              a[firstchannel + 2]);
+            simd::vfloat3 luma  = simd::vdot(rgb, weights);
+            rgb                 = lerp(luma, rgb, scale);
+            r[firstchannel]     = rgb[0];
+            r[firstchannel + 1] = rgb[1];
+            r[firstchannel + 2] = rgb[2];
+            for (int c = firstchannel + 3; c < roi.chend; ++c)
+                r[c] = a[c];
+        }
+    });
+    return true;
+}
+
+
+
+bool
+ImageBufAlgo::saturate(ImageBuf& dst, const ImageBuf& src, float scale,
+                       int firstchannel, ROI roi, int nthreads)
+{
+    pvt::LoggedTimer logtime("IBA::saturate");
+    if (!IBAprep(roi, &dst, &src, IBAprep_CLAMP_MUTUAL_NCHANNELS))
+        return false;
+
+    // Some basic error checking on whether the channel set makes sense
+    int alpha_channel = src.spec().alpha_channel;
+    int z_channel     = src.spec().z_channel;
+    if (roi.chend - firstchannel < 3) {
+        dst.errorfmt(
+            "ImageBufAlgo::saturate can only work on 3 channels at a time. "
+            "You specified starting at channel {} of a {}-channel ROI, that's not enough.",
+            firstchannel, roi.nchannels());
+        return false;
+    }
+    if (alpha_channel >= firstchannel && alpha_channel < firstchannel + 3) {
+        dst.errorfmt(
+            "ImageBufAlgo::saturate cannot operate alpha channels "
+            "and you asked saturate to operate on channels {}-{}. Alpha is channel {}.",
+            firstchannel, firstchannel + 2, alpha_channel);
+        return false;
+    }
+    if (z_channel >= firstchannel && z_channel < firstchannel + 3) {
+        dst.errorfmt(
+            "ImageBufAlgo::saturate cannot operate z channels "
+            "and you asked saturate to operate on channels {}-{}. Z is channel {}.",
+            firstchannel, firstchannel + 2, z_channel);
+        return false;
+    }
+
+    bool ok = true;
+    OIIO_DISPATCH_COMMON_TYPES2(ok, "saturate", saturate_, dst.spec().format,
+                                src.spec().format, dst, src, scale,
+                                firstchannel, roi, nthreads);
+    return ok;
+}
+
+
+
+ImageBuf
+ImageBufAlgo::saturate(const ImageBuf& src, float scale, int firstchannel,
+                       ROI roi, int nthreads)
+{
+    ImageBuf result;
+    bool ok = saturate(result, src, scale, firstchannel, roi, nthreads);
+    if (!ok && !result.has_error())
+        result.errorfmt("ImageBufAlgo::saturate() error");
+    return result;
+}
+
+
+
 template<class D, class S>
 static bool
 color_map_(ImageBuf& dst, const ImageBuf& src, int srcchannel, int nknots,
@@ -1082,7 +1235,7 @@ ImageBufAlgo::color_map(ImageBuf& dst, const ImageBuf& src, int srcchannel,
         dst.errorfmt("invalid source channel selected");
         return false;
     }
-    if (nknots < 2 || knots.size() < (nknots * channels)) {
+    if (nknots < 2 || std::ssize(knots) < (nknots * channels)) {
         dst.errorfmt("not enough knot values supplied");
         return false;
     }

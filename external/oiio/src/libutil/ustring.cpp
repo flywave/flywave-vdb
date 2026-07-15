@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <string>
 #include <unordered_map>
@@ -69,7 +69,7 @@ template<unsigned BASE_CAPACITY, unsigned POOL_SIZE> struct TableRepMap {
     }
 #endif
 
-    const char* lookup(string_view str, size_t hash)
+    const char* lookup(string_view str, uint64_t hash)
     {
         ustring_read_lock_t lock(mutex);
 #ifdef USTRING_TRACK_NUM_LOOKUPS
@@ -93,7 +93,31 @@ template<unsigned BASE_CAPACITY, unsigned POOL_SIZE> struct TableRepMap {
         }
     }
 
-    const char* insert(string_view str, size_t hash)
+    // Look up based on hash only. Return nullptr if not found. Note that if
+    // the hash is not unique, this will return the first entry that matches
+    // the hash.
+    const char* lookup(uint64_t hash)
+    {
+        ustring_read_lock_t lock(mutex);
+#ifdef USTRING_TRACK_NUM_LOOKUPS
+        // NOTE: this simple increment adds a substantial amount of overhead
+        // so keep it off by default, unless the user really wants it
+        // NOTE2: note that in debug, asserts like the one in ustring::from_unique
+        // can skew the number of lookups compared to release builds
+        ++num_lookups;
+#endif
+        size_t pos = hash & mask, dist = 0;
+        for (;;) {
+            if (entries[pos] == 0)
+                return 0;
+            if (entries[pos]->hashed == hash)
+                return entries[pos]->c_str();
+            ++dist;
+            pos = (pos + dist) & mask;  // quadratic probing
+        }
+    }
+
+    const char* insert(string_view str, uint64_t hash)
     {
         ustring_write_lock_t lock(mutex);
         size_t pos = hash & mask, dist = 0;
@@ -149,7 +173,7 @@ private:
         mask    = new_mask;
     }
 
-    ustring::TableRep* make_rep(string_view str, size_t hash)
+    ustring::TableRep* make_rep(string_view str, uint64_t hash)
     {
         char* repmem = pool_alloc(sizeof(ustring::TableRep) + str.length() + 1);
         return new (repmem) ustring::TableRep(str, hash);
@@ -157,7 +181,7 @@ private:
 
     char* pool_alloc(size_t len)
     {
-        // round up to nearest multiple of pointer size to guarentee proper alignment of TableRep objects
+        // round up to nearest multiple of pointer size to guarantee proper alignment of TableRep objects
         len = (len + alignof(ustring::TableRep) - 1)
               & ~(alignof(ustring::TableRep) - 1);
 
@@ -195,12 +219,16 @@ typedef TableRepMap<1 << 20, 16 << 20> UstringTable;
 // Optimized map broken up into chunks by the top bits of the hash.
 // This helps reduce the amount of contention for locks.
 struct UstringTable {
-    const char* lookup(string_view str, size_t hash)
+    using hash_t = ustring::hash_t;
+
+    const char* lookup(string_view str, hash_t hash)
     {
         return whichbin(hash).lookup(str, hash);
     }
 
-    const char* insert(string_view str, size_t hash)
+    const char* lookup(hash_t hash) { return whichbin(hash).lookup(hash); }
+
+    const char* insert(string_view str, uint64_t hash)
     {
         return whichbin(hash).insert(str, hash);
     }
@@ -233,7 +261,7 @@ struct UstringTable {
 
 private:
     enum {
-        // NOTE: this guarentees NUM_BINS is a power of 2
+        // NOTE: this guarantees NUM_BINS is a power of 2
         BIN_SHIFT = 12,
         NUM_BINS  = 1 << BIN_SHIFT,
         TOP_SHIFT = 8 * sizeof(size_t) - BIN_SHIFT
@@ -243,7 +271,7 @@ private:
 
     Bin bins[NUM_BINS];
 
-    Bin& whichbin(size_t hash)
+    Bin& whichbin(uint64_t hash)
     {
         // use the top bits of the hash to pick a bin
         // (lower bits choose position within the table)
@@ -257,8 +285,8 @@ std::string ustring::empty_std_string;
 
 // The reverse map that lets you look up a string by its initial hash.
 using ReverseMap
-    = unordered_map_concurrent<size_t, const char*, identity<size_t>,
-                               std::equal_to<size_t>, 256 /*bins*/>;
+    = unordered_map_concurrent<uint64_t, const char*, identity<uint64_t>,
+                               std::equal_to<uint64_t>, 256 /*bins*/>;
 
 
 namespace {  // anonymous
@@ -280,7 +308,7 @@ reverse_map()
 
 
 // Keep track of any collisions
-static std::vector<std::pair<const char*, size_t>> all_hash_collisions;
+static std::vector<std::pair<const char*, uint64_t>> all_hash_collisions;
 OIIO_CACHE_ALIGN static std::mutex collision_mutex;
 
 }  // end anonymous namespace
@@ -308,7 +336,7 @@ struct libcpp_string__long {
     std::string::size_type __size_;
     std::string::size_type __cap_;
 };
-#    if _LIBCPP_BIG_ENDIAN
+#    ifdef _LIBCPP_BIG_ENDIAN
 enum { libcpp_string__long_mask = 0x1ul };
 #    else   // _LIBCPP_BIG_ENDIAN
 enum { libcpp_string__long_mask = ~(std::string::size_type(~0) >> 1) };
@@ -319,7 +347,7 @@ struct libcpp_string__long {
     std::string::size_type __size_;
     std::string::pointer __data_;
 };
-#    if _LIBCPP_BIG_ENDIAN
+#    ifdef _LIBCPP_BIG_ENDIAN
 enum { libcpp_string__long_mask = ~(std::string::size_type(~0) >> 1) };
 #    else   // _LIBCPP_BIG_ENDIAN
 enum { libcpp_string__long_mask = 0x1ul };
@@ -339,7 +367,7 @@ enum {
 
 
 
-ustring::TableRep::TableRep(string_view strref, size_t hash)
+ustring::TableRep::TableRep(string_view strref, ustring::hash_t hash)
     : hashed(hash)
 {
     length = strref.length();
@@ -362,7 +390,7 @@ ustring::TableRep::TableRep(string_view strref, size_t hash)
     // It turns out that the first field of a gcc std::string is a pointer
     // to the characters within the basic_string::_Rep.  We merely redirect
     // that pointer, though for std::string to function properly, the chars
-    // must be preceeded immediately in memory by the rest of
+    // must be preceded immediately in memory by the rest of
     // basic_string::_Rep, consisting of length, capacity and refcount
     // fields.  And we have designed our TableRep to do just that!  So now
     // we redirect the std::string's pointer to our own characters and its
@@ -376,7 +404,11 @@ ustring::TableRep::TableRep(string_view strref, size_t hash)
     OIIO_DASSERT(str.c_str() == c_str() && str.size() == length);
     return;
 
-#elif defined(_LIBCPP_VERSION)
+#elif defined(_LIBCPP_VERSION) && !defined(__aarch64__)
+    // FIXME -- we seem to do the wrong thing with libcpp on Mac M1. Disable
+    // when on aarch64 for now. Come back and fix then when I have easier
+    // access to an M1 Mac.
+    //
     // libc++ uses a different std::string representation than gcc.  For
     // long char sequences, it's two size_t's (capacity & length) followed
     // by the pointer to allocated characters. (Gory detail: see the
@@ -387,7 +419,7 @@ ustring::TableRep::TableRep(string_view strref, size_t hash)
     // allocations to be had for short strings, so we just let those behave
     // as normal.  But if it's going to make a long string (we can tell from
     // the length), we construct it ourselves, forcing the pointer to point
-    // to the charcters in the TableRep we allocated.
+    // to the characters in the TableRep we allocated.
     if (length >= libcpp_string__min_cap /* it'll be a "long string" */) {
         ((libcpp_string__long*)&str)->__cap_ = libcpp_string__long_mask
                                                | (length + 1);
@@ -423,13 +455,13 @@ const char*
 ustring::make_unique(string_view strref)
 {
     UstringTable& table(ustring_table());
-    // Eliminate NULLs
+    // Eliminate nullptr-referred string views
     if (!strref.data())
         strref = string_view("", 0);
 
-    size_t hash = Strutil::strhash(strref);
+    hash_t hash = Strutil::strhash64(strref);
     // This line, if uncommented, lets you force lots of hash collisions:
-    // hash &= ~size_t(0xffffff);
+    // hash &= ~hash_t(0xffffff);
 
 #if !PREVENT_HASH_COLLISIONS
     // Check the ustring table to see if this string already exists.  If so,
@@ -438,6 +470,18 @@ ustring::make_unique(string_view strref)
     const char* result = table.lookup(strref, hash);
     if (result)
         return result;
+    auto nul = strref.find('\0');
+    if (nul != string_view::npos) {
+        // Strutil::print("ustring::make_unique: string contains nulls @{}/{}: \"{}\"\n",
+        //                strref.find('\0'), strref.size(), strref);
+        // OIIO_ASSERT(strref.find('\0') == string_view::npos &&
+        //             "ustring::make_unique() does not support embedded nulls");
+        strref = strref.substr(0, nul);
+        hash   = Strutil::strhash64(strref);
+        result = table.lookup(strref, hash);
+        if (result)
+            return result;
+    }
     // Strutil::print("ADDED ustring \"{}\" {:08x}\n", strref, hash);
     return table.insert(strref, hash);
 
@@ -449,6 +493,21 @@ ustring::make_unique(string_view strref)
     const char* result = table.lookup(strref, hash);
     if (result)
         return result;
+
+    // ustring doesn't allow strings with embedded nul characters. Before we
+    // go any further, trim beyond any nul and rehash.
+    auto nul = strref.find('\0');
+    if (nul != string_view::npos) {
+        // Strutil::print("ustring::make_unique: string contains nulls @{}/{}: \"{}\"\n",
+        //                strref.find('\0'), strref.size(), strref);
+        // OIIO_ASSERT(strref.find('\0') == string_view::npos &&
+        //             "ustring::make_unique() does not support embedded nulls");
+        strref = strref.substr(0, nul);
+        hash   = Strutil::strhash64(strref);
+        result = table.lookup(strref, hash);
+        if (result)
+            return result;
+    }
 
     // We did not find it. There are two possibilities: (1) the string is in
     // the table but has a different hash because it collided; or (2) the
@@ -462,7 +521,7 @@ ustring::make_unique(string_view strref)
     auto& rm(reverse_map());
     size_t bin = rm.lock_bin(hash);
 
-    size_t orighash     = hash;
+    hash_t orighash     = hash;
     size_t binmask      = orighash & (~rm.nobin_mask());
     size_t num_rehashes = 0;
 
@@ -486,7 +545,7 @@ ustring::make_unique(string_view strref)
             result = rev->second;
             break;
         }
-        // Rehash, but keep the bin bits identical so we alwasy rehash into
+        // Rehash, but keep the bin bits identical so we always rehash into
         // the same (locked) bin.
         hash = (hash & binmask)
                | (farmhash::Fingerprint(hash) & rm.nobin_mask());
@@ -507,6 +566,15 @@ ustring::make_unique(string_view strref)
 
     return result;
 #endif
+}
+
+
+
+ustring
+ustring::from_hash(hash_t hash)
+{
+    UstringTable& table(ustring_table());
+    return from_unique(table.lookup(hash));
 }
 
 
@@ -534,15 +602,15 @@ ustring::concat(string_view s, string_view t)
 std::string
 ustring::getstats(bool verbose)
 {
-    UstringTable& table(ustring_table());
     std::ostringstream out;
     out.imbue(std::locale::classic());  // Force "C" locale with '.' decimal
-    size_t n_e = table.get_num_entries();
-    size_t mem = table.get_memory_usage();
+    size_t n_e = total_ustrings();
+    size_t mem = memory();
     if (verbose) {
         out << "ustring statistics:\n";
 #ifdef USTRING_TRACK_NUM_LOOKUPS
-        out << "  ustring requests: " << table.get_num_lookups() << "\n";
+        out << "  ustring requests: " << ustring_table().get_num_lookups()
+            << "\n";
 #endif
         out << "  unique strings: " << n_e << "\n";
         out << "  ustring memory: " << Strutil::memformat(mem) << "\n";
@@ -557,7 +625,7 @@ ustring::getstats(bool verbose)
 #endif
     } else {
 #ifdef USTRING_TRACK_NUM_LOOKUPS
-        out << "requests: " << table.get_num_lookups() << ", ";
+        out << "requests: " << ustring_table().get_num_lookups() << ", ";
 #endif
         out << "unique " << n_e << ", " << Strutil::memformat(mem);
     }

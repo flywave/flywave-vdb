@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <OpenImageIO/argparse.h>
@@ -54,6 +54,7 @@ main(int argc, char** argv)
 
     const int interval = 100000;  // 1/10 sec
     double eps         = 0.01;    // slop we allow in our timings
+    double epsrel      = 0.1;     // Allow an additional 10% relative error
 #ifdef __APPLE__
     eps = 0.03;
     // On some Apple OSX systems (especially >= 10.10 Yosemite), a feature
@@ -66,55 +67,69 @@ main(int argc, char** argv)
     // But you want better power use, so instead we just increase the timing
     // tolereance on Apple to make this test pass.
 #    if defined(OIIO_CI) || defined(OIIO_CODE_COVERAGE)
-    // It seems especially bad on Travis, give extra time slop.
-    // Got even worse in Nov 2017 on Travis. Make the slop enormous.
-    // Got worse again Nov 2018. (What does Travis do every November?)
+    // It seems especially bad on CI runs, so give extra time slop.
     eps = 1.0;
 #    endif
+#elif defined(OIIO_CI)
+    // Also on GitHub Actions CI, timing seems a little imprecise. Give it
+    // some extra room to avoid spurious CI failures on this test.
+    eps = 0.25;
 #endif
 
     // Verify that Timer(false) doesn't start
     Timer all(Timer::StartNow);
     Timer selective(Timer::DontStartNow);
     Sysutil::usleep(interval);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.0, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.1, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.0, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.1, eps, epsrel);
 
     // Make sure start/stop work
     selective.start();
     Sysutil::usleep(interval);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.1, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.2, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.1, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.2, eps, epsrel);
     selective.stop();
     Sysutil::usleep(interval);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.1, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.3, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.1, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.3, eps, epsrel);
     std::cout << "Checkpoint: All " << all() << " selective " << selective()
               << "\n";
 
     // Test reset() -- should set selective to 0 and turn it off
     selective.reset();
     Sysutil::usleep(interval);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.0, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.4, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.0, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.4, eps, epsrel);
     selective.start();
     Sysutil::usleep(interval);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.1, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.5, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.1, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.5, eps, epsrel);
 
     // Test lap()
     double lap = selective.lap();  // lap=.1, select.time_since_start
-    OIIO_CHECK_EQUAL_THRESH(lap, 0.1, eps);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.1, eps);
-    OIIO_CHECK_EQUAL_THRESH(selective.time_since_start(), 0.0, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.5, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(lap, 0.1, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.1, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective.time_since_start(), 0.0, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.5, eps, epsrel);
     Sysutil::usleep(interval);
-    OIIO_CHECK_EQUAL_THRESH(selective(), 0.2, eps);
-    OIIO_CHECK_EQUAL_THRESH(selective.time_since_start(), 0.1, eps);
-    OIIO_CHECK_EQUAL_THRESH(all(), 0.6, eps);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective(), 0.2, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(selective.time_since_start(), 0.1, eps, epsrel);
+    OIIO_CHECK_EQUAL_THRESH_REL(all(), 0.6, eps, epsrel);
     std::cout << "Checkpoint2: All " << all() << " selective " << selective()
               << "\n";
 
+    // Test add_ticks/add_seconds
+    {
+        Timer t(false);
+        Sysutil::usleep(100000);
+        OIIO_CHECK_EQUAL(t.ticking(), false);
+        t.add_ticks(100);
+        OIIO_CHECK_EQUAL(t.ticks(), 100);
+        t.add_ticks(100);
+        t.reset();
+        t.add_seconds(1.0);
+        OIIO_CHECK_EQUAL_THRESH(t(), 1.0, 1.0e-6);
+    }
 
     // Test Benchmarker
     Benchmarker bench;
@@ -123,7 +138,7 @@ main(int argc, char** argv)
 
     float val = 0.5;
     clobber(val);
-    simd::float4 val4 = val;
+    simd::vfloat4 val4 = val;
     clobber(val4);
 
     bench("add", [&]() { DoNotOptimize(val + 1.5); });

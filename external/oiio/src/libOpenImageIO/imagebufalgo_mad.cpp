@@ -1,12 +1,13 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 #include <cmath>
 #include <iostream>
 #include <limits>
 
 #include <OpenImageIO/dassert.h>
+#include <OpenImageIO/half.h>
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
 #include <OpenImageIO/imagebufalgo_util.h>
@@ -24,8 +25,10 @@ mad_impl(ImageBuf& R, const ImageBuf& A, const ImageBuf& B, const ImageBuf& C,
          ROI roi, int nthreads)
 {
     ImageBufAlgo::parallel_image(roi, nthreads, [&](ROI roi) {
-        if ((is_same<Rtype, float>::value || is_same<Rtype, half>::value)
-            && (is_same<ABCtype, float>::value || is_same<ABCtype, half>::value)
+        if ((std::is_same<Rtype, float>::value
+             || std::is_same<Rtype, half>::value)
+            && (std::is_same<ABCtype, float>::value
+                || std::is_same<ABCtype, half>::value)
             // && R.localpixels() // has to be, because it's writable
             && A.localpixels() && B.localpixels()
             && C.localpixels()
@@ -146,7 +149,7 @@ ImageBufAlgo::mad(ImageBuf& dst, Image_or_Const A_, Image_or_Const B_,
         A_.swap(B_);
     // Get pointers to any image. At least one of A or B must be an image.
     const ImageBuf *A = A_.imgptr(), *B = B_.imgptr(), *C = C_.imgptr();
-    if (!A && !B) {
+    if (!A) {
         dst.errorfmt(
             "ImageBufAlgo::mad(): at least one of the first two arguments must be an image");
         return false;
@@ -161,7 +164,8 @@ ImageBufAlgo::mad(ImageBuf& dst, Image_or_Const A_, Image_or_Const B_,
     // To avoid the full cross-product of dst/A/B/C types, force any of
     // A,B,C that are images to all be the same data type, copying if we
     // have to.
-    TypeDesc abc_type = type_merge(A ? A->spec().format : TypeUnknown,
+    TypeDesc abc_type
+        = TypeDesc::basetype_merge(A ? A->spec().format : TypeUnknown,
                                    B ? B->spec().format : TypeUnknown,
                                    C ? C->spec().format : TypeUnknown);
     ImageBuf Anew, Bnew, Cnew;

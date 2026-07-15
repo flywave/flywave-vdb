@@ -1,3 +1,7 @@
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
+
 #include <sstream>
 #include <vector>
 
@@ -321,9 +325,10 @@ public:
         destSpec.attribute("maketx:checknan", (int)checkNan_);
         destSpec.attribute("maketx:verbose", (int)verbose_);
 
-        std::string software = Strutil::sprintf("OpenImageIO %s, Nuke %s",
-                                                OIIO_VERSION_STRING,
-                                                applicationVersion().string());
+        std::string software
+            = Strutil::fmt::format("OpenImageIO {}, Nuke {}",
+                                   OIIO_VERSION_STRING,
+                                   applicationVersion().string());
         destSpec.attribute("Software", software);
 
         if (aborted())

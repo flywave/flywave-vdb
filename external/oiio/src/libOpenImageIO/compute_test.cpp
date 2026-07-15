@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 //
@@ -44,7 +44,8 @@ static ImageBuf imgA, imgB, imgR;
 
 
 
-static void test_arrays(ROI)
+static void
+test_arrays(ROI)
 {
     const float* a = (const float*)imgA.localpixels();
     OIIO_DASSERT(a);
@@ -79,7 +80,8 @@ test_arrays_like_image(ROI roi)
 
 
 
-static void test_arrays_simd4(ROI)
+static void
+test_arrays_simd4(ROI)
 {
     const float* a = (const float*)imgA.localpixels();
     OIIO_DASSERT(a);
@@ -232,9 +234,9 @@ getargs(int argc, char* argv[])
     ap.arg("-v", &verbose)
       .help("Verbose mode");
     ap.arg("--threads %d", &numthreads)
-      .help(Strutil::sprintf("Number of threads (default: %d)", numthreads));
+      .help(Strutil::fmt::format("Number of threads (default: {})", numthreads));
     ap.arg("--iters %d", &iterations)
-      .help(Strutil::sprintf("Number of iterations (default: %d)", iterations));
+      .help(Strutil::fmt::format("Number of iterations (default: {})", iterations));
     ap.arg("--trials %d", &ntrials)
       .help("Number of trials");
     ap.arg("--allgpus", &allgpus)
@@ -269,8 +271,10 @@ main(int argc, char* argv[])
     float green[3] = { 0, 1, 0 };
     float blue[3]  = { 0, 0, 1 };
     float black[3] = { 0, 0, 0 };
-    ImageBufAlgo::fill(imgA, red, green, red, green);
-    ImageBufAlgo::fill(imgB, blue, blue, black, black);
+    ImageBufAlgo::fill(imgA, cspan<float>(red), cspan<float>(green),
+                       cspan<float>(red), cspan<float>(green));
+    ImageBufAlgo::fill(imgB, cspan<float>(blue), cspan<float>(blue),
+                       cspan<float>(black), cspan<float>(black));
     // imgA.write ("A.exr");
     // imgB.write ("B.exr");
 

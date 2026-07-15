@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <cmath>
@@ -10,24 +10,13 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <regex>
 
 #include <OpenImageIO/argparse.h>
 #include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/strutil.h>
 #include <OpenImageIO/sysutil.h>
-
-#ifdef USE_BOOST_REGEX
-#    include <boost/regex.hpp>
-using boost::regex;
-using boost::regex_search;
-using namespace boost::regex_constants;
-#else
-#    include <regex>
-using std::regex;
-using std::regex_search;
-using namespace std::regex_constants;
-#endif
 
 using namespace OIIO;
 
@@ -44,7 +33,7 @@ static std::vector<std::string> filenames;
 
 
 static bool
-grep_file(const std::string& filename, regex& re,
+grep_file(const std::string& filename, std::regex& re,
           bool ignore_nonimage_files = false)
 {
     if (!Filesystem::exists(filename)) {
@@ -73,10 +62,15 @@ grep_file(const std::string& filename, regex& re,
             std::cerr << geterror() << "\n";
         return false;
     }
-    ImageSpec spec = in->spec();
 
     if (file_match) {
-        bool match = regex_search(filename, re);
+        bool match = false;
+        try {
+            match = std::regex_search(filename, re);
+        } catch (const std::regex_error& e) {
+            std::cerr << "igrep: " << e.what() << "\n";
+            return false;
+        }
         if (match && !invert_match) {
             std::cout << filename << "\n";
             return true;
@@ -88,12 +82,20 @@ grep_file(const std::string& filename, regex& re,
     do {
         if (!all_subimages && subimage > 0)
             break;
+        ImageSpec spec = in->spec(subimage);
         for (auto&& p : spec.extra_attribs) {
             TypeDesc t = p.type();
             if (t.elementtype() == TypeDesc::STRING) {
                 int n = t.numelements();
                 for (int i = 0; i < n; ++i) {
-                    bool match = regex_search(((const char**)p.data())[i], re);
+                    bool match = false;
+                    try {
+                        match = std::regex_search(((const char**)p.data())[i],
+                                                  re);
+                    } catch (const std::regex_error& e) {
+                        std::cerr << "igrep: " << e.what() << "\n";
+                        return false;
+                    }
                     found |= match;
                     if (match && !invert_match) {
                         if (list_files) {
@@ -106,7 +108,7 @@ grep_file(const std::string& filename, regex& re,
                 }
             }
         }
-    } while (in->seek_subimage(++subimage, 0, spec));
+    } while (in->seek_subimage(++subimage, 0));
 
     if (invert_match) {
         found = !found;
@@ -144,7 +146,8 @@ main(int argc, const char* argv[])
     ArgParse ap;
     ap.intro("igrep -- search images for matching metadata\n"
              OIIO_INTRO_STRING)
-      .usage("igrep [options] pattern filename...");
+      .usage("igrep [options] pattern filename...")
+      .add_version(OIIO_VERSION_STRING);
     ap.arg("filename")
       .hidden()
       .action(parse_files);
@@ -173,23 +176,22 @@ main(int argc, const char* argv[])
         return help ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
-#if USE_BOOST_REGEX
-    boost::regex_constants::syntax_option_type flag
-        = boost::regex_constants::grep;
-    if (ap["E"].get<int>())
-        flag = boost::regex::extended;
-    if (ap["i"].get<int>())
-        flag |= boost::regex_constants::icase;
-#else
     auto flag = std::regex_constants::grep;
     if (ap["E"].get<int>())
         flag = std::regex_constants::extended;
     if (ap["i"].get<int>())
         flag |= std::regex_constants::icase;
-#endif
-    regex re(pattern, flag);
-    for (auto&& s : filenames)
-        grep_file(s, re);
 
-    return 0;
+    bool ok = true;
+
+    try {
+        std::regex re(pattern, flag);
+        for (auto&& s : filenames)
+            grep_file(s, re);
+    } catch (const std::regex_error& e) {
+        std::cerr << "igrep: " << e.what() << "\n";
+        ok = false;
+    }
+    shutdown();
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

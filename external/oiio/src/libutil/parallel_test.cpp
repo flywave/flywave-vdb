@@ -1,6 +1,6 @@
-// Copyright 2008-present Contributors to the OpenImageIO project.
-// SPDX-License-Identifier: BSD-3-Clause
-// https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+// Copyright Contributors to the OpenImageIO project.
+// SPDX-License-Identifier: Apache-2.0
+// https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 
 #include <algorithm>
@@ -39,9 +39,9 @@ getargs(int argc, char* argv[])
     ap.arg("-v", &verbose)
       .help("Verbose mode");
     ap.arg("--threads %d", &numthreads)
-      .help(Strutil::sprintf("Number of threads (default: %d)", numthreads));
+      .help(Strutil::fmt::format("Number of threads (default: {})", numthreads));
     ap.arg("--iters %d", &iterations)
-      .help(Strutil::sprintf("Number of iterations (default: %d)", iterations));
+      .help(Strutil::fmt::format("Number of iterations (default: {})", iterations));
     ap.arg("--trials %d", &ntrials)
       .help("Number of trials");
     ap.arg("--wedge", &wedge)
@@ -124,13 +124,13 @@ test_thread_pool_recursion()
     static spin_mutex print_mutex;
     thread_pool* pool(default_thread_pool());
     pool->resize(2);
-    parallel_for(0, 10, [&](int /*id*/, int64_t /*i*/) {
+    parallel_for(0, 10, [&](int64_t /*i*/) {
         // sleep long enough that we can push all the jobs before any get
         // done.
         Sysutil::usleep(10);
         // then run something else that itself will push jobs onto the
         // thread pool queue.
-        parallel_for(0, 10, [&](int /*id*/, int64_t /*i*/) {
+        parallel_for(0, 10, [&](int64_t /*i*/) {
             Sysutil::usleep(2);
             spin_lock lock(print_mutex);
             // std::cout << "  recursive running thread " << id << std::endl;
@@ -162,6 +162,19 @@ test_empty_thread_pool()
 
 
 
+void
+test_thread_pool_shutdown()
+{
+    // Test that we can shut down the pool before exiting
+    thread_pool* pool(default_thread_pool());
+    pool->resize(3);
+    OIIO_CHECK_EQUAL(pool->size(), 3);
+    default_thread_pool_shutdown();
+    OIIO_CHECK_EQUAL(pool->size(), 0);
+}
+
+
+
 int
 main(int argc, char** argv)
 {
@@ -182,6 +195,7 @@ main(int argc, char** argv)
     time_parallel_for();
     test_thread_pool_recursion();
     test_empty_thread_pool();
+    test_thread_pool_shutdown();
 
     return unit_test_failures;
 }

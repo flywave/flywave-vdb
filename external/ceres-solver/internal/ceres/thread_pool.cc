@@ -1,5 +1,5 @@
 // Ceres Solver - A fast non-linear least squares minimizer
-// Copyright 2018 Google Inc. All rights reserved.
+// Copyright 2023 Google Inc. All rights reserved.
 // http://ceres-solver.org/
 //
 // Redistribution and use in source and binary forms, with or without
@@ -28,41 +28,37 @@
 //
 // Author: vitus@google.com (Michael Vitus)
 
-// This include must come before any #ifndef check on Ceres compile options.
-#include "ceres/internal/port.h"
-
-#ifdef CERES_USE_CXX11_THREADS
-
 #include "ceres/thread_pool.h"
 
 #include <cmath>
+#include <limits>
 
-namespace ceres {
-namespace internal {
+#include "ceres/internal/config.h"
+
+namespace ceres::internal {
 namespace {
 
 // Constrain the total number of threads to the amount the hardware can support.
 int GetNumAllowedThreads(int requested_num_threads) {
-  const int num_hardware_threads = std::thread::hardware_concurrency();
-  // hardware_concurrency() can return 0 if the value is not well defined or not
-  // computable.
-  if (num_hardware_threads == 0) {
-    return requested_num_threads;
-  }
-
-  return std::min(requested_num_threads, num_hardware_threads);
+  return std::min(requested_num_threads, ThreadPool::MaxNumThreadsAvailable());
 }
 
 }  // namespace
 
-ThreadPool::ThreadPool() { }
-
-ThreadPool::ThreadPool(int num_threads) {
-  Resize(num_threads);
+int ThreadPool::MaxNumThreadsAvailable() {
+  const int num_hardware_threads = std::thread::hardware_concurrency();
+  // hardware_concurrency() can return 0 if the value is not well defined or not
+  // computable.
+  return num_hardware_threads == 0 ? std::numeric_limits<int>::max()
+                                   : num_hardware_threads;
 }
 
+ThreadPool::ThreadPool() = default;
+
+ThreadPool::ThreadPool(int num_threads) { Resize(num_threads); }
+
 ThreadPool::~ThreadPool() {
-  std::unique_lock<std::mutex> lock(thread_pool_mutex_);
+  std::lock_guard<std::mutex> lock(thread_pool_mutex_);
   // Signal the thread workers to stop and wait for them to finish all scheduled
   // tasks.
   Stop();
@@ -72,7 +68,7 @@ ThreadPool::~ThreadPool() {
 }
 
 void ThreadPool::Resize(int num_threads) {
-  std::unique_lock<std::mutex> lock(thread_pool_mutex_);
+  std::lock_guard<std::mutex> lock(thread_pool_mutex_);
 
   const int num_current_threads = thread_pool_.size();
   if (num_current_threads >= num_threads) {
@@ -83,7 +79,7 @@ void ThreadPool::Resize(int num_threads) {
       GetNumAllowedThreads(num_threads) - num_current_threads;
 
   for (int i = 0; i < create_num_threads; ++i) {
-    thread_pool_.push_back(std::thread(&ThreadPool::ThreadMainLoop, this));
+    thread_pool_.emplace_back(&ThreadPool::ThreadMainLoop, this);
   }
 }
 
@@ -92,7 +88,7 @@ void ThreadPool::AddTask(const std::function<void()>& func) {
 }
 
 int ThreadPool::Size() {
-  std::unique_lock<std::mutex> lock(thread_pool_mutex_);
+  std::lock_guard<std::mutex> lock(thread_pool_mutex_);
   return thread_pool_.size();
 }
 
@@ -103,11 +99,6 @@ void ThreadPool::ThreadMainLoop() {
   }
 }
 
-void ThreadPool::Stop() {
-  task_queue_.StopWaiters();
-}
+void ThreadPool::Stop() { task_queue_.StopWaiters(); }
 
-}  // namespace internal
-}  // namespace ceres
-
-#endif // CERES_USE_CXX11_THREADS
+}  // namespace ceres::internal

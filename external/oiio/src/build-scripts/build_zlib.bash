@@ -3,8 +3,8 @@
 # Utility script to download and build zlib
 #
 # Copyright Contributors to the OpenImageIO project.
-# SPDX-License-Identifier: BSD-3-Clause
-# https://github.com/OpenImageIO/oiio
+# SPDX-License-Identifier: Apache-2.0
+# https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 # Exit the whole script if any command fails.
 set -ex
@@ -21,6 +21,10 @@ ZLIB_BUILD_DIR=${ZLIB_BUILD_DIR:=${ZLIB_SRC_DIR}/build}
 ZLIB_INSTALL_DIR=${ZLIB_INSTALL_DIR:=${PWD}/ext/dist}
 #ZLIB_CONFIG_OPTS=${ZLIB_CONFIG_OPTS:=}
 
+# Fix zlib which breaks against cmake 4.0 because of too-old cmake min.
+# Remove when zlib is fixed to declare its own minimum high enough.
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
+
 pwd
 echo "zlib install dir will be: ${ZLIB_INSTALL_DIR}"
 
@@ -33,15 +37,16 @@ if [[ ! -e ${ZLIB_SRC_DIR} ]] ; then
     git clone ${ZLIB_REPO} ${ZLIB_SRC_DIR}
 fi
 cd ${ZLIB_SRC_DIR}
+
 echo "git checkout ${ZLIB_VERSION} --force"
 git checkout ${ZLIB_VERSION} --force
 
-mkdir -p ${ZLIB_BUILD_DIR} && true
-cd ${ZLIB_BUILD_DIR}
-time cmake -DCMAKE_BUILD_TYPE=Release \
-           -DCMAKE_INSTALL_PREFIX=${ZLIB_INSTALL_DIR} \
-           ${ZLIB_CONFIG_OPTS} ..
-time cmake --build . --config Release --target install
+if [[ -z $DEP_DOWNLOAD_ONLY ]]; then
+    time cmake -S . -B ${ZLIB_BUILD_DIR} -DCMAKE_BUILD_TYPE=Release \
+               -DCMAKE_INSTALL_PREFIX=${ZLIB_INSTALL_DIR} \
+               ${ZLIB_CONFIG_OPTS}
+    time cmake --build ${ZLIB_BUILD_DIR} --config Release --target install
+fi
 
 # ls -R ${ZLIB_INSTALL_DIR}
 popd

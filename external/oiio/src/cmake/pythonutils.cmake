@@ -1,6 +1,6 @@
-# Copyright 2008-present Contributors to the OpenImageIO project.
-# SPDX-License-Identifier: BSD-3-Clause
-# https://github.com/OpenImageIO/oiio/blob/master/LICENSE.md
+# Copyright Contributors to the OpenImageIO project.
+# SPDX-License-Identifier: Apache-2.0
+# https://github.com/AcademySoftwareFoundation/OpenImageIO
 
 # Python-related options.
 option (USE_PYTHON "Build the Python bindings" ON)
@@ -19,8 +19,8 @@ endif ()
 # Python cannot be found, it will be a fatal error.
 macro (find_python)
     if (NOT VERBOSE)
-        set (PythonInterp_FIND_QUIETLY true)
-        set (PythonLibs_FIND_QUIETLY true)
+        set (PythonInterp3_FIND_QUIETLY true)
+        set (PythonLibs3_FIND_QUIETLY true)
     endif ()
 
     # Attempt to find the desired version, but fall back to other
@@ -32,31 +32,41 @@ macro (find_python)
             list (APPEND _req EXACT)
         endif ()
     endif ()
-    checked_find_package (Python ${PYTHON_VERSION}
+
+    # Support building on manylinux docker images, which do not contain
+    # the Development.Embedded component.
+    # https://pybind11.readthedocs.io/en/stable/compiling.html#findpython-mode
+    if (WIN32)
+        set (_py_components Interpreter Development)
+    else ()
+        set (_py_components Interpreter Development.Module)
+    endif ()
+
+    checked_find_package (Python3 ${PYTHON_VERSION}
                           ${_req}
-                          COMPONENTS Interpreter Development
-                          PRINT Python_VERSION Python_EXECUTABLE
-                                Python_LIBRARIES
-                                Python_Development_FOUND
-                                Python_Interpreter_FOUND )
+                          VERSION_MIN 3.7
+                          COMPONENTS ${_py_components}
+                          PRINT Python3_VERSION Python3_EXECUTABLE
+                                Python3_LIBRARIES
+                                Python3_Development_FOUND
+                                Python3_Development.Module_FOUND
+                                Python3_Interpreter_FOUND )
 
     # The version that was found may not be the default or user
     # defined one.
-    set (PYTHON_VERSION_FOUND ${Python_VERSION_MAJOR}.${Python_VERSION_MINOR})
+    set (PYTHON_VERSION_FOUND ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR})
 
     # Give hints to subsequent pybind11 searching to ensure that it finds
     # exactly the same version that we found.
-    set (PythonInterp_FIND_VERSION PYTHON_VERSION_FOUND)
-    set (PythonInterp_FIND_VERSION_MAJOR ${Python_VERSION_MAJOR})
+    set (PythonInterp3_FIND_VERSION PYTHON_VERSION_FOUND)
+    set (PythonInterp3_FIND_VERSION_MAJOR ${Python3_VERSION_MAJOR})
 
     if (NOT DEFINED PYTHON_SITE_DIR)
-        set (PYTHON_SITE_DIR "${CMAKE_INSTALL_LIBDIR}/python${PYTHON_VERSION_FOUND}/site-packages")
+        set (PYTHON_SITE_DIR "${CMAKE_INSTALL_LIBDIR}/python${PYTHON_VERSION_FOUND}/site-packages/OpenImageIO")
     endif ()
-    if (VERBOSE)
-        message (STATUS "    Python site packages dir ${PYTHON_SITE_DIR}")
-        message (STATUS "    Python to include 'lib' prefix: ${PYLIB_LIB_PREFIX}")
-        message (STATUS "    Python to include SO version: ${PYLIB_INCLUDE_SONAME}")
-    endif ()
+    message (VERBOSE "    Python site packages dir ${PYTHON_SITE_DIR}")
+    message (VERBOSE "    Python to include 'lib' prefix: ${PYLIB_LIB_PREFIX}")
+    message (VERBOSE "    Python to include SO version: ${PYLIB_INCLUDE_SONAME}")
 endmacro()
 
 
@@ -64,12 +74,12 @@ endmacro()
 # pybind11
 
 macro (setup_python_module)
-    cmake_parse_arguments (lib "" "TARGET;MODULE;LIBS" "SOURCES" ${ARGN})
+    cmake_parse_arguments (lib "" "TARGET;MODULE" "SOURCES;LIBS;INCLUDES;SYSTEM_INCLUDE_DIRS" ${ARGN})
     # Arguments: <prefix> <options> <one_value_keywords> <multi_value_keywords> args...
 
     set (target_name ${lib_TARGET})
 
-    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND NOT ${CMAKE_COMPILER_ID} STREQUAL "Intel")
         # Seems to be a problem on some systems, with pybind11 and python headers
         set_property (SOURCE ${lib_SOURCES} APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-macro-redefined ")
     endif ()
@@ -80,12 +90,19 @@ macro (setup_python_module)
 #    add_library (${target_name} MODULE ${lib_SOURCES})
 #
     # Declare the libraries it should link against
+    target_include_directories (${target_name}
+                                PRIVATE ${lib_INCLUDES})
+    target_include_directories (${target_name}
+                                SYSTEM PRIVATE ${lib_SYSTEM_INCLUDE_DIRS})
     target_link_libraries (${target_name}
-                           PRIVATE ${lib_LIBS} ${SANITIZE_LIBRARIES})
+                           PRIVATE ${lib_LIBS})
 
-#    if (APPLE)
-#        set_target_properties (${target_name} PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
-#    endif ()
+    set (_module_LINK_FLAGS "${VISIBILITY_MAP_COMMAND} ${EXTRA_DSO_LINK_ARGS}")
+    if (UNIX AND NOT APPLE)
+        # Hide symbols from any static dependent libraries embedded here.
+        set (_module_LINK_FLAGS "${_module_LINK_FLAGS} -Wl,--exclude-libs,ALL")
+    endif ()
+    set_target_properties (${target_name} PROPERTIES LINK_FLAGS ${_module_LINK_FLAGS})
 
 
     # Exclude the 'lib' prefix from the name
@@ -104,11 +121,14 @@ macro (setup_python_module)
                                PREFIX lib)
     endif ()
 
+    # Even if using a debug postfix, don't use it for the python module, or
+    # python won't find it properly.
+    set_target_properties(PyOpenImageIO PROPERTIES
+                          DEBUG_POSTFIX "")
+
     # This is only needed for SpComp2
     if (PYLIB_INCLUDE_SONAME)
-        if (VERBOSE)
-            message(STATUS "Setting Py${lib_MODULE} SOVERSION to: ${SOVERSION}")
-        endif ()
+        message(VERBOSE "Setting Py${lib_MODULE} SOVERSION to: ${SOVERSION}")
         set_target_properties(${target_name} PROPERTIES
             VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
             SOVERSION ${SOVERSION} )
@@ -119,6 +139,10 @@ macro (setup_python_module)
 #                               DEBUG_POSTFIX "_d"
 #                               SUFFIX ".pyd")
 #    endif()
+
+    if (SKBUILD)
+        set (PYTHON_SITE_DIR .)
+    endif ()
 
     # In the build area, put it in lib/python so it doesn't clash with the
     # non-python libraries of the same name (which aren't prefixed by "lib"
@@ -131,6 +155,9 @@ macro (setup_python_module)
     install (TARGETS ${target_name}
              RUNTIME DESTINATION ${PYTHON_SITE_DIR} COMPONENT user
              LIBRARY DESTINATION ${PYTHON_SITE_DIR} COMPONENT user)
+
+    install (FILES __init__.py stubs/OpenImageIO/__init__.pyi stubs/OpenImageIO/py.typed
+             DESTINATION ${PYTHON_SITE_DIR} COMPONENT user)
 
 endmacro ()
 

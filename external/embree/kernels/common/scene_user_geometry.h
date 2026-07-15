@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -23,24 +10,87 @@ namespace embree
   /*! User geometry with user defined intersection functions */
   struct UserGeometry : public AccelSet
   {
+    /*! type of this geometry */
+    static const Geometry::GTypeMask geom_type = Geometry::MTY_USER_GEOMETRY;
+
   public:
-    UserGeometry (Scene* parent, size_t items, size_t numTimeSteps); 
-    virtual void setUserData (void* ptr);
+    UserGeometry (Device* device, unsigned int items = 0, unsigned int numTimeSteps = 1);
     virtual void setMask (unsigned mask);
-    virtual void setBoundsFunction (RTCBoundsFunc bounds);
-    virtual void setBoundsFunction2 (RTCBoundsFunc2 bounds, void* userPtr);
-    virtual void setIntersectFunction (RTCIntersectFunc intersect, bool ispc);
-    virtual void setIntersectFunction4 (RTCIntersectFunc4 intersect4, bool ispc);
-    virtual void setIntersectFunction8 (RTCIntersectFunc8 intersect8, bool ispc);
-    virtual void setIntersectFunction16 (RTCIntersectFunc16 intersect16, bool ispc);
-    virtual void setIntersectFunction1Mp (RTCIntersectFunc1Mp intersect);
-    virtual void setIntersectFunctionN (RTCIntersectFuncN intersect);
-    virtual void setOccludedFunction (RTCOccludedFunc occluded, bool ispc);
-    virtual void setOccludedFunction4 (RTCOccludedFunc4 occluded4, bool ispc);
-    virtual void setOccludedFunction8 (RTCOccludedFunc8 occluded8, bool ispc);
-    virtual void setOccludedFunction16 (RTCOccludedFunc16 occluded16, bool ispc);
-    virtual void setOccludedFunction1Mp (RTCOccludedFunc1Mp occluded);
-    virtual void setOccludedFunctionN (RTCOccludedFuncN occluded);
-    virtual void build(size_t threadIndex, size_t threadCount) {}
+    virtual void setBoundsFunction (RTCBoundsFunction bounds, void* userPtr);
+    virtual void setIntersectFunctionN (RTCIntersectFunctionN intersect);
+    virtual void setOccludedFunctionN (RTCOccludedFunctionN occluded);
+    virtual void build() {}
+    virtual void addElementsToCount (GeometryCounts & counts) const;
+
+    __forceinline float projectedPrimitiveArea(const size_t i) const { return 0.0f; }
   };
+
+  namespace isa
+  {
+    struct UserGeometryISA : public UserGeometry
+    {
+      UserGeometryISA (Device* device)
+        : UserGeometry(device) {}
+
+      PrimInfo createPrimRefArray(PrimRef* prims, const range<size_t>& r, size_t k, unsigned int geomID) const
+      {
+        PrimInfo pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          BBox3fa bounds = empty;
+          if (!buildBounds(j,&bounds)) continue;
+          const PrimRef prim(bounds,geomID,unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+
+      PrimInfo createPrimRefArrayMB(mvector<PrimRef>& prims, size_t itime, const range<size_t>& r, size_t k, unsigned int geomID) const
+      {
+        PrimInfo pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          BBox3fa bounds = empty;
+          if (!buildBounds(j,itime,bounds)) continue;
+          const PrimRef prim(bounds,geomID,unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+
+      PrimInfo createPrimRefArrayMB(PrimRef* prims, const BBox1f& time_range, const range<size_t>& r, size_t k, unsigned int geomID) const
+      {
+        PrimInfo pinfo(empty);
+        const BBox1f t0t1 = BBox1f::intersect(getTimeRange(), time_range);
+        if (t0t1.empty()) return pinfo;
+        
+        for (size_t j = r.begin(); j < r.end(); j++) {
+          LBBox3fa lbounds = empty;
+          if (!linearBounds(j, t0t1, lbounds))
+            continue;
+          const PrimRef prim(lbounds.bounds(), geomID, unsigned(j));
+          pinfo.add_center2(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+
+      PrimInfoMB createPrimRefMBArray(mvector<PrimRefMB>& prims, const BBox1f& t0t1, const range<size_t>& r, size_t k, unsigned int geomID) const
+      {
+        PrimInfoMB pinfo(empty);
+        for (size_t j=r.begin(); j<r.end(); j++)
+        {
+          if (!valid(j, timeSegmentRange(t0t1))) continue;
+          const PrimRefMB prim(linearBounds(j,t0t1),this->numTimeSegments(),this->time_range,this->numTimeSegments(),geomID,unsigned(j));
+          pinfo.add_primref(prim);
+          prims[k++] = prim;
+        }
+        return pinfo;
+      }
+    };
+  }
+  
+  DECLARE_ISA_FUNCTION(UserGeometry*, createUserGeometry, Device*);
 }

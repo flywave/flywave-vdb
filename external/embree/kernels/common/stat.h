@@ -1,24 +1,11 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
 #include "default.h"
 
-/* Makros to gather statistics */
+/* Macros to gather statistics */
 #ifdef EMBREE_STAT_COUNTERS
 #  define STAT(x) x
 #  define STAT3(s,x,y,z) \
@@ -56,17 +43,42 @@ namespace embree
         clear(); 
       }
       
-      void clear() { 
-        memset(this,0,sizeof(Counters)); 
+      void clear() 
+      { 
+        all.clear();
+        active.clear();
+        code.clear();
+        for (auto& u : user) u.store(0);
       }
 
     public:
 
 	/* per packet and per ray stastics */
-	struct 
+	struct Data
         {
+          void clear () {
+            normal.clear();
+            shadow.clear();
+            point_query.clear();
+          }
+
 	  /* normal and shadow ray statistics */
-	  struct {
+	  struct 
+          {
+            void clear() 
+            {
+              travs.store(0);
+              trav_nodes.store(0);
+              trav_leaves.store(0);
+              trav_prims.store(0);
+              trav_prim_hits.store(0);
+              for (auto& v : trav_hit_boxes) v.store(0);
+              trav_stack_pop.store(0);
+              trav_stack_nodes.store(0); 
+              trav_xfm_nodes.store(0); 
+            }
+
+          public:
 	    std::atomic<size_t> travs;
 	    std::atomic<size_t> trav_nodes;
 	    std::atomic<size_t> trav_leaves;
@@ -76,7 +88,8 @@ namespace embree
 	    std::atomic<size_t> trav_stack_pop;
 	    std::atomic<size_t> trav_stack_nodes; 
             std::atomic<size_t> trav_xfm_nodes; 
-	  } normal, shadow;
+            
+	  } normal, shadow, point_query;
 	} all, active, code; 
 
         std::atomic<size_t> user[10];
@@ -92,7 +105,7 @@ namespace embree
       instance.cntrs.clear();
     }
     
-    static void print(std::ostream& cout);
+    static void print(embree_ostream cout);
 
   private: 
     Counters cntrs;

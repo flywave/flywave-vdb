@@ -1,38 +1,20 @@
-## ======================================================================== ##
-## Copyright 2009-2016 Intel Corporation                                    ##
-##                                                                          ##
-## Licensed under the Apache License, Version 2.0 (the "License");          ##
-## you may not use this file except in compliance with the License.         ##
-## You may obtain a copy of the License at                                  ##
-##                                                                          ##
-##     http://www.apache.org/licenses/LICENSE-2.0                           ##
-##                                                                          ##
-## Unless required by applicable law or agreed to in writing, software      ##
-## distributed under the License is distributed on an "AS IS" BASIS,        ##
-## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
-## See the License for the specific language governing permissions and      ##
-## limitations under the License.                                           ##
-## ======================================================================== ##
+## Copyright 2009-2021 Intel Corporation
+## SPDX-License-Identifier: Apache-2.0
 
-# FIXME: have to add these CPP files directly in libembree as otherwise globals of the tasking system exist twice under VS2012 Win32
+ADD_LIBRARY(tasking STATIC taskschedulerinternal.cpp)
 
-#  IF (TASKING_INTERNAL)
-#    ADD_DEFINITIONS(-DTASKING_INTERNAL)
-#  ENDIF()
+SET_PROPERTY(TARGET tasking APPEND PROPERTY COMPILE_FLAGS " ${FLAGS_LOWEST}")
 
-#  IF (TASKING_TBB)
-#    ADD_DEFINITIONS(-DTASKING_TBB)
-#  ENDIF()
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(tasking PROPERTIES FOLDER external/embree/common)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
 
-#  ADD_LIBRARY(tasking STATIC
-#    taskscheduler_tbb.cpp
-#    tasksys.cpp
-#  )
-
-#  IF (TASKING_TBB)
-#    TARGET_LINK_LIBRARIES(tasking sys ${TBB_LIBRARIES})
-#  ELSE()
-#    TARGET_LINK_LIBRARIES(tasking sys)
-#  ENDIF()
-
-#  SET_PROPERTY(TARGET tasking PROPERTY FOLDER kernels)
+SET_TARGET_PROPERTIES(tasking PROPERTIES
+ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+SET_TARGET_PROPERTIES(tasking PROPERTIES 
+LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+SET_TARGET_PROPERTIES(tasking PROPERTIES
+RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})

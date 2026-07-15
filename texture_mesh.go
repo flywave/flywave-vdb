@@ -25,7 +25,7 @@ func NewTextureMeshFromMeshDatas(datas []MeshData) *TextureMesh {
 	for i := 0; i < len(datas); i++ {
 		datasSlice[i] = datas[i].m
 	}
-	var ptr *C.struct__voxel_pixel_mesh_data_t
+	var ptr **C.struct__voxel_pixel_mesh_data_t
 	if len(datasSlice) > 0 {
 		ptr = &datasSlice[0]
 	}

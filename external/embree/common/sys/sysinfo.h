@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -22,20 +9,16 @@
   #define PAGE_SIZE 4096
 #endif
 
-#define MAX_THREADS 512
-#define MAX_MIC_CORES (MAX_THREADS/4)
+#define PAGE_SIZE_2M (2*1024*1024)
+#define PAGE_SIZE_4K (4*1024)
 
 #include "platform.h"
 
 /* define isa namespace and ISA bitvector */
 #if defined (__AVX512VL__)
-#  define isa avx512skx
-#  define ISA AVX512SKX
-#  define ISA_STR "AVX512SKX"
-#elif defined (__AVX512F__)
-#  define isa avx512knl
-#  define ISA AVX512KNL
-#  define ISA_STR "AVX512KNL"
+#  define isa avx512
+#  define ISA AVX512
+#  define ISA_STR "AVX512"
 #elif defined (__AVX2__)
 #  define isa avx2
 #  define ISA AVX2
@@ -52,19 +35,19 @@
 #  define isa sse42
 #  define ISA SSE42
 #  define ISA_STR "SSE4.2"
-#elif defined (__SSE4_1__)
-#  define isa sse41
-#  define ISA SSE41
-#  define ISA_STR "SSE4.1"
-#elif defined(__SSSE3__)
-#  define isa ssse3
-#  define ISA SSSE3
-#  define ISA_STR "SSSE3"
-#elif defined(__SSE3__)
-#  define isa sse3
-#  define ISA SSE3
-#  define ISA_STR "SSE3"
-#elif defined(__SSE2__)
+//#elif defined (__SSE4_1__) //  we demote this to SSE2, MacOSX code compiles with SSE41 by default with XCode 11
+//#  define isa sse41
+//#  define ISA SSE41
+//#  define ISA_STR "SSE4.1"
+//#elif defined(__SSSE3__) // we demote this to SSE2, MacOSX code compiles with SSSE3 by default with ICC
+//#  define isa ssse3
+//#  define ISA SSSE3
+//#  define ISA_STR "SSSE3"
+//#elif defined(__SSE3__) // we demote this to SSE2, MacOSX code compiles with SSE3 by default with clang
+//#  define isa sse3
+//#  define ISA SSE3
+//#  define ISA_STR "SSE3"
+#elif defined(__SSE2__) || defined(__SSE3__) || defined(__SSSE3__)
 #  define isa sse2
 #  define ISA SSE2
 #  define ISA_STR "SSE2"
@@ -72,33 +55,43 @@
 #  define isa sse
 #  define ISA SSE
 #  define ISA_STR "SSE"
-#else 
+#elif defined(__ARM_NEON)
+// NOTE(LTE): Use sse2 for `isa` for the compatibility at the moment.
+#define isa sse2
+#define ISA NEON
+#define ISA_STR "NEON"
+#else
 #error Unknown ISA
-#endif
-
-#if defined (__MACOSX__)
-#if defined (__INTEL_COMPILER)
-#define DEFAULT_ISA SSSE3
-#else
-#define DEFAULT_ISA SSE3
-#endif
-#else
-#define DEFAULT_ISA SSE2
 #endif
 
 namespace embree
 {
-  enum CPUModel {
-    CPU_UNKNOWN,
-    CPU_CORE1,
-    CPU_CORE2,
-    CPU_CORE_NEHALEM,
-    CPU_CORE_SANDYBRIDGE,
-    CPU_HASWELL,
-    CPU_KNC,
-    CPU_KNL
+  enum class CPU
+  {
+    XEON_ICE_LAKE,
+    CORE_ICE_LAKE,
+    CORE_TIGER_LAKE,
+    CORE_COMET_LAKE,
+    CORE_CANNON_LAKE,
+    CORE_KABY_LAKE,
+    XEON_SKY_LAKE,
+    CORE_SKY_LAKE,
+    XEON_PHI_KNIGHTS_MILL,
+    XEON_PHI_KNIGHTS_LANDING,
+    XEON_BROADWELL,
+    CORE_BROADWELL,
+    XEON_HASWELL,
+    CORE_HASWELL,
+    XEON_IVY_BRIDGE,
+    CORE_IVY_BRIDGE,
+    SANDY_BRIDGE,
+    NEHALEM,
+    CORE2,
+    CORE1,
+    ARM,
+    UNKNOWN,
   };
-
+  
   /*! get the full path to the running executable */
   std::string getExecutableFileName();
 
@@ -112,10 +105,10 @@ namespace embree
   std::string getCPUVendor();
 
   /*! get microprocessor model */
-  CPUModel getCPUModel(); 
+  CPU getCPUModel(); 
 
   /*! converts CPU model into string */
-  std::string stringOfCPUModel(CPUModel model);
+  std::string stringOfCPUModel(CPU model);
 
   /*! CPU features */
   static const int CPU_FEATURE_SSE    = 1 << 0;
@@ -133,7 +126,6 @@ namespace embree
   static const int CPU_FEATURE_LZCNT  = 1 << 12;
   static const int CPU_FEATURE_BMI1   = 1 << 13;
   static const int CPU_FEATURE_BMI2   = 1 << 14;
-  static const int CPU_FEATURE_KNC    = 1 << 15;
   static const int CPU_FEATURE_AVX512F = 1 << 16;
   static const int CPU_FEATURE_AVX512DQ = 1 << 17;    
   static const int CPU_FEATURE_AVX512PF = 1 << 18;
@@ -143,7 +135,12 @@ namespace embree
   static const int CPU_FEATURE_AVX512VL = 1 << 22;
   static const int CPU_FEATURE_AVX512IFMA = 1 << 23;
   static const int CPU_FEATURE_AVX512VBMI = 1 << 24;
- 
+  static const int CPU_FEATURE_XMM_ENABLED = 1 << 25;
+  static const int CPU_FEATURE_YMM_ENABLED = 1 << 26;
+  static const int CPU_FEATURE_ZMM_ENABLED = 1 << 27;
+  static const int CPU_FEATURE_NEON = 1 << 28;
+  static const int CPU_FEATURE_NEON_2X = 1 << 29;
+
   /*! get CPU features */
   int getCPUFeatures();
 
@@ -154,25 +151,25 @@ namespace embree
   std::string supportedTargetList (int isa);
 
   /*! ISAs */
-  static const int SSE    = CPU_FEATURE_SSE; 
+  static const int SSE    = CPU_FEATURE_SSE | CPU_FEATURE_XMM_ENABLED; 
   static const int SSE2   = SSE | CPU_FEATURE_SSE2;
   static const int SSE3   = SSE2 | CPU_FEATURE_SSE3;
   static const int SSSE3  = SSE3 | CPU_FEATURE_SSSE3;
   static const int SSE41  = SSSE3 | CPU_FEATURE_SSE41;
   static const int SSE42  = SSE41 | CPU_FEATURE_SSE42 | CPU_FEATURE_POPCNT;
-  static const int AVX    = SSE42 | CPU_FEATURE_AVX;
+  static const int AVX    = SSE42 | CPU_FEATURE_AVX | CPU_FEATURE_YMM_ENABLED;
   static const int AVXI   = AVX | CPU_FEATURE_F16C | CPU_FEATURE_RDRAND;
   static const int AVX2   = AVXI | CPU_FEATURE_AVX2 | CPU_FEATURE_FMA3 | CPU_FEATURE_BMI1 | CPU_FEATURE_BMI2 | CPU_FEATURE_LZCNT;
-  static const int AVX512KNL = AVX2 | CPU_FEATURE_AVX512F | CPU_FEATURE_AVX512PF | CPU_FEATURE_AVX512ER | CPU_FEATURE_AVX512CD;
-  static const int AVX512SKX = AVX2 | CPU_FEATURE_AVX512F | CPU_FEATURE_AVX512DQ | CPU_FEATURE_AVX512CD | CPU_FEATURE_AVX512BW | CPU_FEATURE_AVX512VL;
-  static const int KNC    = CPU_FEATURE_KNC;
+  static const int AVX512 = AVX2 | CPU_FEATURE_AVX512F | CPU_FEATURE_AVX512DQ | CPU_FEATURE_AVX512CD | CPU_FEATURE_AVX512BW | CPU_FEATURE_AVX512VL | CPU_FEATURE_ZMM_ENABLED;
+  static const int NEON = CPU_FEATURE_NEON | CPU_FEATURE_SSE | CPU_FEATURE_SSE2;
+  static const int NEON_2X = CPU_FEATURE_NEON_2X | AVX2;
 
   /*! converts ISA bitvector into a string */
   std::string stringOfISA(int features);
 
   /*! return the number of logical threads of the system */
   unsigned int getNumberOfLogicalThreads();
-  
+
   /*! returns the size of the terminal window in characters */
   int getTerminalWidth();
 
@@ -181,4 +178,10 @@ namespace embree
 
   /*! sleeps the specified number of seconds */
   void sleepSeconds(double t);
+
+  /*! returns virtual address space occupied by process */
+  size_t getVirtualMemoryBytes();
+
+  /*! returns resident memory required by process */
+  size_t getResidentMemoryBytes();
 }

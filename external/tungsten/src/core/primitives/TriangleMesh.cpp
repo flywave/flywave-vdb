@@ -33,7 +33,8 @@ TriangleMesh::TriangleMesh()
   _backfaceCulling(false),
   _recomputeNormals(false),
   _bsdfs(1, _defaultBsdf),
-  _scene(nullptr)
+  _scene(nullptr),
+  _geom(nullptr)
 {
 }
 
@@ -316,17 +317,19 @@ void TriangleMesh::makeCylinder(float radius, float height)
 
 bool TriangleMesh::intersect(Ray &ray, IntersectionTemporary &data) const
 {
-    RTCRay eRay(EmbreeUtil::convert(ray));
-    rtcIntersect(_scene, eRay);
-    if (eRay.geomID != RTC_INVALID_GEOMETRY_ID) {
-        ray.setFarT(eRay.tfar);
+    RTCRayHit rh(EmbreeUtil::convertToRayHit(ray));
+    RTCIntersectArguments args;
+    rtcInitIntersectArguments(&args);
+    rtcIntersect1(_scene, &rh, &args);
+    if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+        ray.setFarT(rh.ray.tfar);
 
         data.primitive = this;
         MeshIntersection *isect = data.as<MeshIntersection>();
-        isect->Ng = unnormalizedGeometricNormalAt(eRay.primID);
-        isect->u = eRay.u;
-        isect->v = eRay.v;
-        isect->primId = eRay.primID;
+        isect->Ng = unnormalizedGeometricNormalAt(rh.hit.primID);
+        isect->u = rh.hit.u;
+        isect->v = rh.hit.v;
+        isect->primId = rh.hit.primID;
         isect->backSide = isect->Ng.dot(ray.dir()) > 0.0f;
 
         return true;
@@ -337,8 +340,10 @@ bool TriangleMesh::intersect(Ray &ray, IntersectionTemporary &data) const
 bool TriangleMesh::occluded(const Ray &ray) const
 {
     RTCRay eRay(EmbreeUtil::convert(ray));
-    rtcOccluded(_scene, eRay);
-    return eRay.geomID != RTC_INVALID_GEOMETRY_ID;
+    RTCOccludedArguments args;
+    rtcInitOccludedArguments(&args);
+    rtcOccluded1(_scene, &eRay, &args);
+    return eRay.tfar < 0.0f;
 }
 
 void TriangleMesh::intersectionInfo(const IntersectionTemporary &data, IntersectionInfo &info) const
@@ -528,10 +533,14 @@ void TriangleMesh::prepareForRender()
     if (_verts.empty() || _tris.empty())
         return;
 
-    _scene = rtcDeviceNewScene(EmbreeUtil::getDevice(), RTC_SCENE_STATIC | RTC_SCENE_INCOHERENT, RTC_INTERSECT1);
-    _geomId = rtcNewTriangleMesh(_scene, RTC_GEOMETRY_STATIC, _tris.size(), _verts.size(), 1);
-    Vec4f *vs = static_cast<Vec4f *>(rtcMapBuffer(_scene, _geomId, RTC_VERTEX_BUFFER));
-    Vec3u *ts = static_cast<Vec3u *>(rtcMapBuffer(_scene, _geomId, RTC_INDEX_BUFFER));
+    RTCDevice device = EmbreeUtil::getDevice();
+    _scene = rtcNewScene(device);
+    _geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+
+    RTCBuffer vbuf = rtcNewBuffer(device, sizeof(Vec4f) * _verts.size());
+    RTCBuffer ibuf = rtcNewBuffer(device, sizeof(Vec3u) * _tris.size());
+    Vec4f *vs = static_cast<Vec4f *>(rtcGetBufferData(vbuf));
+    Vec3u *ts = static_cast<Vec3u *>(rtcGetBufferData(ibuf));
 
     for (size_t i = 0; i < _tris.size(); ++i) {
         const TriangleI &t = _tris[i];
@@ -560,10 +569,13 @@ void TriangleMesh::prepareForRender()
     }
     _invArea = 1.0f/_totalArea;
 
-    rtcUnmapBuffer(_scene, _geomId, RTC_VERTEX_BUFFER);
-    rtcUnmapBuffer(_scene, _geomId, RTC_INDEX_BUFFER);
-
-    rtcCommit(_scene);
+    rtcSetGeometryBuffer(_geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT4, vbuf, 0, sizeof(Vec4f), _verts.size());
+    rtcSetGeometryBuffer(_geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, ibuf, 0, sizeof(Vec3u), _tris.size());
+    rtcCommitGeometry(_geom);
+    rtcAttachGeometry(_scene, _geom);
+    rtcReleaseGeometry(_geom);
+    _geom = nullptr;
+    rtcCommitScene(_scene);
 
     //if (_backfaceCulling)
     // TODO
@@ -574,10 +586,10 @@ void TriangleMesh::prepareForRender()
 void TriangleMesh::teardownAfterRender()
 {
     if (_scene)  {
-        rtcDeleteGeometry(_scene, _geomId);
-        rtcDeleteScene(_scene);
+        rtcReleaseScene(_scene);
         _scene = nullptr;
     }
+    _geom = nullptr;
     _tfVerts.clear();
 
     Primitive::teardownAfterRender();

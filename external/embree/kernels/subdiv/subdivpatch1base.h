@@ -1,21 +1,9 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
+#include "../geometry/primitive.h"
 #include "bspline_patch.h"
 #include "bezier_patch.h"
 #include "gregory_patch.h"
@@ -39,6 +27,7 @@ namespace embree
       BEZIER_PATCH           = 2,  
       GREGORY_PATCH          = 3,
       EVAL_PATCH             = 5,
+      BILINEAR_PATCH         = 6,
     };
 
     enum Flags {
@@ -52,6 +41,7 @@ namespace embree
                       const unsigned int pID,
                       const unsigned int subPatch,
                       const SubdivMesh *const mesh,
+                      const size_t time,
                       const Vec2f uv[4],
                       const float edge_level[4],
                       const int subdiv[4],
@@ -62,18 +52,14 @@ namespace embree
     }
 
     __forceinline Vec2f getUV(const size_t i) const {
-      return Vec2f((float)u[i],(float)v[i]) * (1.0f/32768.0f);
+      return Vec2f((float)u[i],(float)v[i]) * (8.0f/0x10000);
     }
 
     static void computeEdgeLevels(const float edge_level[4], const int subdiv[4], float level[4]);
     static Vec2i computeGridSize(const float level[4]);
     bool updateEdgeLevels(const float edge_level[4], const int subdiv[4], const SubdivMesh *const mesh, const int simd_width);
 
-  private:
-    size_t get64BytesBlocksForGridSubTree(const GridRange& range, const unsigned int leafBlocks);
-
   public:
-    size_t getSubTreeSize64bBlocks(const unsigned int leafBlocks = 2);
 
     __forceinline size_t getGridBytes() const {
       const size_t grid_size_xyzuv = (grid_size_simd_blocks * VSIZEX) * 4;
@@ -95,6 +81,15 @@ namespace embree
     }
 
   public:    
+    __forceinline unsigned int geomID() const  {
+      return geom;
+    } 
+
+    __forceinline unsigned int primID() const  {
+      return prim;
+    } 
+
+  public:
     SharedLazyTessellationCache::Tag root_ref;
     SpinLock mtx;
 
@@ -110,6 +105,7 @@ namespace embree
     unsigned short grid_v_res;
 
     unsigned short grid_size_simd_blocks;
+    unsigned int time_;
 
     struct PatchHalfEdge {
       const HalfEdge* edge;
@@ -118,21 +114,12 @@ namespace embree
 
     Vec3fa patch_v[4][4];
 
-    const HalfEdge *edge() const {
-      return ((PatchHalfEdge*)patch_v)->edge;
-    }
+    const HalfEdge *edge() const { return ((PatchHalfEdge*)patch_v)->edge; }
+    unsigned time() const { return time_; }
+    unsigned subPatch() const { return ((PatchHalfEdge*)patch_v)->subPatch; }
 
-    unsigned subPatch() const {
-      return ((PatchHalfEdge*)patch_v)->subPatch;
-    }
-
-    void set_edge(const HalfEdge *h) const {
-      ((PatchHalfEdge*)patch_v)->edge = h;
-    }
-
-    void set_subPatch(const unsigned s) const {
-      ((PatchHalfEdge*)patch_v)->subPatch = s;
-    }
+    void set_edge(const HalfEdge *h) const { ((PatchHalfEdge*)patch_v)->edge = h; }
+    void set_subPatch(const unsigned s) const { ((PatchHalfEdge*)patch_v)->subPatch = s; }
   };
 
   namespace isa

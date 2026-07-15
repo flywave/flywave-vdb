@@ -5,8 +5,8 @@
 #include "math/Box.hpp"
 #include "math/Mat4f.hpp"
 
-#include <embree2/rtcore.h>
-#include <embree2/rtcore_ray.h>
+#include <embree4/rtcore.h>
+#include <embree4/rtcore_ray.h>
 
 namespace Tungsten {
 
@@ -33,23 +33,41 @@ inline Box3f convert(const RTCBounds &b)
 
 inline Ray convert(const RTCRay &r)
 {
-    return Ray(Vec3f(r.org), Vec3f(r.dir), r.tnear, r.tfar);
+    return Ray(Vec3f(r.org_x, r.org_y, r.org_z), Vec3f(r.dir_x, r.dir_y, r.dir_z), r.tnear, r.tfar);
 }
 
 inline RTCRay convert(const Ray &r)
 {
     RTCRay ray;
-    ray.org[0] = r.pos().x();
-    ray.org[1] = r.pos().y();
-    ray.org[2] = r.pos().z();
-    ray.dir[0] = r.dir().x();
-    ray.dir[1] = r.dir().y();
-    ray.dir[2] = r.dir().z();
+    ray.org_x = r.pos().x();
+    ray.org_y = r.pos().y();
+    ray.org_z = r.pos().z();
+    ray.dir_x = r.dir().x();
+    ray.dir_y = r.dir().y();
+    ray.dir_z = r.dir().z();
     ray.tnear = r.nearT();
     ray.tfar  = r.farT();
-    ray.geomID = RTC_INVALID_GEOMETRY_ID;
-    ray.primID = RTC_INVALID_GEOMETRY_ID;
+    ray.time  = 0.0f;
+    ray.mask  = -1u;
+    ray.id    = 0;
+    ray.flags = 0;
     return ray;
+}
+
+inline RTCRayHit convertToRayHit(const Ray &r)
+{
+    RTCRayHit rh;
+    rh.ray = convert(r);
+    rh.hit.Ng_x = 0.0f;
+    rh.hit.Ng_y = 0.0f;
+    rh.hit.Ng_z = 0.0f;
+    rh.hit.u = 0.0f;
+    rh.hit.v = 0.0f;
+    rh.hit.primID = RTC_INVALID_GEOMETRY_ID;
+    rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    for (int i = 0; i < RTC_MAX_INSTANCE_LEVEL_COUNT; ++i)
+        rh.hit.instID[i] = RTC_INVALID_GEOMETRY_ID;
+    return rh;
 }
 
 }

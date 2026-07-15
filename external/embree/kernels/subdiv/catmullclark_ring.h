@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -30,17 +17,19 @@ namespace embree
   template<typename Vertex, typename Vertex_t = Vertex>
     struct __aligned(64) CatmullClark1RingT
   {
+    ALIGNED_STRUCT_(64);
+    
     int border_index;                                   //!< edge index where border starts
     unsigned int face_valence;                          //!< number of adjacent quad faces
     unsigned int edge_valence;                          //!< number of adjacent edges (2*face_valence)
     float vertex_crease_weight;                         //!< weight of vertex crease (0 if no vertex crease)
-    array_t<float,MAX_RING_FACE_VALENCE> crease_weight; //!< edge crease weights for each adjacent edge
-    float vertex_level;                                 //!< maximal level of all adjacent edges
+    DynamicStackArray<float,16,MAX_RING_FACE_VALENCE> crease_weight; //!< edge crease weights for each adjacent edge
+    float vertex_level;                                 //!< maximum level of all adjacent edges
     float edge_level;                                   //!< level of first edge
     unsigned int eval_start_index;                      //!< topology dependent index to start evaluation
     unsigned int eval_unique_identifier;                //!< topology dependent unique identifier for this ring 
     Vertex vtx;                                         //!< center vertex
-    array_t<Vertex,MAX_RING_EDGE_VALENCE> ring;         //!< ring of neighboring vertices
+    DynamicStackArray<Vertex,32,MAX_RING_EDGE_VALENCE> ring;  //!< ring of neighboring vertices
    
   public:
     CatmullClark1RingT () 
@@ -126,15 +115,15 @@ namespace embree
     }
     
     __forceinline bool has_last_face() const {
-      return border_index != edge_valence-2;
+      return (size_t)border_index != (size_t)edge_valence-2;
     }
 
     __forceinline bool has_opposite_front(size_t i) const {
-      return border_index != 2*i;
+      return (size_t)border_index != 2*i;
     }
 
     __forceinline bool has_opposite_back(size_t i) const {
-      return border_index != (edge_valence-2-2*i);
+      return (size_t)border_index != ((size_t)edge_valence-2-2*i);
     }
     
     __forceinline BBox3fa bounds() const
@@ -153,7 +142,7 @@ namespace embree
       vertex_crease_weight = h->vertex_crease_weight;
       
       HalfEdge* p = (HalfEdge*) h;
-      
+
       unsigned i=0;
       unsigned min_vertex_index = (unsigned)-1;
       unsigned min_vertex_index_face = (unsigned)-1;
@@ -184,7 +173,7 @@ namespace embree
         /* if there is no opposite go the long way to the other side of the border */
         else
         {
-          /* find minimal start vertex */
+          /* find minimum start vertex */
           const unsigned index0 = p->getStartVertexIndex();
           if (index0 < min_vertex_index) { min_vertex_index = index0; min_vertex_index_face = i>>1; }
 
@@ -263,15 +252,14 @@ namespace embree
 	  
           /* even slower path for blended edge rule */
           if (unlikely(edge_crease < 1.0f)) {
-            const float w1 = edge_crease, w0 = 1.0f-w1;
-            dest.ring[index] = w0*((v+f)*0.25f) + w1*(v*0.5f);
+            dest.ring[index] = lerp((v+f)*0.25f,v*0.5f,edge_crease);
           }
         }
       }
       
       /* compute new vertex using smooth rule */
       const float inv_face_valence = 1.0f / (float)face_valence;
-      const Vertex_t v_smooth = (Vertex_t)(S*inv_face_valence + (float(face_valence)-2.0f)*vtx)*inv_face_valence;
+      const Vertex_t v_smooth = (Vertex_t) madd(inv_face_valence,S,(float(face_valence)-2.0f)*vtx)*inv_face_valence;
       dest.vtx = v_smooth;
       
       /* compute new vertex using vertex_crease_weight rule */
@@ -280,8 +268,7 @@ namespace embree
         if (vertex_crease_weight >= 1.0f) {
           dest.vtx = vtx;
         } else {
-          const float t1 = vertex_crease_weight, t0 = 1.0f-t1;
-          dest.vtx = t0*v_smooth + t1*vtx;
+          dest.vtx = lerp(v_smooth,vtx,vertex_crease_weight);
         }
         return;
       }
@@ -304,9 +291,9 @@ namespace embree
         dest.crease_weight[crease1] = max(0.25f*(3.0f*crease_weight1 + crease_weight0)-1.0f,0.0f);
 
         /* interpolate between sharp and smooth rule */
-        const float t1 = 0.5f*(crease_weight0+crease_weight1), t0 = 1.0f-t1;
-        if (unlikely(t1 < 1.0f)) {
-          dest.vtx = t0*v_smooth + t1*v_sharp;
+        const float v_blend = 0.5f*(crease_weight0+crease_weight1);
+        if (unlikely(v_blend < 1.0f)) {
+          dest.vtx = lerp(v_smooth,v_sharp,v_blend);
         }
       }
       
@@ -401,7 +388,7 @@ namespace embree
       return (Vertex_t)(n*n*vtx+4.0f*E+F) / ((n+5.0f)*n);      
     }
     
-    /* gets limit tangent in the direction of egde vtx -> ring[0] */
+    /* gets limit tangent in the direction of edge vtx -> ring[0] */
     __forceinline Vertex getLimitTangent() const 
     {
       if (unlikely(std::isinf(vertex_crease_weight)))
@@ -410,7 +397,7 @@ namespace embree
       /* border vertex rule */
       if (unlikely(border_index != -1))
       {	
-	if (border_index != edge_valence-2 ) {
+	if (border_index != (int)edge_valence-2 ) {
 	  return ring[0] - vtx; 
 	}
 	else
@@ -442,7 +429,7 @@ namespace embree
       return sigma * (alpha + beta);
     }
     
-    /* gets limit tangent in the direction of egde vtx -> ring[edge_valence-2] */
+    /* gets limit tangent in the direction of edge vtx -> ring[edge_valence-2] */
     __forceinline Vertex getSecondLimitTangent() const 
     {
       if (unlikely(std::isinf(vertex_crease_weight)))
@@ -485,7 +472,7 @@ namespace embree
 
     /* gets surface normal */
     const Vertex getNormal() const  {
-      return cross(getSecondLimitTangent(),getLimitTangent());
+      return cross(getLimitTangent(),getSecondLimitTangent());
     }
     
     /* returns center of the n-th quad in the 1-ring */
@@ -513,16 +500,16 @@ namespace embree
       return true;
     }
 
-    friend __forceinline std::ostream &operator<<(std::ostream &o, const CatmullClark1RingT &c)
+    friend __forceinline embree_ostream operator<<(embree_ostream o, const CatmullClark1RingT &c)
     {
       o << "vtx " << c.vtx << " size = " << c.edge_valence << ", " << 
 	"hard_edge = " << c.border_index << ", face_valence " << c.face_valence << 
-	", edge_level = " << c.edge_level << ", vertex_level = " << c.vertex_level << ", eval_start_index: " << c.eval_start_index << ", ring: " << std::endl;
+	", edge_level = " << c.edge_level << ", vertex_level = " << c.vertex_level << ", eval_start_index: " << c.eval_start_index << ", ring: " << embree_endl;
       
-      for (size_t i=0; i<c.edge_valence; i++) {
+      for (unsigned int i=0; i<min(c.edge_valence,(unsigned int)MAX_RING_FACE_VALENCE); i++) {
         o << i << " -> " << c.ring[i];
         if (i % 2 == 0) o << " crease = " << c.crease_weight[i/2];
-        o << std::endl;
+        o << embree_endl;
       }
       return o;
     } 
@@ -533,6 +520,8 @@ namespace embree
   template<typename Vertex, typename Vertex_t = Vertex>
     struct __aligned(64) GeneralCatmullClark1RingT
   {
+    ALIGNED_STRUCT_(64);
+    
     typedef CatmullClark1RingT<Vertex,Vertex_t> CatmullClark1Ring;
     
     struct Face 
@@ -548,13 +537,13 @@ namespace embree
     };
 
     Vertex vtx;
-    array_t<Vertex,MAX_RING_EDGE_VALENCE> ring; 
-    array_t<Face,MAX_RING_FACE_VALENCE> faces;
+    DynamicStackArray<Vertex,32,MAX_RING_EDGE_VALENCE> ring; 
+    DynamicStackArray<Face,16,MAX_RING_FACE_VALENCE> faces;
     unsigned int face_valence;
     unsigned int edge_valence;
     int border_face;
     float vertex_crease_weight;
-    float vertex_level;                      //!< maximal level of adjacent edges
+    float vertex_level;                      //!< maximum level of adjacent edges
     float edge_level;                        // level of first edge
     bool only_quads;                         // true if all faces are quads
     unsigned int eval_start_face_index;
@@ -572,7 +561,7 @@ namespace embree
     }
     
     __forceinline bool has_last_face() const {
-      return border_face != face_valence-1;
+      return border_face != (int)face_valence-1;
     }
     
     __forceinline bool has_second_face() const {
@@ -610,7 +599,7 @@ namespace embree
          assert(p->hasOpposite() || p->edge_crease_weight == float(inf));
         vertex_level = max(vertex_level,p->edge_level);
 
-        /* find minimal start vertex */
+        /* find minimum start vertex */
         unsigned vertex_index = p_next->getStartVertexIndex();
         if (vertex_index < min_vertex_index) { min_vertex_index = vertex_index; min_vertex_index_face = f; min_vertex_index_vertex = e; }
 
@@ -630,7 +619,7 @@ namespace embree
         /* if there is no opposite go the long way to the other side of the border */
         else
         {
-          /* find minimal start vertex */
+          /* find minimum start vertex */
           unsigned vertex_index = p->getStartVertexIndex();
           if (vertex_index < min_vertex_index) { min_vertex_index = vertex_index; min_vertex_index_face = f; min_vertex_index_vertex = e; }
 
@@ -708,8 +697,7 @@ namespace embree
 	  
           /* even slower path for blended edge rule */
           if (unlikely(faces[i].crease_weight < 1.0f)) {
-            const float w0 = faces[i].crease_weight, w1 = 1.0f-w0;
-            dest.ring[2*i] = w1*((v+f)*0.25f) + w0*(v*0.5f);
+            dest.ring[2*i] = lerp((v+f)*0.25f,v*0.5f,faces[i].crease_weight);
           }
         }
         j+=faces[i].size;
@@ -718,7 +706,7 @@ namespace embree
       
       /* compute new vertex using smooth rule */
       const float inv_face_valence = 1.0f / (float)face_valence;
-      const Vertex_t v_smooth = (Vertex_t)(S*inv_face_valence + (float(face_valence)-2.0f)*vtx)*inv_face_valence;
+      const Vertex_t v_smooth = (Vertex_t) madd(inv_face_valence,S,(float(face_valence)-2.0f)*vtx)*inv_face_valence;
       dest.vtx = v_smooth;
       
       /* compute new vertex using vertex_crease_weight rule */
@@ -727,8 +715,7 @@ namespace embree
         if (vertex_crease_weight >= 1.0f) {
           dest.vtx = vtx;
         } else {
-          const float t0 = vertex_crease_weight, t1 = 1.0f-t0;
-          dest.vtx = t0*vtx + t1*v_smooth;
+          dest.vtx = lerp(vtx,v_smooth,vertex_crease_weight);
         }
         return;
       }
@@ -744,9 +731,9 @@ namespace embree
         dest.vtx = v_sharp;
         dest.crease_weight[crease_id[0]] = max(0.25f*(3.0f*crease_weight0 + crease_weight1)-1.0f,0.0f);
         dest.crease_weight[crease_id[1]] = max(0.25f*(3.0f*crease_weight1 + crease_weight0)-1.0f,0.0f);
-        const float t0 = 0.5f*(crease_weight0+crease_weight1), t1 = 1.0f-t0;
-        if (unlikely(t0 < 1.0f)) {
-          dest.vtx = t0*v_sharp + t1*v_smooth;
+        const float v_blend = 0.5f*(crease_weight0+crease_weight1);
+        if (unlikely(v_blend < 1.0f)) {
+          dest.vtx = lerp(v_sharp,v_smooth,v_blend);
         }
       }
       
@@ -776,7 +763,7 @@ namespace embree
     }
 
 
-    /* gets limit tangent in the direction of egde vtx -> ring[0] */
+    /* gets limit tangent in the direction of edge vtx -> ring[0] */
     __forceinline Vertex getLimitTangent() const 
     {
       CatmullClark1Ring cc_vtx;
@@ -792,7 +779,7 @@ namespace embree
       return 2.0f * cc_vtx.getLimitTangent();
     }
 
-    /* gets limit tangent in the direction of egde vtx -> ring[edge_valence-2] */
+    /* gets limit tangent in the direction of edge vtx -> ring[edge_valence-2] */
     __forceinline Vertex getSecondLimitTangent() const 
     {
       CatmullClark1Ring cc_vtx;
@@ -822,15 +809,15 @@ namespace embree
       return cc_vtx.getLimitVertex();
     }
 
-    friend __forceinline std::ostream &operator<<(std::ostream &o, const GeneralCatmullClark1RingT &c)
+    friend __forceinline embree_ostream operator<<(embree_ostream o, const GeneralCatmullClark1RingT &c)
     {
       o << "vtx " << c.vtx << " size = " << c.edge_valence << ", border_face = " << c.border_face << ", " << " face_valence = " << c.face_valence << 
-	", edge_level = " << c.edge_level << ", vertex_level = " << c.vertex_level << ", ring: " << std::endl;
+	", edge_level = " << c.edge_level << ", vertex_level = " << c.vertex_level << ", ring: " << embree_endl;
       for (size_t v=0, f=0; f<c.face_valence; v+=c.faces[f++].size) {
         for (size_t i=v; i<v+c.faces[f].size; i++) {
           o << i << " -> " << c.ring[i];
           if (i == v) o << " crease = " << c.faces[f].crease_weight;
-          o << std::endl;
+          o << embree_endl;
         }
       }
       return o;

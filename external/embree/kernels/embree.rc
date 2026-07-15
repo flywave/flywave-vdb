@@ -1,8 +1,11 @@
-#include "version.h"
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+
+#include "../include/embree4/rtcore_config.h"
 
 1 VERSIONINFO
- FILEVERSION __EMBREE_VERSION_MAJOR__,__EMBREE_VERSION_MINOR__,__EMBREE_VERSION_PATCH__,0
- PRODUCTVERSION __EMBREE_VERSION_MAJOR__,__EMBREE_VERSION_MINOR__,__EMBREE_VERSION_PATCH__,0
+ FILEVERSION RTC_VERSION_MAJOR,RTC_VERSION_MINOR,RTC_VERSION_PATCH,0
+ PRODUCTVERSION RTC_VERSION_MAJOR,RTC_VERSION_MINOR,RTC_VERSION_PATCH,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -19,12 +22,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Intel"
             VALUE "FileDescription", "Embree Ray Tracing Kernels"
-            VALUE "FileVersion", __EMBREE_VERSION__
-            VALUE "ProductVersion", __EMBREE_VERSION__
-            VALUE "LegalCopyright", "www.apache.org/licenses/LICENSE-2.0"
-            VALUE "OriginalFilename", "embree.dll"
+            VALUE "FileVersion", RTC_VERSION_STRING
+            VALUE "ProductVersion", RTC_VERSION_STRING
+            VALUE "LegalCopyright", "(C) 2009-2021 Intel Corporation"
             VALUE "InternalName", "Embree"
-            VALUE "ProductName", "Embree Ray Tracing Kernels"
+            VALUE "ProductName", "Intel(R) Embree"
         END
     END
     BLOCK "VarFileInfo"

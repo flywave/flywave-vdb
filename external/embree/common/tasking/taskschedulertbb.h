@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -23,58 +10,80 @@
 #include "../sys/mutex.h"
 #include "../sys/condition.h"
 #include "../sys/ref.h"
-#include "../../kernels/algorithms/range.h"
 
-#if defined(__WIN32__)
+#if defined(__WIN32__) && !defined(NOMINMAX)
 #  define NOMINMAX
-#  if defined(__clang__) && !defined(__INTEL_COMPILER) 
-#    define __MINGW64__ 1
-#  endif
 #endif
 
-#define TBB_IMPLEMENT_CPP0X 0
+#if defined(__INTEL_LLVM_COMPILER)
+// prevents "'__thiscall' calling convention is not supported for this target" warning from TBB
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wignored-attributes"
+#endif
+
+// We need to define these to avoid implicit linkage against
+// tbb_debug.lib under Windows. When removing these lines debug build
+// under Windows fails.
 #define __TBB_NO_IMPLICIT_LINKAGE 1
 #define __TBBMALLOC_NO_IMPLICIT_LINKAGE 1
-#include "tbb/tbb_config.h"
-#undef TBB_USE_CAPTURED_EXCEPTION
-#define TBB_USE_CAPTURED_EXCEPTION 0
-#undef __TBB_EXCEPTION_PTR_PRESENT
-#define __TBB_EXCEPTION_PTR_PRESENT 1
+#define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
+#define TBB_PREVIEW_ISOLATED_TASK_GROUP 1
 #include "tbb/tbb.h"
+#include "tbb/parallel_sort.h"
+
+#if defined(TASKING_TBB) && (TBB_INTERFACE_VERSION_MAJOR >= 8)
+#  define USE_TASK_ARENA 1
+#else
+#  define USE_TASK_ARENA 0
+#endif
+
+#if defined(TASKING_TBB) && (TBB_INTERFACE_VERSION >= 11009) // TBB 2019 Update 9
+#  define TASKING_TBB_USE_TASK_ISOLATION 1
+#else
+#  define TASKING_TBB_USE_TASK_ISOLATION 0
+#endif
 
 namespace embree
 {
-#  define SPAWN_BEGIN tbb::task_group __internal_task_group
-#  define SPAWN(closure) __internal_task_group.run(closure)
-#  define SPAWN_END __internal_task_group.wait();                       \
-  if (tbb::task::self().is_cancelled())                                 \
-    throw std::runtime_error("task group cancelled");
-  
   struct TaskScheduler
   {
     /*! initializes the task scheduler */
-    static void create(size_t numThreads, bool set_affinity);
+    static void create(size_t numThreads, bool set_affinity, bool start_threads);
 
     /*! destroys the task scheduler again */
     static void destroy();
-    
-    /* returns the index of the current thread */
+
+    /* returns the ID of the current thread */
+    static __forceinline size_t threadID()
+    {
+      return threadIndex();
+    }
+
+    /* returns the index (0..threadCount-1) of the current thread */
     static __forceinline size_t threadIndex()
     {
-#if TBB_INTERFACE_VERSION_MAJOR < 8
-      return 0;
-#else
+#if TBB_INTERFACE_VERSION >= 9100
+      return tbb::this_task_arena::current_thread_index();
+#elif TBB_INTERFACE_VERSION >= 9000
       return tbb::task_arena::current_thread_index();
+#else
+      return 0;
 #endif
     }
-  
+
     /* returns the total number of threads */
     static __forceinline size_t threadCount() {
+#if TBB_INTERFACE_VERSION >= 9100
+      return tbb::this_task_arena::max_concurrency();
+#else
       return tbb::task_scheduler_init::default_num_threads();
+#endif
     }
 
-  private:
-    static size_t g_numThreads;
   };
+
 };
 
+#if defined(__INTEL_LLVM_COMPILER)
+#pragma clang diagnostic pop
+#endif

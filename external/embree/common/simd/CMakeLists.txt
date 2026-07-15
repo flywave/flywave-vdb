@@ -1,19 +1,19 @@
-## ======================================================================== ##
-## Copyright 2009-2016 Intel Corporation                                    ##
-##                                                                          ##
-## Licensed under the Apache License, Version 2.0 (the "License");          ##
-## you may not use this file except in compliance with the License.         ##
-## You may obtain a copy of the License at                                  ##
-##                                                                          ##
-##     http://www.apache.org/licenses/LICENSE-2.0                           ##
-##                                                                          ##
-## Unless required by applicable law or agreed to in writing, software      ##
-## distributed under the License is distributed on an "AS IS" BASIS,        ##
-## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
-## See the License for the specific language governing permissions and      ##
-## limitations under the License.                                           ##
-## ======================================================================== ##
+## Copyright 2009-2021 Intel Corporation
+## SPDX-License-Identifier: Apache-2.0
 
 ADD_LIBRARY(simd STATIC sse.cpp)
-SET_PROPERTY(TARGET simd PROPERTY FOLDER common)
+SET_PROPERTY(TARGET simd APPEND PROPERTY COMPILE_FLAGS " ${FLAGS_LOWEST}")
 
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(simd PROPERTIES FOLDER external/embree/common)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+
+SET_TARGET_PROPERTIES(simd PROPERTIES
+ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+SET_TARGET_PROPERTIES(simd PROPERTIES 
+LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+SET_TARGET_PROPERTIES(simd PROPERTIES
+RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})

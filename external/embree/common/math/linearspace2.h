@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -31,6 +18,7 @@ namespace embree
 
     /*! default matrix constructor */
     __forceinline LinearSpace2           ( ) {}
+
     __forceinline LinearSpace2           ( const LinearSpace2& other ) { vx = other.vx; vy = other.vy; }
     __forceinline LinearSpace2& operator=( const LinearSpace2& other ) { vx = other.vx; vy = other.vy; return *this; }
 
@@ -58,10 +46,10 @@ namespace embree
     __forceinline const LinearSpace2 transposed() const { return LinearSpace2(vx.x,vx.y,vy.x,vy.y); }
 
     /*! returns first row of matrix */
-    __forceinline const Vector row0() const { return Vector(vx.x,vy.x); }
+    __forceinline Vector row0() const { return Vector(vx.x,vy.x); }
 
     /*! returns second row of matrix */
-    __forceinline const Vector row1() const { return Vector(vx.y,vy.y); }
+    __forceinline Vector row1() const { return Vector(vx.y,vy.y); }
 
     ////////////////////////////////////////////////////////////////////////////////
     /// Constants
@@ -151,10 +139,11 @@ namespace embree
   /// Output Operators
   ////////////////////////////////////////////////////////////////////////////////
 
-  template<typename T> static std::ostream& operator<<(std::ostream& cout, const LinearSpace2<T>& m) {
+  template<typename T> static embree_ostream operator<<(embree_ostream cout, const LinearSpace2<T>& m) {
     return cout << "{ vx = " << m.vx << ", vy = " << m.vy << "}";
   }
 
   /*! Shortcuts for common linear spaces. */
   typedef LinearSpace2<Vec2f> LinearSpace2f;
+  typedef LinearSpace2<Vec2fa> LinearSpace2fa;
 }

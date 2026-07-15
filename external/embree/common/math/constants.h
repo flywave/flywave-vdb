@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -23,24 +10,29 @@
 #define _USE_MATH_DEFINES
 #include <math.h> // using cmath causes issues under Windows
 #include <cfloat>
+#include <climits>
 
 namespace embree
 {
-  static const float one_over_255 = 1.0f/255.0f;
-  static const float min_rcp_input = 1E-18f;  // for abs(x) >= min_rcp_input the newton raphson rcp calculation does not fail
+  static MAYBE_UNUSED const float one_over_255 = 1.0f/255.0f;
+  static MAYBE_UNUSED const float min_rcp_input = 1E-18f;  // for abs(x) >= min_rcp_input the newton raphson rcp calculation does not fail
 
   /* we consider floating point numbers in that range as valid input numbers */
-  static float FLT_LARGE = 1.844E18f;
+  static MAYBE_UNUSED float FLT_LARGE = 1.844E18f;
 
-  static struct TrueTy {
+  struct TrueTy {
     __forceinline operator bool( ) const { return true; }
-  } True MAYBE_UNUSED;
+  };
 
-  static struct FalseTy {
+  const constexpr TrueTy True = TrueTy();
+
+  struct FalseTy {
     __forceinline operator bool( ) const { return false; }
-  } False MAYBE_UNUSED;
+  };
+
+  const constexpr FalseTy False = FalseTy();
   
-  static struct ZeroTy
+  struct ZeroTy
   {
     __forceinline operator          double   ( ) const { return 0; }
     __forceinline operator          float    ( ) const { return 0; }
@@ -54,9 +46,11 @@ namespace embree
     __forceinline operator unsigned short    ( ) const { return 0; }
     __forceinline operator          char     ( ) const { return 0; }
     __forceinline operator unsigned char     ( ) const { return 0; }
-  } zero MAYBE_UNUSED;
+  }; 
 
-  static struct OneTy
+  const constexpr ZeroTy zero = ZeroTy();
+
+  struct OneTy
   {
     __forceinline operator          double   ( ) const { return 1; }
     __forceinline operator          float    ( ) const { return 1; }
@@ -70,9 +64,11 @@ namespace embree
     __forceinline operator unsigned short    ( ) const { return 1; }
     __forceinline operator          char     ( ) const { return 1; }
     __forceinline operator unsigned char     ( ) const { return 1; }
-  } one MAYBE_UNUSED;
+  };
 
-  static struct NegInfTy
+  const constexpr OneTy one = OneTy();
+
+  struct NegInfTy
   {
     __forceinline operator          double   ( ) const { return -std::numeric_limits<double>::infinity(); }
     __forceinline operator          float    ( ) const { return -std::numeric_limits<float>::infinity(); }
@@ -87,9 +83,11 @@ namespace embree
     __forceinline operator          char     ( ) const { return std::numeric_limits<char>::min(); }
     __forceinline operator unsigned char     ( ) const { return std::numeric_limits<unsigned char>::min(); }
 
-  } neg_inf MAYBE_UNUSED;
+  };
 
-  static struct PosInfTy
+  const constexpr NegInfTy neg_inf = NegInfTy();
+
+  struct PosInfTy
   {
     __forceinline operator          double   ( ) const { return std::numeric_limits<double>::infinity(); }
     __forceinline operator          float    ( ) const { return std::numeric_limits<float>::infinity(); }
@@ -103,65 +101,109 @@ namespace embree
     __forceinline operator unsigned short    ( ) const { return std::numeric_limits<unsigned short>::max(); }
     __forceinline operator          char     ( ) const { return std::numeric_limits<char>::max(); }
     __forceinline operator unsigned char     ( ) const { return std::numeric_limits<unsigned char>::max(); }
-  } inf MAYBE_UNUSED, pos_inf MAYBE_UNUSED;
+  };
 
-  static struct NaNTy
+  const constexpr PosInfTy     inf = PosInfTy();
+  const constexpr PosInfTy pos_inf = PosInfTy();
+
+  struct NaNTy
   {
     __forceinline operator double( ) const { return std::numeric_limits<double>::quiet_NaN(); }
     __forceinline operator float ( ) const { return std::numeric_limits<float>::quiet_NaN(); }
-  } nan MAYBE_UNUSED;
+  };
 
-  static struct UlpTy
+  const constexpr NaNTy nan = NaNTy();
+
+  struct UlpTy
   {
     __forceinline operator double( ) const { return std::numeric_limits<double>::epsilon(); }
     __forceinline operator float ( ) const { return std::numeric_limits<float>::epsilon(); }
-  } ulp MAYBE_UNUSED;
+  };
+  
+  const constexpr UlpTy ulp = UlpTy();
 
-  static struct PiTy
+  struct PiTy
   {
     __forceinline operator double( ) const { return double(M_PI); }
     __forceinline operator float ( ) const { return float(M_PI); }
-  } pi MAYBE_UNUSED;
+  };
 
-  static struct OneOverPiTy
+  const constexpr PiTy pi = PiTy();
+
+  struct OneOverPiTy
   {
     __forceinline operator double( ) const { return double(M_1_PI); }
     __forceinline operator float ( ) const { return float(M_1_PI); }
-  } one_over_pi MAYBE_UNUSED;
+  };
 
-  static struct TwoPiTy
+  const constexpr OneOverPiTy one_over_pi = OneOverPiTy();
+
+  struct TwoPiTy
   {
     __forceinline operator double( ) const { return double(2.0*M_PI); }
     __forceinline operator float ( ) const { return float(2.0*M_PI); }
-  } two_pi MAYBE_UNUSED;
+  };
 
-  static struct OneOverTwoPiTy
+  const constexpr TwoPiTy two_pi = TwoPiTy();
+
+  struct OneOverTwoPiTy
   {
     __forceinline operator double( ) const { return double(0.5*M_1_PI); }
     __forceinline operator float ( ) const { return float(0.5*M_1_PI); }
-  } one_over_two_pi MAYBE_UNUSED;
+  };
 
-  static struct FourPiTy
+  const constexpr OneOverTwoPiTy one_over_two_pi = OneOverTwoPiTy();
+
+  struct FourPiTy
   {
     __forceinline operator double( ) const { return double(4.0*M_PI); } 
     __forceinline operator float ( ) const { return float(4.0*M_PI); }
-  } four_pi MAYBE_UNUSED;
+  };
 
-  static struct OneOverFourPiTy
+  const constexpr FourPiTy four_pi = FourPiTy();
+
+  struct OneOverFourPiTy
   {
     __forceinline operator double( ) const { return double(0.25*M_1_PI); }
     __forceinline operator float ( ) const { return float(0.25*M_1_PI); }
-  } one_over_four_pi MAYBE_UNUSED;
+  };
 
-  static struct StepTy {
-  } step MAYBE_UNUSED;
+  const constexpr OneOverFourPiTy one_over_four_pi = OneOverFourPiTy();
 
-  static struct ReverseStepTy {
-  } reverse_step MAYBE_UNUSED;
+  struct StepTy {
+    __forceinline operator          double   ( ) const { return 0; }
+    __forceinline operator          float    ( ) const { return 0; }
+    __forceinline operator          long long( ) const { return 0; }
+    __forceinline operator unsigned long long( ) const { return 0; }
+    __forceinline operator          long     ( ) const { return 0; }
+    __forceinline operator unsigned long     ( ) const { return 0; }
+    __forceinline operator          int      ( ) const { return 0; }
+    __forceinline operator unsigned int      ( ) const { return 0; }
+    __forceinline operator          short    ( ) const { return 0; }
+    __forceinline operator unsigned short    ( ) const { return 0; }
+    __forceinline operator          char     ( ) const { return 0; }
+    __forceinline operator unsigned char     ( ) const { return 0; }
+  };
 
-  static struct EmptyTy {
-  } empty MAYBE_UNUSED;
+  const constexpr StepTy step = StepTy();
 
-  static struct FullTy {
-  } full MAYBE_UNUSED;
+  struct ReverseStepTy {
+  };
+
+  const constexpr ReverseStepTy reverse_step = ReverseStepTy();
+
+  struct EmptyTy {
+  };
+
+  const constexpr EmptyTy empty = EmptyTy();
+
+  struct FullTy {
+  };
+
+  const constexpr FullTy full = FullTy();
+
+  struct UndefinedTy {
+  };
+
+  const constexpr UndefinedTy undefined = UndefinedTy();
 }

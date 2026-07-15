@@ -12,9 +12,9 @@
 #include <vector>
 #include <string>
 
-#include <embree2/rtcore.h>
-#include <embree2/rtcore_scene.h>
-#include <embree2/rtcore_geometry.h>
+#include <embree4/rtcore.h>
+#include <embree4/rtcore_scene.h>
+#include <embree4/rtcore_geometry.h>
 
 namespace Tungsten {
 
@@ -40,7 +40,7 @@ class TriangleMesh : public Primitive
     Box3f _bounds;
 
     RTCScene _scene;
-    unsigned _geomId;
+    RTCGeometry _geom;
 
     Vec3f unnormalizedGeometricNormalAt(int triangle) const;
     Vec3f normalAt(int triangle, float u, float v) const;

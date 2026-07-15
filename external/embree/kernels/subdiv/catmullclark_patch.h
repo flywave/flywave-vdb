@@ -1,18 +1,5 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
@@ -37,7 +24,7 @@ namespace embree
       init(first_half_edge,vertices,stride);
     }
     
-    __forceinline CatmullClarkPatchT (const HalfEdge* first_half_edge, const BufferT<Vec3fa>& vertices) {
+    __forceinline CatmullClarkPatchT (const HalfEdge* first_half_edge, const BufferView<Vec3fa>& vertices) {
       init(first_half_edge,vertices.getPtr(),vertices.getStride());
     }
     
@@ -275,12 +262,12 @@ namespace embree
       quad.vtx[3] = (Vertex_t)ring[3].vtx;
     };
     
-    friend __forceinline std::ostream &operator<<(std::ostream &o, const CatmullClarkPatchT &p)
+    friend __forceinline embree_ostream operator<<(embree_ostream o, const CatmullClarkPatchT &p)
     {
-      o << "CatmullClarkPatch { " << std::endl;
+      o << "CatmullClarkPatch { " << embree_endl;
       for (size_t i=0; i<4; i++)
-	o << "ring" << i << ": " << p.ring[i] << std::endl;
-      o << "}" << std::endl;
+	o << "ring" << i << ": " << p.ring[i] << embree_endl;
+      o << "}" << embree_endl;
       return o;
     }
     };
@@ -296,7 +283,7 @@ namespace embree
     typedef BezierCurveT<Vertex> BezierCurve;
 
     static const unsigned SIZE = MAX_PATCH_VALENCE;
-    array_t<GeneralCatmullClark1RingT<Vertex,Vertex_t>,SIZE> ring;
+    DynamicStackArray<GeneralCatmullClark1RingT<Vertex,Vertex_t>,8,SIZE> ring;
     unsigned N;
     
     __forceinline GeneralCatmullClarkPatchT () 
@@ -306,7 +293,7 @@ namespace embree
       init(h,vertices,stride);
     }
 
-    __forceinline GeneralCatmullClarkPatchT (const HalfEdge* first_half_edge, const BufferT<Vec3fa>& vertices) {
+    __forceinline GeneralCatmullClarkPatchT (const HalfEdge* first_half_edge, const BufferView<Vec3fa>& vertices) {
       init(first_half_edge,vertices.getPtr(),vertices.getStride());
     }
 
@@ -315,7 +302,7 @@ namespace embree
       unsigned int i = 0;
       const HalfEdge* edge = h; 
       do {
-	      ring[i].init(edge,vertices,stride);
+        ring[i].init(edge,vertices,stride);
         edge = edge->next();
         i++;
       } while ((edge != h) && (i < SIZE));
@@ -329,7 +316,7 @@ namespace embree
     __forceinline bool isQuadPatch() const {
       return (N == 4) && ring[0].only_quads && ring[1].only_quads && ring[2].only_quads && ring[3].only_quads;
     }
-    
+
     static __forceinline void init_regular(const CatmullClark1RingT<Vertex,Vertex_t>& p0,
 					   const CatmullClark1RingT<Vertex,Vertex_t>& p1,
 					   CatmullClark1RingT<Vertex,Vertex_t>& dest0,
@@ -522,9 +509,9 @@ namespace embree
       for (unsigned i=0; i<N; i++)
       {
         const unsigned i0 = i, i1 = i+1==N ? 0 : i+1;
-        const Vertex P1 = P0 + (1.0f/3.0f) * ring[i0].getLimitTangent();
+        const Vertex P1 = madd(1.0f/3.0f,ring[i0].getLimitTangent(),P0);
         const Vertex P3 = ring[i1].getLimitVertex();
-        const Vertex P2 = P3 + (1.0f/3.0f) * ring[i1].getSecondLimitTangent();
+        const Vertex P2 = madd(1.0f/3.0f,ring[i1].getSecondLimitTangent(),P3);
         new (&curves[i]) BezierCurve(P0,P1,P2,P3);
         P0 = P3;
       }
@@ -548,25 +535,25 @@ namespace embree
       const Vertex b03 = ring[i1].getLimitVertex();
       const Vertex b33 = ring[i2].getLimitVertex();
       
-      const Vertex b01 = b00 + 1.0/3.0f * t0_p;
-      const Vertex b11 = b00 + 1.0/3.0f * t0_m;
+      const Vertex b01 = madd(1.0/3.0f,t0_p,b00);
+      const Vertex b11 = madd(1.0/3.0f,t0_m,b00);
       
-      //const Vertex b13 = b03 + 1.0/3.0f * t1_p;
-      const Vertex b02 = b03 + 1.0/3.0f * t1_m;
+      //const Vertex b13 = madd(1.0/3.0f,t1_p,b03);
+      const Vertex b02 = madd(1.0/3.0f,t1_m,b03);
           
-      const Vertex b22 = b33 + 1.0/3.0f * t2_p;
-      const Vertex b23 = b33 + 1.0/3.0f * t2_m;
+      const Vertex b22 = madd(1.0/3.0f,t2_p,b33);
+      const Vertex b23 = madd(1.0/3.0f,t2_m,b33);
           
       new (&curves[0]) BezierCurve(b00,b01,b02,b03);
       new (&curves[1]) BezierCurve(b33,b22,b11,b00);
     }
     
-    friend __forceinline std::ostream &operator<<(std::ostream &o, const GeneralCatmullClarkPatchT &p)
+    friend __forceinline embree_ostream operator<<(embree_ostream o, const GeneralCatmullClarkPatchT &p)
     {
-      o << "GeneralCatmullClarkPatch { " << std::endl;
+      o << "GeneralCatmullClarkPatch { " << embree_endl;
       for (unsigned i=0; i<p.N; i++)
-	o << "ring" << i << ": " << p.ring[i] << std::endl;
-      o << "}" << std::endl;
+	o << "ring" << i << ": " << p.ring[i] << embree_endl;
+      o << "}" << embree_endl;
       return o;
     }
     };

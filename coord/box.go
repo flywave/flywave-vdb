@@ -80,6 +80,7 @@ func (box *Box) Intersects(other *Box) bool {
 	c2 := other.Center()
 	distCenters2 := Sub(&c1, &c2)
 	distCenters2.Scale(2)
+	distCenters2.Abs()
 	return distCenters2[0] <= sizes[0] && distCenters2[1] <= sizes[1] && distCenters2[2] <= sizes[2]
 }
 

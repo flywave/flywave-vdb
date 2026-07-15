@@ -1,41 +1,37 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
 #include "../common/scene.h"
-#include "../common/primref.h"
 #include "priminfo.h"
-#include "../geometry/bezier1v.h"
+#include "priminfo_mb.h"
+#include "bvh_builder_morton.h"
 
 namespace embree
-{
+{ 
   namespace isa
   {
+    PrimInfo createPrimRefArray(Geometry* geometry, unsigned int geomID, size_t numPrimitives, mvector<PrimRef>& prims, BuildProgressMonitor& progressMonitor);
+   
+    PrimInfo createPrimRefArray(Scene* scene, Geometry::GTypeMask types, bool mblur, size_t numPrimitives, mvector<PrimRef>& prims, BuildProgressMonitor& progressMonitor);
+
+    PrimInfo createPrimRefArray(Scene* scene, Geometry::GTypeMask types, bool mblur, size_t numPrimitives, mvector<PrimRef>& prims, mvector<SubGridBuildData>& sgrids, BuildProgressMonitor& progressMonitor);
+   
+    PrimInfo createPrimRefArrayMBlur(Scene* scene, Geometry::GTypeMask types, size_t numPrimitives, mvector<PrimRef>& prims, BuildProgressMonitor& progressMonitor, size_t itime = 0);
+
+    PrimInfoMB createPrimRefArrayMSMBlur(Scene* scene, Geometry::GTypeMask types, size_t numPrimitives, mvector<PrimRefMB>& prims, BuildProgressMonitor& progressMonitor, BBox1f t0t1 = BBox1f(0.0f,1.0f));
+
+    PrimInfoMB createPrimRefArrayMSMBlur(Scene* scene, Geometry::GTypeMask types, size_t numPrimitives, mvector<PrimRefMB>& prims, mvector<SubGridBuildData>& sgrids, BuildProgressMonitor& progressMonitor, BBox1f t0t1 = BBox1f(0.0f,1.0f));
+
     template<typename Mesh>
-      PrimInfo createPrimRefArray(Mesh* mesh, mvector<PrimRef>& prims, BuildProgressMonitor& progressMonitor);
+      size_t createMortonCodeArray(Mesh* mesh, mvector<BVHBuilderMorton::BuildPrim>& morton, BuildProgressMonitor& progressMonitor);
 
-    template<typename Mesh, size_t timeSteps>
-      PrimInfo createPrimRefArray(Scene* scene, mvector<PrimRef>& prims, BuildProgressMonitor& progressMonitor);
+    /* special variants for grids */
+    PrimInfo createPrimRefArrayGrids(Scene* scene, mvector<PrimRef>& prims, mvector<SubGridBuildData>& sgrids); // FIXME: remove
 
-    template<typename Mesh, size_t timeSteps>
-      PrimInfo createPrimRefList(Scene* scene, PrimRefList& prims, BuildProgressMonitor& progressMonitor);
+    PrimInfo createPrimRefArrayGrids(GridMesh* mesh, mvector<PrimRef>& prims, mvector<SubGridBuildData>& sgrids);
 
-    template<size_t timeSteps>
-      PrimInfo createBezierRefArray(Scene* scene, mvector<BezierPrim>& prims, BuildProgressMonitor& progressMonitor);
+    PrimInfoMB createPrimRefArrayMSMBlurGrid(Scene* scene, mvector<PrimRefMB>& prims, mvector<SubGridBuildData>& sgrids, BuildProgressMonitor& progressMonitor, BBox1f t0t1 = BBox1f(0.0f,1.0f));
   }
 }
-

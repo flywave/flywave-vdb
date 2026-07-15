@@ -17,22 +17,21 @@
 #include <vector>
 #include <memory>
 
-#include <embree2/rtcore.h>
-#include <embree2/rtcore_ray.h>
+#include <embree4/rtcore.h>
+#include <embree4/rtcore_ray.h>
+#include <embree4/rtcore_scene.h>
+#include <embree4/rtcore_geometry.h>
 
 namespace Tungsten {
 
 class TraceableScene
 {
 public:
-    struct IntersectionRay : RTCRay
+    struct IntersectionContext
     {
-        IntersectionTemporary &data;
-        Ray &ray;
-        unsigned userGeomId;
-
-        IntersectionRay(RTCRay eRay, IntersectionTemporary &data_, Ray &ray_, unsigned userGeomId_)
-        : RTCRay(eRay), data(data_), ray(ray_), userGeomId(userGeomId_) {}
+        RTCRayQueryContext rtc;
+        IntersectionTemporary *data;
+        Ray *ray;
     };
 
 private:
@@ -49,7 +48,7 @@ private:
     RendererSettings _settings;
 
     RTCScene _scene = nullptr;
-    unsigned _userGeomId;
+    RTCGeometry _userGeom = nullptr;
 
     Box3f _sceneBounds;
 
@@ -110,27 +109,39 @@ public:
         }
 
         if (_settings.useSceneBvh()) {
-            _scene = rtcDeviceNewScene(EmbreeUtil::getDevice(), RTC_SCENE_STATIC | RTC_SCENE_INCOHERENT, RTC_INTERSECT1);
-            _userGeomId = rtcNewUserGeometry(_scene, _finites.size());
-            rtcSetUserData(_scene, _userGeomId, this);
+            _scene = rtcNewScene(EmbreeUtil::getDevice());
+            _userGeom = rtcNewGeometry(EmbreeUtil::getDevice(), RTC_GEOMETRY_TYPE_USER);
+            rtcSetGeometryUserPrimitiveCount(_userGeom, _finites.size());
+            rtcSetGeometryUserData(_userGeom, this);
 
-            rtcSetBoundsFunction(_scene, _userGeomId, [](void *ptr, size_t i, RTCBounds &bounds) {
-                bounds = EmbreeUtil::convert(static_cast<TraceableScene *>(ptr)->finites()[i]->bounds());
-            });
-            rtcSetIntersectFunction(_scene, _userGeomId, [](void *ptr, RTCRay &embreeRay, size_t i) {
-                IntersectionRay &ray = *static_cast<IntersectionRay *>(&embreeRay);
-                if (static_cast<TraceableScene *>(ptr)->finites()[i]->intersect(ray.ray, ray.data)) {
-                    embreeRay.tfar = ray.ray.farT();
-                    embreeRay.geomID = ray.userGeomId;
-                    embreeRay.primID = i;
+            rtcSetGeometryBoundsFunction(_userGeom, [](const RTCBoundsFunctionArguments *args) {
+                auto *scene = static_cast<TraceableScene *>(args->geometryUserPtr);
+                *args->bounds_o = EmbreeUtil::convert(scene->finites()[args->primID]->bounds());
+            }, nullptr);
+            rtcSetGeometryIntersectFunction(_userGeom, [](const RTCIntersectFunctionNArguments *args) {
+                auto *ictx = reinterpret_cast<IntersectionContext *>(args->context);
+                auto *scene = static_cast<TraceableScene *>(args->geometryUserPtr);
+                unsigned int i = args->primID;
+                RTCRayHit *rh = reinterpret_cast<RTCRayHit *>(args->rayhit);
+                if (scene->finites()[i]->intersect(*ictx->ray, *ictx->data)) {
+                    rh->ray.tfar = ictx->ray->farT();
+                    rh->hit.geomID = args->geomID;
+                    rh->hit.primID = i;
                 }
             });
-            rtcSetOccludedFunction(_scene, _userGeomId, [](void *ptr, RTCRay &embreeRay, size_t i) {
-                if (static_cast<TraceableScene *>(ptr)->finites()[i]->occluded(Ray(EmbreeUtil::convert(embreeRay))))
-                    embreeRay.geomID = 0;
+            rtcSetGeometryOccludedFunction(_userGeom, [](const RTCOccludedFunctionNArguments *args) {
+                auto *scene = static_cast<TraceableScene *>(args->geometryUserPtr);
+                unsigned int i = args->primID;
+                RTCRay *ray = reinterpret_cast<RTCRay *>(args->ray);
+                if (scene->finites()[i]->occluded(EmbreeUtil::convert(*ray)))
+                    ray->tfar = -1.0f;
             });
 
-            rtcCommit(_scene);
+            rtcCommitGeometry(_userGeom);
+            rtcAttachGeometry(_scene, _userGeom);
+            rtcReleaseGeometry(_userGeom);
+            _userGeom = nullptr;
+            rtcCommitScene(_scene);
         }
 
         _integrator.prepareForRender(*this, seed);
@@ -155,16 +166,23 @@ public:
         }
 
         if (_scene)
-            rtcDeleteScene(_scene);
+            rtcReleaseScene(_scene);
         _scene = nullptr;
     }
 
     float hitDistance(Ray &ray) const
     {
         IntersectionTemporary data;
-        IntersectionRay eRay(EmbreeUtil::convert(ray), data, ray, _userGeomId);
-        rtcIntersect(_scene, eRay);
-        return eRay.ray.farT();
+        RTCRayHit rh(EmbreeUtil::convertToRayHit(ray));
+        IntersectionContext ictx;
+        rtcInitRayQueryContext(&ictx.rtc);
+        ictx.data = &data;
+        ictx.ray = &ray;
+        RTCIntersectArguments args;
+        rtcInitIntersectArguments(&args);
+        args.context = &ictx.rtc;
+        rtcIntersect1(_scene, &rh, &args);
+        return ray.farT();
     }
 
     bool intersect(Ray &ray, IntersectionTemporary &data, IntersectionInfo &info) const
@@ -173,8 +191,15 @@ public:
         data.primitive = nullptr;
 
         if (_settings.useSceneBvh()) {
-            IntersectionRay eRay(EmbreeUtil::convert(ray), data, ray, _userGeomId);
-            rtcIntersect(_scene, eRay);
+            RTCRayHit rh(EmbreeUtil::convertToRayHit(ray));
+            IntersectionContext ictx;
+            rtcInitRayQueryContext(&ictx.rtc);
+            ictx.data = &data;
+            ictx.ray = &ray;
+            RTCIntersectArguments args;
+            rtcInitIntersectArguments(&args);
+            args.context = &ictx.rtc;
+            rtcIntersect1(_scene, &rh, &args);
         } else {
             for (const Primitive *prim : _finites)
                 prim->intersect(ray, data);
@@ -211,9 +236,11 @@ public:
     bool occluded(const Ray &ray) const
     {
         if (_settings.useSceneBvh()) {
-            auto eRay = EmbreeUtil::convert(ray);
-            rtcOccluded(_scene, eRay);
-            return eRay.geomID != RTC_INVALID_GEOMETRY_ID;
+            RTCRay eRay = EmbreeUtil::convert(ray);
+            RTCOccludedArguments args;
+            rtcInitOccludedArguments(&args);
+            rtcOccluded1(_scene, &eRay, &args);
+            return eRay.tfar < 0.0f;
         } else {
             for (const Primitive *prim : _finites)
                 if (prim->occluded(ray))

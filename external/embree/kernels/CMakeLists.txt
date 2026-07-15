@@ -1,18 +1,26 @@
-## ======================================================================== ##
-## Copyright 2009-2016 Intel Corporation                                    ##
-##                                                                          ##
-## Licensed under the Apache License, Version 2.0 (the "License");          ##
-## you may not use this file except in compliance with the License.         ##
-## You may obtain a copy of the License at                                  ##
-##                                                                          ##
-##     http://www.apache.org/licenses/LICENSE-2.0                           ##
-##                                                                          ##
-## Unless required by applicable law or agreed to in writing, software      ##
-## distributed under the License is distributed on an "AS IS" BASIS,        ##
-## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. ##
-## See the License for the specific language governing permissions and      ##
-## limitations under the License.                                           ##
-## ======================================================================== ##
+## Copyright 2009-2021 Intel Corporation
+## SPDX-License-Identifier: Apache-2.0
+
+IF (EMBREE_SYCL_RT_SIMULATION)
+  FIND_PACKAGE(rtcore)
+ENDIF()
+
+IF (EMBREE_SYCL_SUPPORT)
+  ADD_SUBDIRECTORY(level_zero)
+  ADD_SUBDIRECTORY(rthwif)
+ENDIF()
+
+IF (EMBREE_CONFIG)
+  ADD_DEFINITIONS(-DEMBREE_CONFIG="${EMBREE_CONFIG}")
+ENDIF()
+
+MACRO(DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS)
+  FOREACH(src ${ARGN})
+    IF (src MATCHES ".*intersector.*")
+      DISABLE_STACK_PROTECTOR_FOR_FILE(${src})
+    ENDIF()
+  ENDFOREACH()
+ENDMACRO()
 
 SOURCE_GROUP("Source Files\\bvh4" "/bvh4/" )
 SOURCE_GROUP("Source Files\\bvh8" "/bvh8/" )
@@ -24,15 +32,8 @@ SOURCE_GROUP("Source Files\\algorithms" "/algorithms/")
 SOURCE_GROUP("" FILES embree.rc)
 
 SET(EMBREE_LIBRARY_FILES
-  algorithms/parallel_for.cpp
-  algorithms/parallel_reduce.cpp
-  algorithms/parallel_prefix_sum.cpp
-  algorithms/parallel_for_for.cpp
-  algorithms/parallel_for_for_prefix_sum.cpp
-  algorithms/sort.cpp
-  algorithms/pset.cpp
-  algorithms/pmap.cpp
-  algorithms/prefix.cpp
+ 
+  embree.rc
 
   common/device.cpp
   common/stat.cpp
@@ -40,28 +41,35 @@ SET(EMBREE_LIBRARY_FILES
   common/accelset.cpp
   common/state.cpp
   common/rtcore.cpp
-  common/buffer.cpp
+  common/rtcore_builder.cpp
   common/scene.cpp
+  common/scene_verify.cpp
   common/alloc.cpp
   common/geometry.cpp
   common/scene_user_geometry.cpp
   common/scene_instance.cpp
-  common/scene_geometry_instance.cpp
+  common/scene_instance_array.cpp
   common/scene_triangle_mesh.cpp
   common/scene_quad_mesh.cpp
-  common/scene_bezier_curves.cpp
+  common/scene_curves.cpp
   common/scene_line_segments.cpp
-  common/scene_subdiv_mesh.cpp
-  subdiv/tessellation_cache.cpp
-  subdiv/subdivpatch1base.cpp
-  subdiv/catmullclark_coefficients.cpp
-  subdiv/bezier_curve.cpp
+  common/scene_grid_mesh.cpp
+  common/scene_points.cpp
+  common/motion_derivative.cpp
 
-  geometry/primitive.cpp
-  geometry/instance_intersector1.cpp
+  subdiv/bezier_curve.cpp
+  subdiv/bspline_curve.cpp
+  subdiv/catmullrom_curve.cpp
+
+  geometry/primitive4.cpp
   geometry/instance_intersector.cpp
-  geometry/grid_soa.cpp	
-  subdiv/subdivpatch1base_eval.cpp	
+  geometry/instance_array_intersector.cpp
+  geometry/curve_intersector_virtual_4v.cpp
+  geometry/curve_intersector_virtual_4i.cpp
+  geometry/curve_intersector_virtual_4i_mb.cpp
+  geometry/curve_intersector_virtual_8v.cpp
+  geometry/curve_intersector_virtual_8i.cpp
+  geometry/curve_intersector_virtual_8i_mb.cpp
   builders/primrefgen.cpp
 
   bvh/bvh.cpp
@@ -69,206 +77,372 @@ SET(EMBREE_LIBRARY_FILES
   bvh/bvh4_factory.cpp
   bvh/bvh8_factory.cpp
 
+  bvh/bvh_collider.cpp
   bvh/bvh_rotate.cpp
   bvh/bvh_refit.cpp
   bvh/bvh_builder.cpp
   bvh/bvh_builder_hair.cpp
+  bvh/bvh_builder_hair_mb.cpp
   bvh/bvh_builder_morton.cpp
   bvh/bvh_builder_sah.cpp
+  bvh/bvh_builder_sah_spatial.cpp
+  bvh/bvh_builder_sah_mb.cpp
   bvh/bvh_builder_twolevel.cpp
-  bvh/bvh_builder_instancing.cpp
-  bvh/bvh_builder_subdiv.cpp
-
-  bvh/bvh_intersector1.cpp
+  bvh/bvh_intersector1_bvh4.cpp
   )
 
-IF (WIN32 AND NOT MINGW)
-  SET(EMBREE_LIBRARY_FILES 
-    embree.rc
-    ${EMBREE_LIBRARY_FILES})
-ENDIF()
-  
-IF (TASKING_INTERNAL)
-  SET(EMBREE_LIBRARY_FILES 
-    ../common/tasking/taskschedulerinternal.cpp
-    ../common/tasking/tasksys.cpp
-    ${EMBREE_LIBRARY_FILES})
+
+IF (EMBREE_SYCL_SUPPORT)
+  SET(EMBREE_LIBRARY_FILES ${EMBREE_LIBRARY_FILES}
+  sycl/rthwif_embree_builder.cpp
+  sycl/scene_sycl.cpp)
+
+  set_source_files_properties(sycl/scene_sycl.cpp PROPERTIES COMPILE_FLAGS ${CMAKE_CXX_FLAGS_SYCL})
 ENDIF()
 
-IF (TASKING_TBB)
-  SET(EMBREE_LIBRARY_FILES 
-    ../common/tasking/taskschedulertbb.cpp
-    ../common/tasking/tasksys.cpp
-    ${EMBREE_LIBRARY_FILES})
-  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} ${TBB_LIBRARIES})
+IF (EMBREE_GEOMETRY_SUBDIVISION)
+  SET(EMBREE_LIBRARY_FILES ${EMBREE_LIBRARY_FILES}
+  common/scene_subdiv_mesh.cpp
+  subdiv/tessellation_cache.cpp
+  subdiv/subdivpatch1base.cpp
+  subdiv/catmullclark_coefficients.cpp
+  geometry/grid_soa.cpp	
+  subdiv/subdivpatch1base_eval.cpp
+  bvh/bvh_builder_subdiv.cpp)
 ENDIF()
 
 IF (EMBREE_RAY_PACKETS)
   SET(EMBREE_LIBRARY_FILES ${EMBREE_LIBRARY_FILES}
-
-  common/rtcore_ispc.cpp
-  common/rtcore_ispc.ispc
-
-  bvh/bvh_intersector_single.cpp
-  bvh/bvh_intersector_hybrid.cpp
-  bvh/bvh_intersector_stream_filters.cpp)
+  bvh/bvh_intersector_hybrid4_bvh4.cpp)
 ENDIF()
 
-SET(EMBREE_LIBRARY_FILES_SSE42
-    geometry/grid_soa.cpp
-    subdiv/subdivpatch1base_eval.cpp
-    bvh/bvh_intersector1.cpp)
+MACRO(embree_files TARGET ISA)
+      
+  SET(${TARGET}
+    geometry/instance_intersector.cpp
+    geometry/instance_array_intersector.cpp
+    geometry/curve_intersector_virtual_4v.cpp
+    geometry/curve_intersector_virtual_4i.cpp
+    geometry/curve_intersector_virtual_4i_mb.cpp
+    geometry/curve_intersector_virtual_8v.cpp
+    geometry/curve_intersector_virtual_8i.cpp
+    geometry/curve_intersector_virtual_8i_mb.cpp
+    bvh/bvh_intersector1_bvh4.cpp)
 
-IF (EMBREE_RAY_PACKETS)
-    SET(EMBREE_LIBRARY_FILES_SSE42 ${EMBREE_LIBRARY_FILES_SSE42}
-    bvh/bvh_intersector_single.cpp
-    bvh/bvh_intersector_hybrid.cpp
-    bvh/bvh_intersector_stream.cpp
-    bvh/bvh_intersector_stream_filters.cpp)
-ENDIF()
+  IF (${ISA} EQUAL ${ISA_LOWEST_AVX})
+    LIST(APPEND ${TARGET} geometry/primitive8.cpp)
+  ENDIF() 
 
-SET(EMBREE_LIBRARY_FILES_AVX
+  IF (${ISA} EQUAL ${SSE2} OR ${ISA} EQUAL ${AVX} OR ${ISA} EQUAL ${AVX2} OR ${ISA} EQUAL ${AVX512} OR ${ISA_LOWEST} EQUAL ${ISA})
     
-    common/scene_subdiv_mesh_avx.cpp
+    LIST(APPEND ${TARGET}
+      common/scene_user_geometry.cpp
+      common/scene_instance.cpp
+      common/scene_instance_array.cpp
+      common/scene_triangle_mesh.cpp
+      common/scene_quad_mesh.cpp 
+      common/scene_curves.cpp
+      common/scene_line_segments.cpp
+      common/scene_grid_mesh.cpp
+      common/scene_points.cpp
+
+      bvh/bvh_collider.cpp
+      bvh/bvh_refit.cpp
+      bvh/bvh_builder.cpp
+      bvh/bvh_builder_hair.cpp
+      bvh/bvh_builder_hair_mb.cpp
+      bvh/bvh_builder_sah.cpp
+      bvh/bvh_builder_sah_spatial.cpp
+      bvh/bvh_builder_sah_mb.cpp
+      bvh/bvh_builder_twolevel.cpp)
+
+    IF (EMBREE_GEOMETRY_SUBDIVISION)
+      LIST(APPEND ${TARGET} bvh/bvh_builder_subdiv.cpp)
+    ENDIF()
+  ENDIF()
+
+  IF (${ISA} EQUAL ${SSE2} OR ${ISA} EQUAL ${AVX} OR ${ISA} EQUAL ${AVX2} OR ${ISA_LOWEST} EQUAL ${ISA})
+    LIST(APPEND ${TARGET}
+      bvh/bvh_builder_morton.cpp
+      bvh/bvh_rotate.cpp
+      builders/primrefgen.cpp)
+  ENDIF()
+    
+  IF (${ISA} GREATER ${SSE42})
+    LIST(APPEND ${TARGET} bvh/bvh_intersector1_bvh8.cpp)
+  ENDIF()
+
+  IF (${ISA} EQUAL ${AVX})
+    LIST(APPEND ${TARGET}
+      bvh/bvh.cpp
+      bvh/bvh_statistics.cpp)
+  ENDIF()
+
+  IF (EMBREE_GEOMETRY_SUBDIVISION)
+    LIST(APPEND ${TARGET}
+        common/scene_subdiv_mesh.cpp
+        geometry/grid_soa.cpp
+        subdiv/subdivpatch1base_eval.cpp)
+  ENDIF()
+    
+  IF (EMBREE_RAY_PACKETS)
+    LIST(APPEND ${TARGET}
+      bvh/bvh_intersector_hybrid4_bvh4.cpp)
+
+    IF (${ISA} GREATER ${SSE42})
+      LIST(APPEND ${TARGET}
+        bvh/bvh_intersector_hybrid8_bvh4.cpp
+        bvh/bvh_intersector_hybrid4_bvh8.cpp
+        bvh/bvh_intersector_hybrid8_bvh8.cpp)
+    ENDIF()
+
+    IF (${ISA} GREATER ${AVX2})
+      LIST(APPEND ${TARGET}
+        bvh/bvh_intersector_hybrid16_bvh8.cpp
+        bvh/bvh_intersector_hybrid16_bvh4.cpp)
+    ENDIF()
+  ENDIF()
   
-    geometry/instance_intersector1.cpp
-    
-    geometry/grid_soa.cpp
-    subdiv/subdivpatch1base_eval.cpp
-    builders/primrefgen.avx.cpp
+ENDMACRO()
 
-    bvh/bvh_rotate.cpp
-    bvh/bvh_refit.avx.cpp
-    bvh/bvh_builder.avx.cpp
-    bvh/bvh_builder_hair.avx.cpp
-    bvh/bvh_builder_morton.avx.cpp
-    bvh/bvh_builder_sah.avx.cpp
-    bvh/bvh_builder_twolevel.avx.cpp
-    bvh/bvh_builder_instancing.avx.cpp
-    bvh/bvh_builder_subdiv.avx.cpp
-    bvh/bvh_intersector1.cpp
-    
-    bvh/bvh.cpp
-    bvh/bvh_statistics.cpp)
+#embree_files(EMBREE_LIBRARY_FILES_SSE2 ${SSE2})
+embree_files(EMBREE_LIBRARY_FILES_SSE42 ${SSE42})
+embree_files(EMBREE_LIBRARY_FILES_AVX ${AVX})
+embree_files(EMBREE_LIBRARY_FILES_AVX2 ${AVX2})
+embree_files(EMBREE_LIBRARY_FILES_AVX512 ${AVX512})
 
-IF (EMBREE_RAY_PACKETS)
-  SET(EMBREE_LIBRARY_FILES_AVX ${EMBREE_LIBRARY_FILES_AVX}
+#message("SSE2: ${EMBREE_LIBRARY_FILES_SSE2}")
+#message("SSE42: ${EMBREE_LIBRARY_FILES_SSE42}")
+#message("AVX: ${EMBREE_LIBRARY_FILES_AVX}")
+#message("AVX2: ${EMBREE_LIBRARY_FILES_AVX2}")
+#message("AVX512: ${EMBREE_LIBRARY_FILES_AVX512}")
 
-    geometry/instance_intersector.cpp
+# replaces all .cpp files with a dummy file that includes that .cpp file
+# this is to work around an ICC name mangling issue related to lambda functions under windows
+MACRO (CreateISADummyFiles list isa)
+  SET(${list})
+  FOREACH(src ${ARGN})
+    SET(src_file "${CMAKE_CURRENT_SOURCE_DIR}/${src}")
+    SET(dst_file "${CMAKE_BINARY_DIR}/${src}.${isa}.cpp")
+    SET(${list} ${${list}} ${dst_file})
+    ADD_CUSTOM_COMMAND(OUTPUT ${dst_file}
+      COMMAND ${CMAKE_COMMAND} 
+       -D src=${src_file}
+       -D dst=${dst_file}
+       -P "${PROJECT_SOURCE_DIR}/common/cmake/create_isa_dummy_file.cmake"
+      DEPENDS ${src_file})
+  ENDFOREACH()
+ENDMACRO()
+#CreateISADummyFiles(EMBREE_LIBRARY_FILES_SSE2      sse2      ${EMBREE_LIBRARY_FILES_SSE2})
+CreateISADummyFiles(EMBREE_LIBRARY_FILES_SSE42     sse42     ${EMBREE_LIBRARY_FILES_SSE42})
+CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX       avx       ${EMBREE_LIBRARY_FILES_AVX})
+CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX2      avx2      ${EMBREE_LIBRARY_FILES_AVX2})
+CreateISADummyFiles(EMBREE_LIBRARY_FILES_AVX512    avx512    ${EMBREE_LIBRARY_FILES_AVX512})
 
-    bvh/bvh_intersector_single.cpp
-    bvh/bvh_intersector_hybrid.cpp
-    bvh/bvh_intersector_stream.cpp
-    bvh/bvh_intersector_stream_filters.cpp)
+MACRO (CheckGlobals library)
+  IF (NOT WIN32 AND NOT APPLE)
+    ADD_CUSTOM_TARGET(${library}_check_globals ALL COMMAND ${CMAKE_COMMAND} -D file=$<TARGET_FILE:${library}> -P "${PROJECT_SOURCE_DIR}/common/cmake/check_globals.cmake" DEPENDS ${library})
+  ENDIF()
+ENDMACRO()
+ 
+DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES})
+ADD_LIBRARY(embree ${EMBREE_LIB_TYPE} ${EMBREE_LIBRARY_FILES})
+
+IF (EMBREE_SYCL_SUPPORT)
+  # add link flag '-fsycl' here to include the kernel for USM prefetch from
+  # scene_sycl.cpp in embree4.dll/embree4.so
+  TARGET_LINK_OPTIONS(embree PRIVATE "-fsycl")
+
+  ADD_LIBRARY(embree_sycl STATIC
+    sycl/rtcore_sycl.cpp
+    sycl/rthwif_embree.cpp)
+
+  SET_TARGET_PROPERTIES(embree_sycl PROPERTIES COMPILE_FLAGS ${CMAKE_CXX_FLAGS_SYCL})
+  IF (EMBREE_SYCL_RT_VALIDATION_API)
+    TARGET_LINK_LIBRARIES(embree_sycl PRIVATE embree_rthwif_sycl)
+  ENDIF()
+
+  IF (EMBREE_SYCL_RT_SIMULATION)
+    TARGET_LINK_LIBRARIES(embree_sycl PRIVATE rtcore)
+  ENDIF()
+
+  INSTALL(TARGETS embree_sycl EXPORT embree_sycl-targets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+  INSTALL(EXPORT embree_sycl-targets DESTINATION ${EMBREE_CMAKEEXPORT_DIR} COMPONENT devel)
+
+  SET_TARGET_PROPERTIES(embree_sycl PROPERTIES OUTPUT_NAME embree${EMBREE_VERSION_MAJOR}_sycl)
+
 ENDIF()
 
-SET(EMBREE_LIBRARY_FILES_AVX2
-
-    geometry/instance_intersector1.cpp
-    geometry/grid_soa.cpp
-    subdiv/subdivpatch1base_eval.cpp
-
-    bvh/bvh_intersector1.cpp)
-
-IF (EMBREE_RAY_PACKETS)
-  SET(EMBREE_LIBRARY_FILES_AVX2 ${EMBREE_LIBRARY_FILES_AVX2}
-    geometry/instance_intersector.cpp
-
-    bvh/bvh_intersector_single.cpp
-    bvh/bvh_intersector_hybrid.cpp
-    bvh/bvh_intersector_stream.cpp
-    bvh/bvh_intersector_stream_filters.cpp)
+SET_TARGET_PROPERTIES(embree PROPERTIES COMPILE_FLAGS "${FLAGS_LOWEST}")
+SET_TARGET_PROPERTIES(embree PROPERTIES COMPILE_DEFINITIONS "EMBREE_LOWEST_ISA")
+IF (NOT WIN32 AND NOT  APPLE)
+  ADD_CUSTOM_TARGET(embree_check_stack_frame_size COMMAND ${CMAKE_COMMAND} -D file=$<TARGET_FILE:embree> -P "${PROJECT_SOURCE_DIR}/common/cmake/check_stack_frame_size.cmake" DEPENDS embree)
 ENDIF()
 
-SET(EMBREE_LIBRARY_FILES_AVX512
+IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+  SET_TARGET_PROPERTIES(embree PROPERTIES FOLDER external/embree/kernels)
+ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
 
-    geometry/instance_intersector1.cpp
-    geometry/grid_soa.cpp    
-    subdiv/subdivpatch1base_eval.cpp
+SET_TARGET_PROPERTIES(embree PROPERTIES
+                ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+SET_TARGET_PROPERTIES(embree PROPERTIES 
+                LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+SET_TARGET_PROPERTIES(embree PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
 
-    bvh/bvh_refit.cpp
-    bvh/bvh_rotate.cpp
-    bvh/bvh_builder_subdiv.avx512knl.cpp
-    bvh/bvh_intersector1.cpp)
 
-IF (EMBREE_RAY_PACKETS)
-  SET(EMBREE_LIBRARY_FILES_AVX512 ${EMBREE_LIBRARY_FILES_AVX512}
+#IF (EMBREE_ISA_SSE2 AND EMBREE_LIBRARY_FILES_SSE2)
+#  ADD_LIBRARY(embree_sse2 STATIC ${EMBREE_LIBRARY_FILES_SSE2})
+#  SET_TARGET_PROPERTIES(embree_sse2 PROPERTIES COMPILE_FLAGS "${FLAGS_SSE2}")
+#  SET_PROPERTY(TARGET embree_sse2 PROPERTY FOLDER kernels)
+#  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_sse2)
+#  CheckGlobals(embree_sse2)
+#IF (EMBREE_STATIC_LIB)
+#    INSTALL(TARGETS embree_sse2 ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT devel)
+#  ENDIF()
+#ENDIF ()
 
-    geometry/instance_intersector.cpp
-
-    bvh/bvh_intersector_single.cpp
-    bvh/bvh_intersector_hybrid.cpp
-    bvh/bvh_intersector_stream.cpp
-    bvh/bvh_intersector_stream_filters.cpp)
-ENDIF()
-
-SET(EMBREE_LIBRARY_FILES_AVX512KNL ${EMBREE_LIBRARY_FILES_AVX512}
-
-    builders/primrefgen.avx512knl.cpp
-    bvh/bvh_builder.avx512knl.cpp
-    bvh/bvh_builder_sah.avx512knl.cpp
-    bvh/bvh_builder_twolevel.avx512knl.cpp
-    bvh/bvh_builder_instancing.avx512knl.cpp
-    bvh/bvh_builder_morton.avx512knl.cpp
-    bvh/bvh_builder_subdiv.avx512knl.cpp)
-
-SET(EMBREE_LIBRARY_FILES_AVX512SKX ${EMBREE_LIBRARY_FILES_AVX512}
-
-    builders/primrefgen.avx512skx.cpp
-    bvh/bvh_builder.avx512skx.cpp
-    bvh/bvh_builder_sah.avx512skx.cpp
-    bvh/bvh_builder_twolevel.avx512skx.cpp
-    bvh/bvh_builder_instancing.avx512skx.cpp
-    bvh/bvh_builder_morton.avx512skx.cpp
-    bvh/bvh_builder_subdiv.avx512skx.cpp)
-
-ADD_ISPC_LIBRARY(embree STATIC ${EMBREE_LIBRARY_FILES})
-SET_PROPERTY(TARGET embree PROPERTY FOLDER kernels)
-
-IF (TARGET_SSE42 AND EMBREE_LIBRARY_FILES_SSE42)
+IF (EMBREE_ISA_SSE42 AND EMBREE_LIBRARY_FILES_SSE42)
+  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_SSE42})
   ADD_LIBRARY(embree_sse42 STATIC ${EMBREE_LIBRARY_FILES_SSE42})
-  SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES COMPILE_FLAGS "${FLAGS_SSE42}")
+  TARGET_LINK_LIBRARIES(embree_sse42 PRIVATE tasking)
+  SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES COMPILE_FLAGS "${FLAGS_SSE42} -mno-avx -mno-avx2")
   SET_PROPERTY(TARGET embree_sse42 PROPERTY FOLDER kernels)
-  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_sse42)
+  LIST(APPEND EMBREE_LIBRARIES_INTERNAL embree_sse42)
+  CheckGlobals(embree_sse42)
+  IF (EMBREE_STATIC_LIB)
+    INSTALL(TARGETS embree_sse42 EXPORT embree_sse42-targets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT devel)
+    INSTALL(EXPORT embree_sse42-targets DESTINATION "${EMBREE_CMAKEEXPORT_DIR}" COMPONENT devel)
+  ENDIF()
+
+  IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+    SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES FOLDER external/embree/kernels)
+  ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+
+  SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES
+                  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES 
+                  LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_sse42 PROPERTIES
+                  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+
 ENDIF ()
 
-IF (TARGET_AVX  AND EMBREE_LIBRARY_FILES_AVX)
+IF (EMBREE_ISA_AVX  AND EMBREE_LIBRARY_FILES_AVX)
+  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX})
   ADD_LIBRARY(embree_avx STATIC ${EMBREE_LIBRARY_FILES_AVX})
-  SET_TARGET_PROPERTIES(embree_avx PROPERTIES COMPILE_FLAGS "${FLAGS_AVX}")
+  TARGET_LINK_LIBRARIES(embree_avx PRIVATE tasking)
+  SET_TARGET_PROPERTIES(embree_avx PROPERTIES COMPILE_FLAGS "${FLAGS_AVX} -mno-avx2")
   SET_PROPERTY(TARGET embree_avx PROPERTY FOLDER kernels)
-  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx)
- ENDIF()
+  LIST(APPEND EMBREE_LIBRARIES_INTERNAL embree_avx)
+  CheckGlobals(embree_avx)
+  IF (EMBREE_STATIC_LIB)
+    INSTALL(TARGETS embree_avx EXPORT embree_avx-targets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT devel)
+    INSTALL(EXPORT embree_avx-targets DESTINATION "${EMBREE_CMAKEEXPORT_DIR}" COMPONENT devel)
+  ENDIF()
 
-IF (TARGET_AVX2 AND EMBREE_LIBRARY_FILES_AVX2)
+  IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+    SET_TARGET_PROPERTIES(embree_avx PROPERTIES FOLDER external/embree/kernels)
+  ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+
+  SET_TARGET_PROPERTIES(embree_avx PROPERTIES
+                  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_avx PROPERTIES 
+                  LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_avx PROPERTIES
+                  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+
+ENDIF()
+
+IF (EMBREE_ISA_AVX2 AND EMBREE_LIBRARY_FILES_AVX2)
+  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX2})
   ADD_LIBRARY(embree_avx2 STATIC ${EMBREE_LIBRARY_FILES_AVX2})
+  TARGET_LINK_LIBRARIES(embree_avx2 PRIVATE tasking)
   SET_TARGET_PROPERTIES(embree_avx2 PROPERTIES COMPILE_FLAGS "${FLAGS_AVX2}")
   SET_PROPERTY(TARGET embree_avx2 PROPERTY FOLDER kernels)
-  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx2)
+  LIST(APPEND EMBREE_LIBRARIES_INTERNAL embree_avx2)
+  CheckGlobals(embree_avx2)
+  IF (EMBREE_STATIC_LIB)
+    INSTALL(TARGETS embree_avx2 EXPORT embree_avx2-targets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT devel)
+    INSTALL(EXPORT embree_avx2-targets DESTINATION "${EMBREE_CMAKEEXPORT_DIR}" COMPONENT devel)
+  ENDIF()
+
+  IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+    SET_TARGET_PROPERTIES(embree_avx2 PROPERTIES FOLDER external/embree/kernels)
+  ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+
+  SET_TARGET_PROPERTIES(embree_avx2 PROPERTIES
+                  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_avx2 PROPERTIES 
+                  LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_avx2 PROPERTIES
+                  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+
 ENDIF()
 
-IF (TARGET_AVX512KNL AND EMBREE_LIBRARY_FILES_AVX512KNL)
-  ADD_LIBRARY(embree_avx512knl STATIC ${EMBREE_LIBRARY_FILES_AVX512KNL})
-  SET_TARGET_PROPERTIES(embree_avx512knl PROPERTIES COMPILE_FLAGS "${FLAGS_AVX512KNL}")
-  SET_PROPERTY(TARGET embree_avx512knl PROPERTY FOLDER kernels)
-  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx512knl)
+IF (EMBREE_ISA_AVX512 AND EMBREE_LIBRARY_FILES_AVX512)
+  DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES_AVX512})
+  ADD_LIBRARY(embree_avx512 STATIC ${EMBREE_LIBRARY_FILES_AVX512})
+  TARGET_LINK_LIBRARIES(embree_avx512 PRIVATE tasking)
+  SET_TARGET_PROPERTIES(embree_avx512 PROPERTIES COMPILE_FLAGS "${FLAGS_AVX512}")
+  SET_PROPERTY(TARGET embree_avx512 PROPERTY FOLDER kernels)
+  LIST(APPEND EMBREE_LIBRARIES_INTERNAL embree_avx512)
+  CheckGlobals(embree_avx512)
+  IF (EMBREE_STATIC_LIB)
+    INSTALL(TARGETS embree_avx512 EXPORT embree_avx512-targets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT devel)
+    INSTALL(EXPORT embree_avx512-targets DESTINATION "${EMBREE_CMAKEEXPORT_DIR}" COMPONENT devel)
+  ENDIF()
+
+  IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+    SET_TARGET_PROPERTIES(embree_avx512 PROPERTIES FOLDER external/embree/kernels)
+  ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+
+  SET_TARGET_PROPERTIES(embree_avx512 PROPERTIES
+                  ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_avx512 PROPERTIES 
+                  LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+  SET_TARGET_PROPERTIES(embree_avx512 PROPERTIES
+                  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR}
+                  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+
 ENDIF()
 
-IF (TARGET_AVX512SKX AND EMBREE_LIBRARY_FILES_AVX512SKX)
-  ADD_LIBRARY(embree_avx512skx STATIC ${EMBREE_LIBRARY_FILES_AVX512SKX})
-  SET_TARGET_PROPERTIES(embree_avx512skx PROPERTIES COMPILE_FLAGS "${FLAGS_AVX512SKX}")
-  SET_PROPERTY(TARGET embree_avx512skx PROPERTY FOLDER kernels)
-  SET(EMBREE_LIBRARIES ${EMBREE_LIBRARIES} embree_avx512skx)
-ENDIF()
+#TARGET_LINK_LIBRARIES(embree PRIVATE ${EMBREE_LIBRARIES_INTERNAL} sys math simd lexers tasking ${CMAKE_LINK_FLAGS_SYCL})
+SET_TARGET_PROPERTIES(embree PROPERTIES OUTPUT_NAME ${EMBREE_LIBRARY_NAME})
+target_include_directories(embree PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+  $<INSTALL_INTERFACE:include>)
 
-TARGET_LINK_LIBRARIES(embree ${EMBREE_LIBRARIES} sys simd lexers)
+
+# libtbb is located in same install folder as libembree
+IF(WIN32)
+ELSEIF(APPLE)
+  SET_TARGET_PROPERTIES(embree PROPERTIES INSTALL_RPATH "@loader_path") # On MacOSX we tell dyld to find libtbb in the folder libembree is placed
+ELSE()
+  SET_TARGET_PROPERTIES(embree PROPERTIES INSTALL_RPATH "$ORIGIN")  # Linux we tell ld to find libtbb in the folder libembree is placed.
+ENDIF()
 
 IF (WIN32)
 ELSEIF (APPLE)
-  SET_TARGET_PROPERTIES(embree PROPERTIES LINK_FLAGS -Wl,-exported_symbols_list,${PROJECT_SOURCE_DIR}/kernels/export.macosx.map)
-  SET_SOURCE_FILES_PROPERTIES(common/rtcore.cpp PROPERTIES OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/kernels/export.macosx.map) 
+  SET_TARGET_PROPERTIES(embree PROPERTIES LINK_FLAGS -Wl,-exported_symbols_list,"${PROJECT_SOURCE_DIR}/kernels/export.macosx.map")
+  SET_SOURCE_FILES_PROPERTIES(common/rtcore.cpp PROPERTIES OBJECT_DEPENDS "${PROJECT_SOURCE_DIR}/kernels/export.macosx.map") 
 ELSE()
-  SET_TARGET_PROPERTIES(embree PROPERTIES LINK_FLAGS -Wl,--version-script=${PROJECT_SOURCE_DIR}/kernels/export.linux.map)
-  SET_SOURCE_FILES_PROPERTIES(common/rtcore.cpp PROPERTIES OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/kernels/export.linux.map)
+  SET_TARGET_PROPERTIES(embree PROPERTIES LINK_FLAGS -Wl,--version-script="${PROJECT_SOURCE_DIR}/kernels/export.linux.map")
+  SET_SOURCE_FILES_PROPERTIES(common/rtcore.cpp PROPERTIES OBJECT_DEPENDS "${PROJECT_SOURCE_DIR}/kernels/export.linux.map")
 ENDIF()
 
 IF (EMBREE_ZIP_MODE)
@@ -277,6 +451,5 @@ ELSE()
   SET_TARGET_PROPERTIES(embree PROPERTIES VERSION ${EMBREE_VERSION} SOVERSION ${EMBREE_VERSION_MAJOR})
 ENDIF()
 
-IF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
-  SET_TARGET_PROPERTIES(embree  PROPERTIES FOLDER external)
-ENDIF(FLYWAVE_ENABLE_SOLUTION_FOLDERS)
+# Export EMBREE_LIBRARIES to parent scope so it can be used by parent CMakeLists.txt
+SET(EMBREE_LIBRARIES "embree" ${EMBREE_LIBRARIES_INTERNAL} "sys" "math" "simd" "lexers" "tasking" CACHE STRING "Embree libraries" FORCE)

@@ -95,7 +95,7 @@ INCLUDE_DIRECTORIES(
     "${CMAKE_CURRENT_BINARY_DIR}/../libjpeg/"
     "${CMAKE_CURRENT_SOURCE_DIR}/../embree/include/"
     "${CMAKE_CURRENT_BINARY_DIR}/../embree/include/"
-    "${CMAKE_CURRENT_BINARY_DIR}/../embree/include/embree3/"
+    "${CMAKE_CURRENT_BINARY_DIR}/../embree/include/embree4/"
 )
 
 add_definitions(-DOPENEXR_AVAILABLE)

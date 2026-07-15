@@ -1,28 +1,19 @@
-// ======================================================================== //
-// Copyright 2009-2016 Intel Corporation                                    //
-//                                                                          //
-// Licensed under the Apache License, Version 2.0 (the "License");          //
-// you may not use this file except in compliance with the License.         //
-// You may obtain a copy of the License at                                  //
-//                                                                          //
-//     http://www.apache.org/licenses/LICENSE-2.0                           //
-//                                                                          //
-// Unless required by applicable law or agreed to in writing, software      //
-// distributed under the License is distributed on an "AS IS" BASIS,        //
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. //
-// See the License for the specific language governing permissions and      //
-// limitations under the License.                                           //
-// ======================================================================== //
+// Copyright 2009-2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
 
 #include "taskschedulerinternal.h"
-#include "../math/math.h"
+#include "../math/emath.h"
 #include "../sys/sysinfo.h"
 #include <algorithm>
 
 namespace embree
 {
+  RTC_NAMESPACE_BEGIN
+  
+  static MutexSys g_mutex;
   size_t TaskScheduler::g_numThreads = 0;
   __thread TaskScheduler* TaskScheduler::g_instance = nullptr;
+  std::vector<Ref<TaskScheduler>> g_instance_vector;
   __thread TaskScheduler::Thread* TaskScheduler::thread_local_thread = nullptr;
   TaskScheduler::ThreadPool* TaskScheduler::threadPool = nullptr;
 
@@ -50,95 +41,106 @@ namespace embree
   }
 
   /*! run this task */
-  __dllexport void TaskScheduler::Task::run (Thread& thread) // FIXME: avoid as many __dllexports as possible
+  void TaskScheduler::Task::run_internal (Thread& thread) // FIXME: avoid as many dll_exports as possible
   {
     /* try to run if not already stolen */
     if (try_switch_state(INITIALIZED,DONE))
     {
-      Task* prevTask = thread.task; 
+      Task* prevTask = thread.task;
       thread.task = this;
       try {
-        if (thread.scheduler->cancellingException == nullptr)
+        if (context->cancellingException == nullptr)
           closure->execute();
       } catch (...) {
-        if (thread.scheduler->cancellingException == nullptr)
-          thread.scheduler->cancellingException = std::current_exception();
+        if (context->cancellingException == nullptr)
+          context->cancellingException = std::current_exception();
       }
       thread.task = prevTask;
       add_dependencies(-1);
     }
-    
+
     /* steal until all dependencies have completed */
     steal_loop(thread,
                [&] () { return dependencies>0; },
-               [&] () { while (thread.tasks.execute_local(thread,this)); });
+               [&] () { while (thread.tasks.execute_local_internal(thread,this)); });
 
     /* now signal our parent task that we are finished */
-    if (parent) 
+    if (parent)
       parent->add_dependencies(-1);
   }
 
-  __dllexport bool TaskScheduler::TaskQueue::execute_local(Thread& thread, Task* parent)
+    /*! run this task */
+  dll_export void TaskScheduler::Task::run (Thread& thread) {
+    run_internal(thread);
+  }
+
+  bool TaskScheduler::TaskQueue::execute_local_internal(Thread& thread, Task* parent)
   {
     /* stop if we run out of local tasks or reach the waiting task */
     if (right == 0 || &tasks[right-1] == parent)
       return false;
-    
+
     /* execute task */
     size_t oldRight = right;
-    tasks[right-1].run(thread);
+    tasks[right-1].run_internal(thread);
     if (right != oldRight) {
       THROW_RUNTIME_ERROR("you have to wait for spawned subtasks");
     }
-    
+
     /* pop task and closure from stack */
     right--;
     if (tasks[right].stackPtr != size_t(-1))
       stackPtr = tasks[right].stackPtr;
-    
+
     /* also move left pointer */
     if (left >= right) left.store(right.load());
-    
+
     return right != 0;
   }
-  
-  bool TaskScheduler::TaskQueue::steal(Thread& thread) 
+
+  dll_export bool TaskScheduler::TaskQueue::execute_local(Thread& thread, Task* parent) {
+    return execute_local_internal(thread,parent);
+  }
+
+  bool TaskScheduler::TaskQueue::steal(Thread& thread)
   {
     size_t l = left;
-    if (l < right) 
+    size_t r = right;
+    if (l < r)
+    {
       l = left++;
-    else 
+       if (l >= r)
+         return false;
+    }
+    else
       return false;
-    
+
     if (!tasks[l].try_steal(thread.tasks.tasks[thread.tasks.right]))
       return false;
-    
+
     thread.tasks.right++;
     return true;
   }
-  
+
   /* we steal from the left */
-  size_t TaskScheduler::TaskQueue::getTaskSizeAtLeft() 
-  {	
+  size_t TaskScheduler::TaskQueue::getTaskSizeAtLeft()
+  {
     if (left >= right) return 0;
     return tasks[left].N;
   }
-
-  static MutexSys g_mutex;
-  static BarrierSys g_barrier(2);
 
   void threadPoolFunction(std::pair<TaskScheduler::ThreadPool*,size_t>* pair)
   {
     TaskScheduler::ThreadPool* pool = pair->first;
     size_t threadIndex = pair->second;
-    g_barrier.wait();
+    delete pair;
     pool->thread_loop(threadIndex);
   }
 
   TaskScheduler::ThreadPool::ThreadPool(bool set_affinity)
     : numThreads(0), numThreadsRunning(0), set_affinity(set_affinity), running(false) {}
 
-  __dllexport void TaskScheduler::ThreadPool::startThreads()
+  dll_export void TaskScheduler::ThreadPool::startThreads()
   {
     if (running) return;
     setNumThreads(numThreads,true);
@@ -147,9 +149,9 @@ namespace embree
   void TaskScheduler::ThreadPool::setNumThreads(size_t newNumThreads, bool startThreads)
   {
     Lock<MutexSys> lock(g_mutex);
-    
-    if (newNumThreads == 0)
-      newNumThreads = getNumberOfLogicalThreads();
+    assert(newNumThreads);
+    if (newNumThreads == std::numeric_limits<size_t>::max())
+      newNumThreads = (size_t) getNumberOfLogicalThreads();
 
     numThreads = newNumThreads;
     if (!startThreads && !running) return;
@@ -162,12 +164,11 @@ namespace embree
     condition.notify_all();
 
     /* start new threads */
-    for (size_t t=numThreadsActive; t<numThreads; t++) 
+    for (size_t t=numThreadsActive; t<numThreads; t++)
     {
       if (t == 0) continue;
-      auto pair = std::make_pair(this,t);
-      threads.push_back(createThread((thread_func)threadPoolFunction,&pair,4*1024*1024,set_affinity ? t : -1));
-      g_barrier.wait();
+      auto pair = new std::pair<TaskScheduler::ThreadPool*,size_t>(this,t);
+      threads.push_back(createThread((thread_func)threadPoolFunction,pair,4*1024*1024,set_affinity ? t : -1));
     }
 
     /* stop some threads if we reduce the number of threads */
@@ -187,11 +188,11 @@ namespace embree
     condition.notify_all();
 
     /* wait for threads to terminate */
-    for (size_t i=0; i<threads.size(); i++) 
+    for (size_t i=0; i<threads.size(); i++)
       embree::join(threads[i]);
   }
 
-  __dllexport void TaskScheduler::ThreadPool::add(const Ref<TaskScheduler>& scheduler)
+  dll_export void TaskScheduler::ThreadPool::add(const Ref<TaskScheduler>& scheduler)
   {
     mutex.lock();
     schedulers.push_back(scheduler);
@@ -199,7 +200,7 @@ namespace embree
     condition.notify_all();
   }
 
-  __dllexport void TaskScheduler::ThreadPool::remove(const Ref<TaskScheduler>& scheduler)
+  dll_export void TaskScheduler::ThreadPool::remove(const Ref<TaskScheduler>& scheduler)
   {
     Lock<MutexSys> lock(mutex);
     for (std::list<Ref<TaskScheduler> >::iterator it = schedulers.begin(); it != schedulers.end(); it++) {
@@ -226,51 +227,60 @@ namespace embree
       scheduler->thread_loop(threadIndex);
     }
   }
-  
+
   TaskScheduler::TaskScheduler()
-    : threadCounter(0), anyTasksRunning(0), hasRootTask(false) 
+    : threadCounter(0), anyTasksRunning(0), hasRootTask(false)
   {
-    threadLocal.resize(2*getNumberOfLogicalThreads()); // FIXME: this has to be 2x as in the join mode the worker threads also join
+    assert(threadPool);
+    threadLocal.resize(2 * TaskScheduler::threadCount()); // FIXME: this has to be 2x as in the compatibility join mode with rtcCommitScene the worker threads also join. When disallowing rtcCommitScene to join a build we can remove the 2x.
     for (size_t i=0; i<threadLocal.size(); i++)
       threadLocal[i].store(nullptr);
   }
-  
-  TaskScheduler::~TaskScheduler() 
+
+  TaskScheduler::~TaskScheduler()
   {
     assert(threadCounter == 0);
   }
 
-  __dllexport size_t TaskScheduler::threadIndex() 
+  dll_export size_t TaskScheduler::threadID()
   {
     Thread* thread = TaskScheduler::thread();
     if (thread) return thread->threadIndex;
     else        return 0;
   }
 
-  __dllexport size_t TaskScheduler::threadCount() {
+  dll_export size_t TaskScheduler::threadIndex()
+  {
+    Thread* thread = TaskScheduler::thread();
+    if (thread) return thread->threadIndex;
+    else        return 0;
+  }
+
+  dll_export size_t TaskScheduler::threadCount() {
     return threadPool->size();
   }
 
-  __dllexport TaskScheduler* TaskScheduler::instance() 
+  dll_export TaskScheduler* TaskScheduler::instance()
   {
     if (g_instance == NULL) {
+      Lock<MutexSys> lock(g_mutex);
       g_instance = new TaskScheduler;
-      g_instance->refInc();
+      g_instance_vector.push_back(g_instance);
     }
     return g_instance;
   }
 
-  void TaskScheduler::create(size_t numThreads, bool set_affinity)
+  void TaskScheduler::create(size_t numThreads, bool set_affinity, bool start_threads)
   {
     if (!threadPool) threadPool = new TaskScheduler::ThreadPool(set_affinity);
-    threadPool->setNumThreads(numThreads,false);
+    threadPool->setNumThreads(numThreads,start_threads);
   }
 
   void TaskScheduler::destroy() {
     delete threadPool; threadPool = nullptr;
   }
 
-  __dllexport ssize_t TaskScheduler::allocThreadIndex()
+  dll_export ssize_t TaskScheduler::allocThreadIndex()
   {
     size_t threadIndex = threadCounter++;
     assert(threadIndex < threadLocal.size());
@@ -283,8 +293,7 @@ namespace embree
     size_t threadIndex = allocThreadIndex();
     condition.wait(mutex, [&] () { return hasRootTask.load(); });
     mutex.unlock();
-    std::exception_ptr except = thread_loop(threadIndex);
-    if (except != nullptr) std::rethrow_exception(except);
+    thread_loop(threadIndex);
   }
 
   void TaskScheduler::reset() {
@@ -294,29 +303,29 @@ namespace embree
   void TaskScheduler::wait_for_threads(size_t threadCount)
   {
     while (threadCounter < threadCount-1)
-      __pause_cpu();
+      pause_cpu();
   }
 
-  __dllexport TaskScheduler::Thread* TaskScheduler::thread() {
+  dll_export TaskScheduler::Thread* TaskScheduler::thread() {
     return thread_local_thread;
   }
 
-  __dllexport TaskScheduler::Thread* TaskScheduler::swapThread(Thread* thread) 
+  dll_export TaskScheduler::Thread* TaskScheduler::swapThread(Thread* thread)
   {
     Thread* old = thread_local_thread;
     thread_local_thread = thread;
     return old;
   }
 
-  __dllexport bool TaskScheduler::wait() 
+  dll_export void TaskScheduler::wait()
   {
     Thread* thread = TaskScheduler::thread();
-    if (thread == nullptr) return true;
-    while (thread->tasks.execute_local(*thread,thread->task)) {};
-    return thread->scheduler->cancellingException == nullptr;
+    if (thread == nullptr)
+      return;
+    while (thread->tasks.execute_local_internal(*thread,thread->task)) {};
   }
 
-  std::exception_ptr TaskScheduler::thread_loop(size_t threadIndex)
+  void TaskScheduler::thread_loop(size_t threadIndex)
   {
     /* allocate thread structure */
     std::unique_ptr<Thread> mthread(new Thread(threadIndex,this)); // too large for stack allocation
@@ -329,37 +338,32 @@ namespace embree
     {
       steal_loop(thread,
                  [&] () { return anyTasksRunning > 0; },
-                 [&] () { 
+                 [&] () {
                    anyTasksRunning++;
-                   while (thread.tasks.execute_local(thread,nullptr));
+                   while (thread.tasks.execute_local_internal(thread,nullptr));
                    anyTasksRunning--;
                  });
     }
     threadLocal[threadIndex].store(nullptr);
     swapThread(oldThread);
 
-    /* remember exception to throw */
-    std::exception_ptr except = nullptr;
-    if (cancellingException != nullptr) except = cancellingException;
-
     /* wait for all threads to terminate */
     threadCounter--;
 #if defined(__WIN32__)
 	size_t loopIndex = 1;
 #endif
-#define LOOP_YIELD_THRESHOLD 4096
+#define LOOP_YIELD_THRESHOLD (4096)
 	while (threadCounter > 0) {
 #if defined(__WIN32__)
           if ((loopIndex % LOOP_YIELD_THRESHOLD) == 0)
             yield();
           else
-            _mm_pause(); 
+            _mm_pause();
 	  loopIndex++;
 #else
           yield();
-#endif		
+#endif
 	}
-    return except;
   }
 
   bool TaskScheduler::steal_from_other_threads(Thread& thread)
@@ -367,9 +371,9 @@ namespace embree
     const size_t threadIndex = thread.threadIndex;
     const size_t threadCount = this->threadCounter;
 
-    for (size_t i=1; i<threadCount; i++) 
+    for (size_t i=1; i<threadCount; i++)
     {
-      __pause_cpu(32);
+      pause_cpu(32);
       size_t otherThreadIndex = threadIndex+i;
       if (otherThreadIndex >= threadCount) otherThreadIndex -= threadCount;
 
@@ -377,22 +381,24 @@ namespace embree
       if (!othread)
         continue;
 
-      if (othread->tasks.steal(thread)) 
-        return true;      
+      if (othread->tasks.steal(thread))
+        return true;
     }
 
     return false;
   }
 
-  __dllexport void TaskScheduler::startThreads() {
+  dll_export void TaskScheduler::startThreads() {
     threadPool->startThreads();
   }
 
-  __dllexport void TaskScheduler::addScheduler(const Ref<TaskScheduler>& scheduler) {
+  dll_export void TaskScheduler::addScheduler(const Ref<TaskScheduler>& scheduler) {
     threadPool->add(scheduler);
   }
 
-  __dllexport void TaskScheduler::removeScheduler(const Ref<TaskScheduler>& scheduler) {
+  dll_export void TaskScheduler::removeScheduler(const Ref<TaskScheduler>& scheduler) {
     threadPool->remove(scheduler);
   }
+
+  RTC_NAMESPACE_END
 }

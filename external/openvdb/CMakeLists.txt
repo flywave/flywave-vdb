@@ -332,6 +332,9 @@ INCLUDE_DIRECTORIES(
     "${CMAKE_CURRENT_BINARY_DIR}/openvdb/openvdb"
     "${CMAKE_CURRENT_SOURCE_DIR}/../tbb/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/src/lib/"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../imath/src"
+    "${CMAKE_CURRENT_BINARY_DIR}/../imath"
     "${CMAKE_CURRENT_SOURCE_DIR}/../c-blosc/blosc/"
     "${CMAKE_CURRENT_SOURCE_DIR}/../libboost/boost_1_67_0/"
 )

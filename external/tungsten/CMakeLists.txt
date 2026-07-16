@@ -78,6 +78,7 @@ include_directories(src/core src/thirdparty src)
 INCLUDE_DIRECTORIES(
     "${CMAKE_CURRENT_SOURCE_DIR}/../openvdb/"
     "${CMAKE_CURRENT_BINARY_DIR}/../openvdb/openvdb/"
+    "${CMAKE_CURRENT_BINARY_DIR}/../openvdb/openvdb/openvdb/"
     "${CMAKE_CURRENT_SOURCE_DIR}/../tbb/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/src/lib/"
     "${CMAKE_CURRENT_SOURCE_DIR}/../openexr/src/lib/OpenEXR"

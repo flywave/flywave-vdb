@@ -64,7 +64,6 @@ set (libOpenImageIO_srcs
                           imageinput.cpp imageio.cpp imageioplugin.cpp
                           imageoutput.cpp
                           iptc.cpp xmp.cpp
-                          color_ocio.cpp
                           maketexture.cpp
                           bluenoise.cpp
                           printinfo.cpp
@@ -77,6 +76,10 @@ set (libOpenImageIO_srcs
                           ${libOpenImageIO_srcs}
                           ${libOpenImageIO_hdrs}
                          )
+
+if (OpenColorIO_FOUND)
+    list (APPEND libOpenImageIO_srcs color_ocio.cpp)
+endif ()
 
 add_library (OpenImageIO STATIC ${libOpenImageIO_srcs})
 

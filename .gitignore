@@ -13,3 +13,4 @@ debug/
 /lib/
 xcode_build/
 .vscode/
+/temp

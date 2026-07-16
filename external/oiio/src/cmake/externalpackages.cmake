@@ -136,14 +136,13 @@ checked_find_package (Freetype
                       VERSION_MIN 2.10.0
                       DEFINITIONS USE_FREETYPE=1 )
 
-checked_find_package (OpenColorIO REQUIRED
+checked_find_package (OpenColorIO
                       VERSION_MIN 2.2
                       VERSION_MAX 2.9
                      )
-if (NOT OPENCOLORIO_INCLUDES)
-    get_target_property(OPENCOLORIO_INCLUDES OpenColorIO::OpenColorIO INTERFACE_INCLUDE_DIRECTORIES)
+if (OPENCOLORIO_INCLUDES)
+    include_directories(BEFORE ${OPENCOLORIO_INCLUDES})
 endif ()
-include_directories(BEFORE ${OPENCOLORIO_INCLUDES})
 
 checked_find_package (OpenCV 4.0
                       DEFINITIONS USE_OPENCV=1)

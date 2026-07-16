@@ -9,6 +9,7 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
+#include <atomic>
 #include <fstream>
 
 #include <openvdb/io/Compression.h>
@@ -88,7 +89,7 @@ bool sample_volume(const openvdb::Coord &extents, SamplingFunc sampling_func,
   typedef tbb::enumerable_thread_specific<float_range> PerThreadRange;
   PerThreadRange ranges;
   const openvdb::Vec3i stride = {1, extents.x(), extents.x() * extents.y()};
-  tbb::atomic<bool> cancelled;
+  std::atomic<bool> cancelled;
   cancelled = false;
   tbb::parallel_for(domain, [&sampling_func, &stride, &ranges, out_samples,
                              &cancelled](const openvdb::CoordBBox &bbox) {

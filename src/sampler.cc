@@ -13,7 +13,6 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/partitioner.h>
 #include <tbb/task_group.h>
-#include <tbb/task_scheduler_init.h>
 
 namespace flywave {
 

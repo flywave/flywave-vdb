@@ -1,35 +1,39 @@
-### Intel(R) Threading Building Blocks
+# oneAPI Threading Building Blocks
+[![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE.txt)
 
-[![Stable release](https://img.shields.io/badge/version-2020.2-green.svg)](https://github.com/01org/tbb/releases/tag/v2020.2)
-[![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
-[![Build Status](https://travis-ci.org/wjakob/tbb.svg?branch=master)](https://travis-ci.org/wjakob/tbb)
-[![Build status](https://ci.appveyor.com/api/projects/status/fvepmk5nxekq27r8?svg=true)](https://ci.appveyor.com/project/wjakob/tbb/branch/master)
+oneAPI Threading Building Blocks (oneTBB) lets you easily write parallel C++ programs that take
+full advantage of multicore performance, that are portable, composable and have future-proof scalability.
 
-This is git repository is currently based on TBB 2020.2 and will be
-updated from time to time to track the most recent release. The only
-modification is the addition of a CMake-based build system.
+## Release Information
+Here are [Release Notes]( https://software.intel.com/en-us/articles/intel-oneapi-threading-building-blocks-release-notes) and
+[System Requirements](https://software.intel.com/en-us/articles/intel-oneapi-threading-building-blocks-system-requirements).
 
-This is convenient for other projects that use CMake and TBB because TBB can be
-easily incorporated into their build process using git submodules and a simple
-``add_subdirectory`` command.
+## Documentation
+* [oneTBB documentation](https://software.intel.com/en-us/oneapi-tbb-documentation)
+* README for build system: [cmake/README.md](cmake/README.md)
 
-Currently, the CMake-based build can create shared and static versions of
-`libtbb`, `libtbbmalloc` and `libtbbmalloc_proxy` for the Intel `i386` and
-`x86_64` architectures on Windows (Visual Studio, MinGW), MacOS (Clang) and
-Linux (GCC & Clang). The `armv7` and `armv8` architectures are supported on
-Linux (GCC & Clang). Other combinations may work but have not been tested.
+## Support
+Please report issues and suggestions via
+[GitHub issues](https://github.com/oneapi-src/oneTBB/issues) or start a topic on the
+[TBB forum](http://software.intel.com/en-us/forums/intel-threading-building-blocks/).
 
-See index.html for general directions and documentation regarding TBB.
+## How to Contribute
+To contribute to oneTBB, please open a GitHub pull request (preferred) or send us a patch by e-mail.
+oneAPI Threading Building Blocks is licensed under [Apache License, Version 2.0](LICENSE.txt).
+By its terms, contributions submitted to the project are also done under that license.
 
-See examples/index.html for runnable examples and directions.
+## Engineering team contacts
+* [E-mail us.](mailto:inteltbbdevelopers@intel.com)
 
-See http://threadingbuildingblocks.org for full documentation
-and software information.
+------------------------------------------------------------------------
+Intel and the Intel logo are trademarks of Intel Corporation or its subsidiaries in the U.S. and/or other countries.
 
-Note: Intel, Thread Building Blocks, and TBB are either registered trademarks or
-trademarks of Intel Corporation in the United States and/or other countries.
+\* Other names and brands may be claimed as the property of others.
 
-The CMake build contains the following additional/changed files that are not
-part of the regular release: ``build/mingw_cross_toolchain.cmake``,
-``build/version_string.ver.in``, ``.gitignore`` (modified), ``README.md`` (this
-file), and ``Makefile.old`` (renamed from ``Makefile``).
+## 编译安装
+
+```
+cmake -DCMAKE_CXX_FLAGS="-Wno-deprecated-copy" ..
+make -j
+```
+

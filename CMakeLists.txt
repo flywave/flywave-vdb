@@ -119,11 +119,11 @@ IF(UNIX)
 IF(NOT BOOST_INCLUDE)
   ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/external/libboost")
 
-  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/libboost/boost_1_67_0")
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/libboost/boost_1_88_0/boost_unified")
 
-  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/libboost/")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/libboost/lib/")
 
-  LIST(APPEND FLYWAVE_LIBRARY_DEPES "boost_regex_internal" "boost_program_options_internal" "boost_date_time_internal" "boost_filesystem_internal" "boost_system_internal" "boost_thread_internal" "boost_iostreams_internal" "boost_serialization_internal" "boost_timer_internal" "boost_log_internal")
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "boost_iostreams" "boost_filesystem" "boost_thread" "boost_serialization" "boost_chrono" "boost_date_time" "boost_timer" "boost_program_options" "boost_atomic" "boost_container" "boost_random")
 
   SET(BOOST_INCLUDE YES)
 ENDIF()
@@ -278,6 +278,19 @@ IF(NOT JASPER_INCLUDE)
   SET(JASPER_INCLUDE YES)
 ENDIF()
 
+# openjph (required by openexr 3 HT codec)
+IF(NOT OPENJPH_INCLUDE)
+  ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/external/openjph/")
+
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openjph/include/")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openjph/src/core/")
+
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "openjph")
+  SET(EXR_OPENJPH_LIB openjph)
+
+  SET(OPENJPH_INCLUDE YES)
+ENDIF()
+
 # openexr
 IF(NOT OPENEXR_INCLUDE)
   ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/external/openexr/")
@@ -304,7 +317,7 @@ IF(NOT IMATH_INCLUDE)
   LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/imath/src")
   LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/imath")
 
-  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/imath/src/Imath")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/imath/src/Imath/")
 
   LIST(APPEND FLYWAVE_LIBRARY_DEPES "Imath")
 
@@ -419,12 +432,15 @@ ENDIF()
 
 # tbb
 IF(NOT TBB_INCLUDE)
+  SET(TBB_STRICT OFF CACHE BOOL "Treat compiler warnings as errors" FORCE)
+  SET(TBB_TEST OFF CACHE BOOL "Enable testing" FORCE)
+  SET(BUILD_TESTING OFF CACHE BOOL "Build tests" FORCE)
   ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/external/tbb/")
 
   LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/tbb/include/")
-  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/tbb/")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/tbb/lib/")
 
-  LIST(APPEND FLYWAVE_LIBRARY_DEPES "tbb" "tbbmalloc" "tbbmalloc_proxy")
+  LIST(APPEND FLYWAVE_LIBRARY_DEPES "tbb")
 
   SET(TBB_INCLUDE YES)
 ENDIF()
@@ -433,11 +449,10 @@ ENDIF()
 IF(NOT VDB_INCLUDE)
   ADD_SUBDIRECTORY("${CMAKE_CURRENT_SOURCE_DIR}/external/openvdb/")
 
-  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/openvdb/openvdb/")
+  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/external/openvdb/")
   LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/openvdb/")
-  LIST(APPEND FLYWAVE_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/openvdb/openvdb/")
 
-  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/openvdb/openvdb/")
+  LIST(APPEND FLYWAVE_LIBRARY_DIRS "${CMAKE_CURRENT_BINARY_DIR}/external/openvdb/openvdb/")
 
   LIST(APPEND FLYWAVE_LIBRARY_DEPES "openvdb")
 

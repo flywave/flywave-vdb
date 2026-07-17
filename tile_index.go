@@ -287,19 +287,15 @@ func magnifyQuadAddr(inRow uint32, inCol uint32, inQuad uint32) (outRow uint32, 
 	case 0:
 		outRow = inRow * 2
 		outCol = inCol * 2
-		break
 	case 1:
 		outRow = inRow * 2
 		outCol = (inCol * 2) + 1
-		break
 	case 2:
 		outRow = (inRow * 2) + 1
 		outCol = inCol * 2
-		break
 	case 3:
 		outRow = (inRow * 2) + 1
 		outCol = (inCol * 2) + 1
-		break
 	}
 	return
 }

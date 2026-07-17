@@ -38,12 +38,14 @@ func TestTransferFunctionClamp(t *testing.T) {
 	tf := NewTransferFunction()
 	defer tf.Free()
 	tf.AddPoint(0.2, 1, 0, 0, 1)
+	tf.AddPoint(0.8, 0, 0, 1, 1)
+	tf.Build()
 	r, g, b, a := tf.Map(0.0)
 	if r != 1 || a != 1 {
 		t.Errorf("below min should clamp: got (%f,%f,%f,%f)", r, g, b, a)
 	}
 	r, g, b, a = tf.Map(1.0)
-	if r != 1 || a != 1 {
+	if b != 1 || a != 1 {
 		t.Errorf("above max should clamp: got (%f,%f,%f,%f)", r, g, b, a)
 	}
 }

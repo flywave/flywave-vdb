@@ -107,6 +107,68 @@ func TestFloatGridLifecycle(t *testing.T) {
 	g.Free()
 }
 
+func TestFloatGridTransform(t *testing.T) {
+	points := []float64{0, 0, 0}
+	radius := []float64{1.0}
+	g := NewFloatGridFromPoints(points, radius, 0.1, 2)
+	defer g.Free()
+	tr := g.GetTransform()
+	if tr == nil {
+		t.Fatal("GetTransform returned nil")
+	}
+	defer tr.Free()
+	if !tr.IsLinear() {
+		t.Errorf("expected linear transform")
+	}
+	vs := tr.VoxelSize(nil)
+	if vs[0] <= 0 || vs[1] <= 0 || vs[2] <= 0 {
+		t.Errorf("voxel size should be positive: %v", vs)
+	}
+}
+
+func TestFloatGridBackgroundAndMask(t *testing.T) {
+	points := []float64{0, 0, 0}
+	radius := []float64{1.0}
+	g := NewFloatGridFromPoints(points, radius, 0.1, 2)
+	defer g.Free()
+	bg := g.GetBackground()
+	if bg == 0 {
+		t.Errorf("background should be non-zero for level set")
+	}
+	if !g.IsSaveFloatAsHalf() || !g.IsSaveFloatAsHalf() {
+		// toggle is safe
+		g.SetSaveFloatAsHalf(!g.IsSaveFloatAsHalf())
+	}
+}
+
+func TestFloatGridBoundingBox(t *testing.T) {
+	points := []float64{0, 0, 0}
+	radius := []float64{1.0}
+	g := NewFloatGridFromPoints(points, radius, 0.1, 2)
+	defer g.Free()
+	box := g.GetActiveVoxelBoundingBox()
+	if box == nil {
+		t.Errorf("bounding box should not be nil for populated grid")
+	}
+	dim := g.GetActiveVoxelDim()
+	if dim[0] <= 0 || dim[1] <= 0 || dim[2] <= 0 {
+		t.Errorf("active dim should be positive: %v", dim)
+	}
+}
+
+func TestFloatGridPrune(t *testing.T) {
+	points := []float64{0, 0, 0}
+	radius := []float64{1.0}
+	g := NewFloatGridFromPoints(points, radius, 0.1, 2)
+	defer g.Free()
+	before := g.GetActiveVoxelCount()
+	g.Prune(0.01)
+	after := g.GetActiveVoxelCount()
+	if after > before {
+		t.Errorf("prune should not increase active voxel count: before %d after %d", before, after)
+	}
+}
+
 func TestFloatGridFromPoints(t *testing.T) {
 	points := []float64{0, 0, 0}
 	radius := []float64{1.0}

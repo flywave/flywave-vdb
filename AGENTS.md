@@ -49,7 +49,7 @@ the `.go` files.
 
 ## Toolchain notes
 
-- `go.mod` declares `go 1.12`. C++ requires C++17 (`-std=c++17`).
+- `go.mod` declares `go 1.21`. C++ requires C++17 (`-std=c++17`).
 - Unix builds use `-fPIC` and `-march=native`.
 - Output is static libraries only (`*.a`); the install step matches
   `PATTERN "*.a"` and copies public headers `*.h` (not `.hh`).

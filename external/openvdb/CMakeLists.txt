@@ -8,9 +8,9 @@ set(OPENVDB_ABI_VERSION_NUMBER 13 CACHE STRING "OpenVDB ABI version" FORCE)
 
 # Provide find_package config dirs for the vendored dependencies that
 # openvdb 13's internal CMakeLists expects (Imath, TBB, Blosc, Boost).
-set(Imath_DIR "${CMAKE_BINARY_DIR}/external/imath")
-set(Blosc_DIR "${CMAKE_BINARY_DIR}/external/c-blosc/blosc")
-set(TBB_DIR "${CMAKE_BINARY_DIR}/external/tbb-config-override")
+set(Imath_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set(Blosc_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set(TBB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(Boost_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libboost/boost_1_88_0/boost_unified")
 set(Boost_NO_BOOST_CMAKE ON)
 

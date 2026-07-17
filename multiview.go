@@ -1,7 +1,7 @@
 package vdb
 
 // #include <stdlib.h>
-// #include "gaussplat_api.h"
+// #include "multiview_api.h"
 // #cgo CFLAGS: -I ./lib
 // #cgo CXXFLAGS: -I ./lib
 import "C"

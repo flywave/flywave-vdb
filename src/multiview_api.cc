@@ -1,4 +1,4 @@
-#include "gaussplat_api.h"
+#include "multiview_api.h"
 #include "float_grid.hh"
 #include "grid_api_impl.hh"
 #include "trees.hh"
